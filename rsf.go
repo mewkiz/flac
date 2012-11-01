@@ -13,7 +13,7 @@ Links:
 	http://mi.eng.cam.ac.uk/reports/svr-ftp/auto-pdf/robinson_tr156.pdf
 */
 
-//Package rsf (Royal Straight fLaC) is used to extract information from flac files.
+// Package rsf (Royal Straight fLaC) implements access to FLAC files.
 package rsf
 
 import "bytes"
@@ -26,27 +26,26 @@ import "os"
 import "github.com/mewkiz/rsf/frame"
 import "github.com/mewkiz/rsf/meta"
 
-const (
-	//The first four bytes of all flac files
-	FlacSignature = "fLaC"
+// FlacSignature is present at the beginning of each FLAC file.
+const FlacSignature = "fLaC"
 
-	//Formatted error strings
+// Formatted error strings.
+const (
 	ErrSignatureMismatch         = "invalid flac signature: %s, should be " + FlacSignature
 	ErrStreamInfoIsNotFirstBlock = "invalid first block; the first block must be stream info"
 )
 
-//The basic structure of a FLAC stream is:
-// - The four byte string `fLaC`
-// - The STREAMINFO metadata block
-// - Zero or more other metadata blocks
-// - One or more audio frames
+// A Stream is a FLAC bitstream, which has the following basic structure:
+//    - A "fLaC" marker at the beginning of the stream.
+//    - A STREAMINFO metadata block.
+//    - Zero or more other metadata blocks.
+//    - One or more audio frames.
 type Stream struct {
-	HasSignature bool
-	Metadata     []interface{}
+	Metadata []interface{}
 	// Frame    []frame.Frame
 }
 
-//Extracts the flac stream from a file
+// Open opens the provided file and returns the parsed FLAC bitstream.
 func Open(filePath string) (s *Stream, err error) {
 	f, err := os.Open(filePath)
 	if err != nil {
@@ -62,7 +61,8 @@ func Open(filePath string) (s *Stream, err error) {
 	return s, nil
 }
 
-//Extract the flac stream from a io.Reader
+// NewStream reads from the provided io.Reader and returns the parsed FLAC
+// bitstream.
 func NewStream(r io.Reader) (s *Stream, err error) {
 	s = new(Stream)
 
@@ -86,7 +86,7 @@ func NewStream(r io.Reader) (s *Stream, err error) {
 ///	It has at least one audio frame
 ///	All audio frames are valid
 
-//Parse a flac stream to a struct
+// parse parses the FLAC bitstream.
 func (s *Stream) parse(block []byte) (err error) {
 	buf := bytes.NewBuffer(block)
 
@@ -95,7 +95,6 @@ func (s *Stream) parse(block []byte) (err error) {
 	if signature != FlacSignature {
 		return fmt.Errorf(ErrSignatureMismatch, signature)
 	}
-	s.HasSignature = true
 
 	//Depending on the type number extraced from the metadata header different parse() methods will execute
 	var headerTypes = map[uint8]interface{}{
