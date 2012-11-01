@@ -17,13 +17,14 @@ Links:
 package rsf
 
 import "bytes"
+import dbg "fmt"
 import "fmt"
-import "github.com/karlek/rsf/frame"
-import "github.com/karlek/rsf/meta"
 import "io"
 import "io/ioutil"
 import "os"
-import dbg "fmt"
+
+import "github.com/mewkiz/rsf/frame"
+import "github.com/mewkiz/rsf/meta"
 
 const (
 	//The first four bytes of all flac files

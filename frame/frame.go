@@ -1,9 +1,9 @@
 package frame
 
 import "bytes"
+import dbg "fmt"
 import "encoding/binary"
 import "fmt"
-import dbg "fmt"
 
 const (
 	ErrIsNotNil        = "the reserved bits are not all 0"
@@ -133,7 +133,7 @@ func Decode(block []byte) (f *Frame, err error) {
 	// <?> 	if(variable blocksize)
 	//   		<8-56>:"UTF-8" coded sample number (decoded number is 36 bits)
 	// 		else
-	//   		<8-48>:"UTF-8" coded frame number (decoded number is 31 bits) 
+	//   		<8-48>:"UTF-8" coded frame number (decoded number is 31 bits)
 	if f.Header.HasVariableBlockSize {
 
 	} else {
@@ -146,9 +146,9 @@ func Decode(block []byte) (f *Frame, err error) {
 		dbg.Println(readValue)
 	}
 
-	// - If blocksize index = 6, read 8 bits from the stream. The true block 
+	// - If blocksize index = 6, read 8 bits from the stream. The true block
 	// size is the read value + 1.
-	// - If blocksize index = 7, read 16 bits from the stream. The true block 
+	// - If blocksize index = 7, read 16 bits from the stream. The true block
 	// size is the read value + 1.
 	///I have no idea how to decrypt this part of the spec:
 	// <?> 	if(blocksize bits == 011x)
@@ -159,14 +159,14 @@ func Decode(block []byte) (f *Frame, err error) {
 		dbg.Println("True block size is:", binary.BigEndian.Uint16(buf.Next(2))+1)
 	}
 
-	// - If sample index is 12, read 8 bits from the stream. The true sample 
+	// - If sample index is 12, read 8 bits from the stream. The true sample
 	// rate is the read value * 1000.
-	// - If sample index is 13, read 16 bits from the stream. The true sample 
+	// - If sample index is 13, read 16 bits from the stream. The true sample
 	// rate is the read value.
-	// - If sample index is 14, read 16 bits from the stream. The true sample 
+	// - If sample index is 14, read 16 bits from the stream. The true sample
 	// rate is the read value * 10.
 	// <?> 	if(sample rate bits == 11xx)
-	//    		8/16 bit sample rate 
+	//    		8/16 bit sample rate
 	switch f.Header.SampleRate {
 	case 12:
 		dbg.Println("True sample rate is:", uint64(buf.Next(1)[0])*1000)
@@ -227,7 +227,7 @@ func getUTF8Num(block []byte) (readValue uint64, err error) {
 	/*
 
 
-		- assign the bits following the encoding (the x bits in the examples) to 
+		- assign the bits following the encoding (the x bits in the examples) to
 		a variable R with a magnitude of at least 56 bits
 		- loop from 1 to L
 		     - left shift R 6 bits
@@ -236,19 +236,19 @@ func getUTF8Num(block []byte) (readValue uint64, err error) {
 		     - set R = R or <the lower 6 bits from B>
 		- the read value is R
 
-		The following two fields depend on the block size and sample rate index 
+		The following two fields depend on the block size and sample rate index
 		read earlier in the header:
 
-		- If blocksize index = 6, read 8 bits from the stream. The true block 
+		- If blocksize index = 6, read 8 bits from the stream. The true block
 		size is the read value + 1.
-		- If blocksize index = 7, read 16 bits from the stream. The true block 
+		- If blocksize index = 7, read 16 bits from the stream. The true block
 		size is the read value + 1.
 
-		- If sample index is 12, read 8 bits from the stream. The true sample 
+		- If sample index is 12, read 8 bits from the stream. The true sample
 		rate is the read value * 1000.
-		- If sample index is 13, read 16 bits from the stream. The true sample 
+		- If sample index is 13, read 16 bits from the stream. The true sample
 		rate is the read value.
-		- If sample index is 14, read 16 bits from the stream. The true sample 
+		- If sample index is 14, read 16 bits from the stream. The true sample
 		rate is the read value * 10.
 	*/
 	return 0, nil

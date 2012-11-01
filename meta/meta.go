@@ -2,9 +2,9 @@
 package meta
 
 import "bytes"
-import "strings"
-import "fmt"
 import "encoding/binary"
+import "fmt"
+import "strings"
 
 //Formatted error messages
 const (
@@ -58,7 +58,7 @@ type DataHeader struct {
 	Length    uint32
 }
 
-// This block has information about the whole stream. It must be present as the first metadata block in the stream. 
+// This block has information about the whole stream. It must be present as the first metadata block in the stream.
 type StreamInfo struct {
 	MinBlockSize  uint16
 	MaxBlockSize  uint16
@@ -123,7 +123,7 @@ type CueSheetTrackIndex struct {
 	IndexPointNum uint8
 }
 
-//This block is for storing pictures associated with the file, most commonly cover art from CDs. There may be more than one PICTURE block in a file. 
+//This block is for storing pictures associated with the file, most commonly cover art from CDs. There may be more than one PICTURE block in a file.
 type Picture struct {
 	Type       uint32
 	MIME       string
@@ -146,7 +146,7 @@ func IsAllZero(buf []byte) (err error) {
 	return nil
 }
 
-//Parse a metadata header 
+//Parse a metadata header
 func (h *DataHeader) Parse(block []byte) (err error) {
 	const (
 		LastBlockMask = 0x80000000
