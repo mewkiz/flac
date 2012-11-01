@@ -12,12 +12,12 @@ documentation
 Documentation provided by GoPkgDoc:
 
    - [rsf][]
-       - [rsf/frame][]
-       - [rsf/meta][]
+       - [frame][]
+       - [meta][]
 
 [rsf]: http://go.pkgdoc.org/github.com/mewkiz/rsf
-[rsf/frame]: http://go.pkgdoc.org/github.com/mewkiz/frame
-[rsf/meta]: http://go.pkgdoc.org/github.com/mewkiz/meta
+[frame]: http://go.pkgdoc.org/github.com/mewkiz/rsf/frame
+[meta]: http://go.pkgdoc.org/github.com/mewkiz/rsf/meta
 
 public domain
 -------------
