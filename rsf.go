@@ -32,17 +32,13 @@ const FlacSignature = "fLaC"
 // Formatted error strings.
 const (
 	ErrSignatureMismatch         = "invalid flac signature: %s, should be " + FlacSignature
-	ErrStreamInfoIsNotFirstBlock = "invalid first block; the first block must be stream info"
+	ErrStreamInfoIsNotFirstBlock = "first block type is invalid: expected '%d' (StreamInfo), got '%d'."
 )
 
-// A Stream is a FLAC bitstream, which has the following basic structure:
-//    - A "fLaC" marker at the beginning of the stream.
-//    - A STREAMINFO metadata block.
-//    - Zero or more other metadata blocks.
-//    - One or more audio frames.
+// A Stream is a FLAC bitstream.
 type Stream struct {
-	Metadata []interface{}
-	// Frame    []frame.Frame
+	MetaBlocks []interface{}
+	//Frame      []frame.Frame
 }
 
 // Open opens the provided file and returns the parsed FLAC bitstream.
@@ -53,12 +49,7 @@ func Open(filePath string) (s *Stream, err error) {
 	}
 	defer f.Close()
 
-	s, err = NewStream(f)
-	if err != nil {
-		return nil, err
-	}
-
-	return s, nil
+	return NewStream(f)
 }
 
 // NewStream reads from the provided io.Reader and returns the parsed FLAC
@@ -71,7 +62,7 @@ func NewStream(r io.Reader) (s *Stream, err error) {
 		return nil, err
 	}
 
-	err = s.parse(buf)
+	s, err = newStream(buf)
 	if err != nil {
 		return nil, err
 	}
@@ -79,78 +70,100 @@ func NewStream(r io.Reader) (s *Stream, err error) {
 	return s, nil
 }
 
-///A flac stream is valid if:
-///	It has the flac signature `fLaC`
-///	The first metadata block is the StreamInfo block
-///	All optional metadata blocks are valid
-///	It has at least one audio frame
-///	All audio frames are valid
+// newStream parses a FLAC bitstream and returns a new Stream. The FLAC
+// bitstream has the following basic structure:
+//    - A "fLaC" signature at the beginning of the stream.
+//    - A STREAMINFO metadata block.
+//    - Zero or more other metadata blocks.
+//    - One or more audio frames.
+//
+// A FLAC bitstream is valid if:
+//    - It has the FLAC signature "fLaC".
+//    - The first metadata block is the StreamInfo block.
+//    - All optional metadata blocks are valid.
+//    - It has at least one audio frame.
+//    - All audio frames are valid.
+func newStream(buf []byte) (s *Stream, err error) {
+	b := bytes.NewBuffer(buf)
 
-// parse parses the FLAC bitstream.
-func (s *Stream) parse(block []byte) (err error) {
-	buf := bytes.NewBuffer(block)
-
-	//Check `fLaC` signature (size: 4 bytes)
-	signature := string(buf.Next(4))
+	// Check "fLaC" signature (size: 4 bytes).
+	signature := string(b.Next(4))
 	if signature != FlacSignature {
-		return fmt.Errorf(ErrSignatureMismatch, signature)
+		return nil, fmt.Errorf(ErrSignatureMismatch, signature)
 	}
 
-	//Depending on the type number extraced from the metadata header different parse() methods will execute
-	var headerTypes = map[uint8]interface{}{
-		0: new(meta.StreamInfo),
-		// 1: Padding,
-		2: new(meta.Application),
-		3: new(meta.SeekTable),
-		4: new(meta.VorbisComment),
-		5: new(meta.CueSheet),
-		6: new(meta.Picture),
-	}
+	s = new(Stream)
 
-	//Read Metadata blocks
-	isFirstRun := true
-	header := meta.DataHeader{}
-	for header.IsLast == false {
-		//Read Metadata Header (Size: 4 bytes)
-		err = header.Parse(buf.Next(4))
+	// Read metadata blocks.
+	isFirst := true
+	for {
+		// Read metadata block header (size: 4 bytes).
+		header, err := meta.NewBlockHeader(b.Next(4))
 		if err != nil {
-			return err
+			return nil, err
+		}
+		if isFirst {
+			if header.BlockType != meta.TypeStreamInfo {
+				// first block type has to be StreamInfo
+				return nil, fmt.Errorf(ErrStreamInfoIsNotFirstBlock, meta.TypeStreamInfo, header.BlockType)
+			}
+			isFirst = false
+		}
+		switch header.BlockType {
+		case meta.TypeStreamInfo:
+			si, err := meta.NewStreamInfo(b.Next(header.Length))
+			if err != nil {
+				return nil, err
+			}
+			s.MetaBlocks = append(s.MetaBlocks, si)
+		case meta.TypePadding:
+			// skip padding.
+			b.Next(header.Length)
+		case meta.TypeApplication:
+			si, err := meta.NewApplication(b.Next(header.Length))
+			if err != nil {
+				return nil, err
+			}
+			s.MetaBlocks = append(s.MetaBlocks, si)
+		case meta.TypeSeekTable:
+			si, err := meta.NewSeekTable(b.Next(header.Length))
+			if err != nil {
+				return nil, err
+			}
+			s.MetaBlocks = append(s.MetaBlocks, si)
+		case meta.TypeVorbisComment:
+			si, err := meta.NewVorbisComment(b.Next(header.Length))
+			if err != nil {
+				return nil, err
+			}
+			s.MetaBlocks = append(s.MetaBlocks, si)
+		case meta.TypeCueSheet:
+			si, err := meta.NewCueSheet(b.Next(header.Length))
+			if err != nil {
+				return nil, err
+			}
+			s.MetaBlocks = append(s.MetaBlocks, si)
+		case meta.TypePicture:
+			si, err := meta.NewPicture(b.Next(header.Length))
+			if err != nil {
+				return nil, err
+			}
+			s.MetaBlocks = append(s.MetaBlocks, si)
+		default:
+			return nil, fmt.Errorf("block type '%d' not yet supported.", header.BlockType)
 		}
 
-		if isFirstRun && header.BlockType != 0 {
-			return fmt.Errorf(ErrStreamInfoIsNotFirstBlock)
-		} else {
-			isFirstRun = false
+		if header.IsLast {
+			// Break after last metadata block.
+			break
 		}
-
-		///Might have serious bugs with multiple occurences of the same block type. For instance picture blocks
-		//Depending on type of block different parse methods are used (size: depends on header.length)
-		switch b := headerTypes[header.BlockType].(type) {
-		case (*meta.StreamInfo):
-			b.Parse(buf.Next(int(header.Length)))
-		case (*meta.Application):
-			b.Parse(buf.Next(int(header.Length)))
-		case (*meta.SeekTable):
-			b.Parse(buf.Next(int(header.Length)))
-		case (*meta.VorbisComment):
-			b.Parse(buf.Next(int(header.Length)))
-		case (*meta.CueSheet):
-			b.Parse(buf.Next(int(header.Length)))
-		case (*meta.Picture):
-			b.Parse(buf.Next(int(header.Length)))
-		default: //Only when the block type is padding will this code trigger
-			buf.Next(int(header.Length))
-			continue
-		}
-
-		s.Metadata = append(s.Metadata, headerTypes[header.BlockType])
 	}
 
 	///Audio frame parsing
 	///Flac decoding
 
-	f, err := frame.Decode(buf.Bytes())
+	f, err := frame.Decode(b.Bytes())
 	dbg.Println(f)
 
-	return nil
+	return s, nil
 }
