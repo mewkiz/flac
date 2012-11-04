@@ -17,8 +17,8 @@ const (
 	ErrInvalidPictureType         = "the picture type is invalid (must be <=20): %d"
 	ErrInvalidSampleRate          = "invalid sample rate; expected > 0 and <= 655350, got %d."
 	///ErrInvalidSyncCode            = "sync code is invalid (must be 11111111111110 or 16382 decimal): %d"
-	ErrMalformedVorbisComment  = "malformed vorbis comment: %s"
-	ErrUnregisterdAppSignature = "unregistered application signature: %s"
+	ErrMalformedVorbisComment = "malformed vorbis comment: %s"
+	ErrUnregisterdAppID       = "unregistered application id: %s."
 )
 
 // Error messages.
@@ -29,33 +29,6 @@ var (
 	ErrReserved            = errors.New("reserved value.")
 	ErrReservedNotZero     = errors.New("all reserved bits are not 0.")
 )
-
-//Application blocks which IDs are registered (http://flac.sourceforge.net/id.html)
-var RegisteredApplications = map[string]string{
-	"ATCH": "FlacFile",
-	"BSOL": "beSolo",
-	"BUGS": "Bugs Player",
-	"Cues": "GoldWave cue points (specification)",
-	"Fica": "CUE Splitter",
-	"Ftol": "flac-tools",
-	"MOTB": "MOTB MetaCzar",
-	"MPSE": "MP3 Stream Editor",
-	"MuML": "MusicML: Music Metadata Language",
-	"RIFF": "Sound Devices RIFF chunk storage",
-	"SFFL": "Sound Font FLAC",
-	"SONY": "Sony Creative Software",
-	"SQEZ": "flacsqueeze",
-	"TtWv": "TwistedWave",
-	"UITS": "UITS Embedding tools",
-	"aiff": "FLAC AIFF chunk storage",
-	"imag": "flac-image application for storing arbitrary files in APPLICATION metadata blocks",
-	"peem": "Parseable Embedded Extensible Metadata (specification)",
-	"qfst": "QFLAC Studio",
-	"riff": "FLAC RIFF chunk storage",
-	"tune": "TagTuner",
-	"xbat": "XBAT",
-	"xmcd": "xmcd",
-}
 
 /// Might trigger unnesccesary errors
 
@@ -248,10 +221,40 @@ func NewStreamInfo(buf []byte) (si *StreamInfo, err error) {
 
 	si.NumSamples = bits & NumSamplesMask
 
-	// MD5 signature of unencoded audio data (size: 16 bytes)
+	// MD5 signature of unencoded audio data (size: 16 bytes).
 	si.MD5 = b.Next(16)
 
 	return si, nil
+}
+
+// RegisteredApplications maps from a registered application ID to a
+// description.
+//
+// ref: http://flac.sourceforge.net/id.html
+var RegisteredApplications = map[string]string{
+	"ATCH": "FlacFile",
+	"BSOL": "beSolo",
+	"BUGS": "Bugs Player",
+	"Cues": "GoldWave cue points (specification)",
+	"Fica": "CUE Splitter",
+	"Ftol": "flac-tools",
+	"MOTB": "MOTB MetaCzar",
+	"MPSE": "MP3 Stream Editor",
+	"MuML": "MusicML: Music Metadata Language",
+	"RIFF": "Sound Devices RIFF chunk storage",
+	"SFFL": "Sound Font FLAC",
+	"SONY": "Sony Creative Software",
+	"SQEZ": "flacsqueeze",
+	"TtWv": "TwistedWave",
+	"UITS": "UITS Embedding tools",
+	"aiff": "FLAC AIFF chunk storage",
+	"imag": "flac-image application for storing arbitrary files in APPLICATION metadata blocks",
+	"peem": "Parseable Embedded Extensible Metadata (specification)",
+	"qfst": "QFLAC Studio",
+	"riff": "FLAC RIFF chunk storage",
+	"tune": "TagTuner",
+	"xbat": "XBAT",
+	"xmcd": "xmcd",
 }
 
 // An Application metadata block is for use by third-party applications. The
@@ -259,28 +262,30 @@ func NewStreamInfo(buf []byte) (si *StreamInfo, err error) {
 // to an application by the FLAC maintainers. The remainder of the block is
 // defined by the registered application.
 type Application struct {
-	Signature string
-	Data      []byte ///interface{} type instead?
+	// Registered application ID.
+	ID string
+	// Application data.
+	Data []byte ///interface{} type instead?
 }
 
 // NewApplication parses and returns a new Application metadata block.
 func NewApplication(buf []byte) (ap *Application, err error) {
-
-	const (
-		AppSignatureLen = 32
-	)
+	if len(buf) < 4 {
+		return nil, fmt.Errorf("invalid block size; expected >= 4, got %d.", len(buf))
+	}
 
 	ap = new(Application)
 	b := bytes.NewBuffer(buf)
 
-	ap.Signature = string(b.Next(AppSignatureLen / 8))
-	_, ok := RegisteredApplications[ap.Signature]
+	// Application ID (size: 4 bytes).
+	ap.ID = string(b.Next(4))
+	_, ok := RegisteredApplications[ap.ID]
 	if !ok {
-		return nil, fmt.Errorf(ErrUnregisterdAppSignature, ap.Signature)
+		return nil, fmt.Errorf(ErrUnregisterdAppID, ap.ID)
 	}
 
 	///Make uber switch case for all applications
-	// switch ap.Signature {
+	// switch ap.ID {
 
 	// }
 
