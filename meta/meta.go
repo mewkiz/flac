@@ -12,7 +12,6 @@ const (
 	ErrInvalidBlockLen            = "invalid block length; expected %d, got %d."
 	ErrInvalidMaxBlockSize        = "invalid block size; expected >= 16 and <= 65535, got %d."
 	ErrInvalidMinBlockSize        = "invalid block size; expected >= 16, got %d."
-	ErrInvalidNumSeekPoints       = "the number of seek points must be divisible by 18: %d"
 	ErrInvalidNumTracksForCompact = "invalid number of tracks for a compact disc, can't be more than 100: %d"
 	ErrInvalidPictureType         = "the picture type is invalid (must be <=20): %d"
 	ErrInvalidSampleRate          = "invalid sample rate; expected > 0 and <= 655350, got %d."
@@ -24,6 +23,7 @@ const (
 // Error messages.
 var (
 	ErrInvalidBlockType    = errors.New("invalid block type.")
+	ErrInvalidSeekTableLen = errors.New("invalid block size; seek table not divisible by 18.")
 	ErrInvalidTrackNum     = errors.New("invalid track number value 0 isn't allowed.")
 	ErrMissingLeadOutTrack = errors.New("cuesheet needs a lead out track.")
 	ErrReserved            = errors.New("reserved value.")
@@ -304,13 +304,19 @@ func NewApplication(buf []byte) (ap *Application, err error) {
 // will be ignored by decoders but which can be used to reserve space for future
 // seek point insertion.
 type SeekTable struct {
+	// One or more seek points.
 	Points []SeekPoint
 }
 
 // A SeekPoint specifies the offset of a sample.
 type SeekPoint struct {
+	// Sample number of first sample in the target frame, or 0xFFFFFFFFFFFFFFFF
+	// for a placeholder point.
 	SampleNumber uint64
+	// Offset (in bytes) from the first byte of the first frame header to the
+	// first byte of the target frame's header.
 	Offset       uint64
+	// Number of samples in the target frame.
 	NumSamples   uint16
 }
 
@@ -324,15 +330,8 @@ func NewSeekTable(buf []byte) (st *SeekTable, err error) {
 	// Seek points within a table must be unique by sample number, with the exception of placeholder points.
 	// The previous two notes imply that there may be any number of placeholder points, but they must all occur at the end of the table.
 
-	const (
-		SampleNumberLen      = 64
-		OffsetLen            = 64
-		NumSamplesInFrameLen = 16
-	)
-
-	///Error check for fractions
 	if len(buf)%18 != 0 {
-		return nil, fmt.Errorf(ErrInvalidNumSeekPoints, len(buf))
+		return nil, ErrInvalidSeekTableLen
 	}
 
 	st = new(SeekTable)
@@ -340,11 +339,12 @@ func NewSeekTable(buf []byte) (st *SeekTable, err error) {
 	numSeekPoints := len(buf) / 18
 
 	for i := 0; i < numSeekPoints; i++ {
-		st.Points = append(st.Points, SeekPoint{
-			SampleNumber: binary.BigEndian.Uint64(b.Next(8)), //Sample Number (size: 8 bytes)
-			Offset:       binary.BigEndian.Uint64(b.Next(8)), //Offset (in bytes) from the first byte of the first frame header to the first byte of the target frame's header. (size: 8 bytes)
-			NumSamples:   binary.BigEndian.Uint16(b.Next(2)), //Number of samples in the target frame.  (size: 2 bytes)
-		})
+		point := SeekPoint{
+			SampleNumber: binary.BigEndian.Uint64(b.Next(8)), // Sample number (size: 8 bytes).
+			Offset:       binary.BigEndian.Uint64(b.Next(8)), // Offset  (size: 8 bytes).
+			NumSamples:   binary.BigEndian.Uint16(b.Next(2)), // Number of samples (size: 2 bytes).
+		}
+		st.Points = append(st.Points, point)
 	}
 
 	return st, nil
