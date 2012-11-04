@@ -284,6 +284,8 @@ func NewApplication(buf []byte) (ap *Application, err error) {
 		return nil, fmt.Errorf(ErrUnregisterdAppID, ap.ID)
 	}
 
+	ap.Data = b.Bytes()
+
 	///Make uber switch case for all applications
 	// switch ap.ID {
 
@@ -315,21 +317,16 @@ type SeekPoint struct {
 	SampleNumber uint64
 	// Offset (in bytes) from the first byte of the first frame header to the
 	// first byte of the target frame's header.
-	Offset       uint64
+	Offset uint64
 	// Number of samples in the target frame.
-	NumSamples   uint16
+	NumSamples uint16
 }
+
+// PlaceholderPoint is the sample number used for placeholder points.
+const PlaceholderPoint = 0xFFFFFFFFFFFFFFFF
 
 // NewSeekTable parses and returns a new SeekTable metadata block.
 func NewSeekTable(buf []byte) (st *SeekTable, err error) {
-
-	///Wtf is placeholder point xD
-	///Fix this
-	// For placeholder points, the second and third field values are undefined.
-	// Seek points within a table must be sorted in ascending order by sample number.
-	// Seek points within a table must be unique by sample number, with the exception of placeholder points.
-	// The previous two notes imply that there may be any number of placeholder points, but they must all occur at the end of the table.
-
 	if len(buf)%18 != 0 {
 		return nil, ErrInvalidSeekTableLen
 	}
@@ -338,11 +335,24 @@ func NewSeekTable(buf []byte) (st *SeekTable, err error) {
 	b := bytes.NewBuffer(buf)
 	numSeekPoints := len(buf) / 18
 
+	// - For placeholder points, the second and third field values are undefined.
+	// - Seek points within a table must be sorted in ascending order by sample
+	//   number.
+	// - Seek points within a table must be unique by sample number, with the
+	//   exception of placeholder points.
+	// - The previous two notes imply that there may be any number of placeholder
+	//   points, but they must all occur at the end of the table.
+	var prevSampleNumber uint64
 	for i := 0; i < numSeekPoints; i++ {
 		point := SeekPoint{
 			SampleNumber: binary.BigEndian.Uint64(b.Next(8)), // Sample number (size: 8 bytes).
 			Offset:       binary.BigEndian.Uint64(b.Next(8)), // Offset  (size: 8 bytes).
 			NumSamples:   binary.BigEndian.Uint16(b.Next(2)), // Number of samples (size: 2 bytes).
+		}
+		if prevSampleNumber >= point.SampleNumber && i != 0 {
+			if point.SampleNumber != PlaceholderPoint {
+				return nil, fmt.Errorf("invalid seek point; sample number (%d) not in ascending order.", point.SampleNumber)
+			}
 		}
 		st.Points = append(st.Points, point)
 	}
