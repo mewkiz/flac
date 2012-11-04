@@ -9,16 +9,16 @@ import "strings"
 
 // Formatted error messages.
 const (
-	ErrInvalidBlockLen            = "invalid block length; must be: %d, function took: %d"
-	ErrInvalidMaxBlockSize        = "invalid block size; %d should be < 65535 and > 16"
-	ErrInvalidMinBlockSize        = "invalid block size - %d should be >= 16"
+	ErrInvalidBlockLen            = "invalid block length; expected %d, got %d."
+	ErrInvalidMaxBlockSize        = "invalid block size; expected >= 16 and <= 65535, got %d."
+	ErrInvalidMinBlockSize        = "invalid block size; expected >= 16, got %d."
 	ErrInvalidNumSeekPoints       = "the number of seek points must be divisible by 18: %d"
 	ErrInvalidNumTracksForCompact = "invalid number of tracks for a compact disc, can't be more than 100: %d"
 	ErrInvalidPictureType         = "the picture type is invalid (must be <=20): %d"
-	ErrInvalidSampleRate          = "invalid sample rate - %d should be > 655350 and != 0"
+	ErrInvalidSampleRate          = "invalid sample rate; expected > 0 and <= 655350, got %d."
 	///ErrInvalidSyncCode            = "sync code is invalid (must be 11111111111110 or 16382 decimal): %d"
-	ErrMalformedVorbisComment     = "malformed vorbis comment: %s"
-	ErrUnregisterdAppSignature    = "unregistered application signature: %s"
+	ErrMalformedVorbisComment  = "malformed vorbis comment: %s"
+	ErrUnregisterdAppSignature = "unregistered application signature: %s"
 )
 
 // Error messages.
@@ -86,22 +86,36 @@ const (
 
 func (t Type) String() string {
 	m := map[Type]string{
-		TypeStreamInfo: "stream info",
-		TypePadding: "padding",
-		TypeApplication: "application",
-		TypeSeekTable: "seek table",
+		TypeStreamInfo:    "stream info",
+		TypePadding:       "padding",
+		TypeApplication:   "application",
+		TypeSeekTable:     "seek table",
 		TypeVorbisComment: "vorbis comment",
-		TypeCueSheet: "cue sheet",
-		TypePicture: "picture",
+		TypeCueSheet:      "cue sheet",
+		TypePicture:       "picture",
 	}
 	return m[t]
 }
 
 // A BlockHeader contains type and length about a metadata block.
 type BlockHeader struct {
-	IsLast    bool
+	// IsLast is true if this block is the last metadata block before the audio
+	// blocks, and false otherwise.
+	IsLast bool
+	// Block types:
+	//    0: Streaminfo
+	//    1: Padding
+	//    2: Application
+	//    3: Seektable
+	//    4: Vorbis_comment
+	//    5: Cuesheet
+	//    6: Picture
+	//    7-126: reserved
+	//    127: invalid, to avoid confusion with a frame sync code
 	BlockType Type
-	Length    int
+	// Length (in bytes) of metadata to follow (does not include the size of the
+	// BlockHeader).
+	Length int
 }
 
 // NewBlockHeader parses and returns a new metadata block header.
@@ -127,18 +141,11 @@ func NewBlockHeader(buf []byte) (h *BlockHeader, err error) {
 	h.BlockType = Type(bits & TypeMask >> 24)
 	h.Length = int(bits & LengthMask) // won't overflow, since max is 0x00FFFFFF.
 
-	// 0: Streaminfo
-	// 1: Padding
-	// 2: Application
-	// 3: Seektable
-	// 4: Vorbis_comment
-	// 5: Cuesheet
-	// 6: Picture
-	// 7-126: reserved
-	// 127: invalid, to avoid confusion with a frame sync code
 	if h.BlockType >= 7 && h.BlockType <= 126 {
+		// block type 7-126: reserved
 		return nil, ErrReserved
 	} else if h.BlockType == 127 {
+		// block type 127: invalid, to avoid confusion with a frame sync code
 		return nil, ErrInvalidBlockType
 	}
 
@@ -148,32 +155,40 @@ func NewBlockHeader(buf []byte) (h *BlockHeader, err error) {
 // A StreamInfo metadata block has information about the entire stream. It must
 // be present as the first metadata block in the stream.
 type StreamInfo struct {
-	MinBlockSize  uint16
-	MaxBlockSize  uint16
-	MinFrameSize  uint32
-	MaxFrameSize  uint32
-	SampleRate    uint32
-	NumChannels   uint8
+	// The minimum block size (in samples) used in the stream.
+	MinBlockSize uint16
+	// The maximum block size (in samples) used in the stream.
+	// (MinBlockSize == MaxBlockSize) implies a fixed-blocksize stream.
+	MaxBlockSize uint16
+	// The minimum frame size (in bytes) used in the stream. May be 0 to imply
+	// the value is not known.
+	MinFrameSize uint32
+	// The maximum frame size (in bytes) used in the stream. May be 0 to imply
+	// the value is not known.
+	MaxFrameSize uint32
+	// Sample rate in Hz. Though 20 bits are available, the maximum sample rate
+	// is limited by the structure of frame headers to 655350Hz. Also, a value of
+	// 0 is invalid.
+	SampleRate uint32
+	// (number of channels)-1. FLAC supports from 1 to 8 channels.
+	NumChannels uint8
+	// (bits per sample)-1. FLAC supports from 4 to 32 bits per sample. Currently
+	// the reference encoder and decoders only support up to 24 bits per sample.
 	BitsPerSample uint8
-	NumSamples    uint64
-	MD5           []byte
+	// Total samples in stream. 'Samples' means inter-channel sample, i.e. one
+	// second of 44.1Khz audio will have 44100 samples regardless of the number
+	// of channels. A value of zero here means the number of total samples is
+	// unknown.
+	NumSamples uint64
+	// MD5 signature of the unencoded audio data. This allows the decoder to
+	// determine if an error exists in the audio data even when the error does
+	// not result in an invalid bitstream.
+	MD5 []byte
 }
 
 // NewStreamInfo parses and returns a new StreamInfo metadata block.
 func NewStreamInfo(buf []byte) (si *StreamInfo, err error) {
-
-	const (
-		MaxBlockSizeMask = 0xFFFF000000000000
-		MinFrameSizeMask = 0x0000FFFFFF000000
-		MaxFrameSizeMask = 0x0000000000FFFFFF
-
-		SampleRateMask    = 0xFFFFF00000000000
-		NumChannelsMask   = 0x00000E0000000000
-		BitsPerSampleMask = 0x000001F000000000
-		NumSamplesMask    = 0x0000000FFFFFFFFF
-	)
-
-	//A StreamInfo block is always 34 bytes
+	// A StreamInfo block is always 34 bytes.
 	if len(buf) != 34 {
 		return nil, fmt.Errorf(ErrInvalidBlockLen, 34, len(buf))
 	}
@@ -181,40 +196,59 @@ func NewStreamInfo(buf []byte) (si *StreamInfo, err error) {
 	si = new(StreamInfo)
 	b := bytes.NewBuffer(buf)
 
-	//Minimum block size (size: 2 bytes)
+	// Minimum block size (size: 2 bytes).
 	si.MinBlockSize = binary.BigEndian.Uint16(b.Next(2))
-	if si.MinBlockSize > 0 && si.MinBlockSize < 16 {
+	if si.MinBlockSize < 16 {
 		return nil, fmt.Errorf(ErrInvalidMinBlockSize, si.MinBlockSize)
 	}
 
-	//In order to keep everything on powers-of-2 boundaries, reads from the block are grouped thus:
-	//MaxBlockSize (16 bits) + MinFrameSize (24 bits) + MaxFrameSize (24 bits) = 64 bits
+	const (
+		MaxBlockSizeMask = 0xFFFF000000000000 // 16 bits
+		MinFrameSizeMask = 0x0000FFFFFF000000 // 24 bits
+		MaxFrameSizeMask = 0x0000000000FFFFFF // 24 bits
+	)
+
+	// In order to keep everything on powers-of-2 boundaries, reads from the
+	// block are grouped thus:
+	// MaxBlockSize (16 bits) + MinFrameSize (24 bits) + MaxFrameSize (24 bits) =
+	// 64 bits
 	bits := binary.BigEndian.Uint64(b.Next(8))
 
-	si.MaxBlockSize = uint16((MaxBlockSizeMask & bits) >> 48)
-	if si.MaxBlockSize > 65535 || (si.MaxBlockSize > 0 && si.MaxBlockSize < 16) {
+	si.MaxBlockSize = uint16(bits & MaxBlockSizeMask >> 48)
+	if si.MaxBlockSize < 16 || si.MaxBlockSize > 65535 {
 		return nil, fmt.Errorf(ErrInvalidMaxBlockSize, si.MaxBlockSize)
 	}
 
-	si.MinFrameSize = uint32((MinFrameSizeMask & bits) >> 32)
-	si.MaxFrameSize = uint32((bits & MaxFrameSizeMask))
+	si.MinFrameSize = uint32(bits & MinFrameSizeMask >> 24)
+	si.MaxFrameSize = uint32(bits & MaxFrameSizeMask)
 
-	//In order to keep everything on powers-of-2 boundaries, reads from the block are grouped thus:
-	//SampleRate (20 bits) + NumChannels (3 bits) + BitsPerSample (5 bits) + NumSamples (36 bits) = 64 bits
+	const (
+		SampleRateMask    = 0xFFFFF00000000000 // 20 bits
+		NumChannelsMask   = 0x00000E0000000000 // 3 bits
+		BitsPerSampleMask = 0x000001F000000000 // 5 bits
+		NumSamplesMask    = 0x0000000FFFFFFFFF // 36 bits
+	)
+
+	// In order to keep everything on powers-of-2 boundaries, reads from the
+	// block are grouped thus:
+	// SampleRate (20 bits) + NumChannels (3 bits) + BitsPerSample (5 bits) +
+	// NumSamples (36 bits) = 64 bits
 	bits = binary.BigEndian.Uint64(b.Next(8))
 
-	si.SampleRate = uint32((SampleRateMask & bits) >> 44)
-	if si.SampleRate > 655350 && si.SampleRate != 0 {
+	si.SampleRate = uint32(bits & SampleRateMask >> 44)
+	if si.SampleRate > 655350 || si.SampleRate == 0 {
 		return nil, fmt.Errorf(ErrInvalidSampleRate, si.SampleRate)
 	}
 
-	//Both NumChannels and BitsPerSample are specified to be subtracted by 1 in the specification: http://flac.sourceforge.net/format.html#metadata_block_streaminfo
-	si.NumChannels = uint8((NumChannelsMask&bits)>>41) + 1
-	si.BitsPerSample = uint8((BitsPerSampleMask&bits)>>36) + 1
+	// Both NumChannels and BitsPerSample are specified to be subtracted by 1 in
+	// the specification:
+	// http://flac.sourceforge.net/format.html#metadata_block_streaminfo
+	si.NumChannels = uint8(bits&NumChannelsMask>>41) + 1
+	si.BitsPerSample = uint8(bits&BitsPerSampleMask>>36) + 1
 
-	si.NumSamples = NumSamplesMask & bits
+	si.NumSamples = bits & NumSamplesMask
 
-	//MD5 signature of unencoded audio data (size: 16 bytes)
+	// MD5 signature of unencoded audio data (size: 16 bytes)
 	si.MD5 = b.Next(16)
 
 	return si, nil

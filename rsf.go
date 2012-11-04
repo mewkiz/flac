@@ -70,19 +70,12 @@ func NewStream(r io.Reader) (s *Stream, err error) {
 	return s, nil
 }
 
-// newStream parses a FLAC bitstream and returns a new Stream. The FLAC
-// bitstream has the following basic structure:
-//    - A "fLaC" signature at the beginning of the stream.
-//    - A STREAMINFO metadata block.
+// newStream parses a FLAC bitstream and returns a new Stream. The basic
+// structure of a FLAC stream is:
+//    - The four byte string "fLaC".
+//    - The STREAMINFO metadata block.
 //    - Zero or more other metadata blocks.
 //    - One or more audio frames.
-//
-// A FLAC bitstream is valid if:
-//    - It has the FLAC signature "fLaC".
-//    - The first metadata block is the StreamInfo block.
-//    - All optional metadata blocks are valid.
-//    - It has at least one audio frame.
-//    - All audio frames are valid.
 func newStream(buf []byte) (s *Stream, err error) {
 	b := bytes.NewBuffer(buf)
 
