@@ -12,7 +12,7 @@ const (
 	ErrInvalidBlockLen            = "invalid block length; expected %d, got %d."
 	ErrInvalidMaxBlockSize        = "invalid block size; expected >= 16 and <= 65535, got %d."
 	ErrInvalidMinBlockSize        = "invalid block size; expected >= 16, got %d."
-	ErrInvalidNumTracksForCompact = "invalid number of tracks for a compact disc, can't be more than 100: %d"
+	ErrInvalidNumTracksForCompact = "invalid number of tracks for a compact disc; expected <= 100, got %d."
 	ErrInvalidPictureType         = "the picture type is invalid (must be <=20): %d"
 	ErrInvalidSampleRate          = "invalid sample rate; expected > 0 and <= 655350, got %d."
 	///ErrInvalidSyncCode            = "sync code is invalid (must be 11111111111110 or 16382 decimal): %d"
@@ -24,8 +24,8 @@ const (
 var (
 	ErrInvalidBlockType    = errors.New("invalid block type.")
 	ErrInvalidSeekTableLen = errors.New("invalid block size; seek table not divisible by 18.")
-	ErrInvalidTrackNum     = errors.New("invalid track number value 0 isn't allowed.")
-	ErrMissingLeadOutTrack = errors.New("cuesheet needs a lead out track.")
+	ErrInvalidTrackNum     = errors.New("invalid track number; value 0 isn't allowed.")
+	ErrMissingLeadOutTrack = errors.New("cuesheet requires a lead out track.")
 	ErrReserved            = errors.New("reserved value.")
 	ErrReservedNotZero     = errors.New("all reserved bits are not 0.")
 )
@@ -415,61 +415,117 @@ func NewVorbisComment(buf []byte) (vc *VorbisComment, err error) {
 // up CD-DA discs, but it can be used as a general purpose cueing mechanism for
 // playback.
 type CueSheet struct {
-	CatalogNum       []byte
+	// Media catalog number, in ASCII printable characters 0x20-0x7e. In general,
+	// the media catalog number may be 0 to 128 bytes long; any unused characters
+	// should be right-padded with NUL characters. For CD-DA, this is a thirteen
+	// digit number, followed by 115 NUL bytes.
+	CatalogNum []byte
+	// The number of lead-in samples. This field has meaning only for CD-DA
+	// cuesheets; for other uses it should be 0. For CD-DA, the lead-in is the
+	// TRACK 00 area where the table of contents is stored; more precisely, it is
+	// the number of samples from the first sample of the media to the first
+	// sample of the first index point of the first track. According to the Red
+	// Book, the lead-in must be silence and CD grabbing software does not
+	// usually store it; additionally, the lead-in must be at least two seconds
+	// but may be longer. For these reasons the lead-in length is stored here so
+	// that the absolute position of the first track can be computed. Note that
+	// the lead-in stored here is the number of samples up to the first index
+	// point of the first track, not necessarily to INDEX 01 of the first track;
+	// even the first track may have INDEX 00 data.
 	NumLeadInSamples uint64
-	IsCompactDisc    bool
-	NumTracks        uint8
-	Tracks           []CueSheetTrack
+	// true if the CUESHEET corresponds to a Compact Disc, else false.
+	IsCompactDisc bool
+	// The number of tracks. Must be at least 1 (because of the requisite
+	// lead-out track). For CD-DA, this number must be no more than 100 (99
+	// regular tracks and one lead-out track).
+	NumTracks uint8
+	// One or more tracks. A CUESHEET block is required to have a lead-out track;
+	// it is always the last track in the CUESHEET. For CD-DA, the lead-out track
+	// number must be 170 as specified by the Red Book, otherwise is must be 255.
+	Tracks []CueSheetTrack
 }
 
 // A CueSheetTrack contains information about a track within a CueSheet.
 type CueSheetTrack struct {
-	Offset              uint64
-	TrackNum            uint8
-	ISRC                []byte
-	IsAudio             bool
-	HasPreEmphasis      bool
+	// Track offset in samples, relative to the beginning of the FLAC audio
+	// stream. It is the offset to the first index point of the track. (Note how
+	// this differs from CD-DA, where the track's offset in the TOC is that of
+	// the track's INDEX 01 even if there is an INDEX 00.) For CD-DA, the offset
+	// must be evenly divisible by 588 samples (588 samples = 44100 samples/sec *
+	// 1/75th of a sec).
+	Offset uint64
+	// Track number. A track number of 0 is not allowed to avoid conflicting with
+	// the CD-DA spec, which reserves this for the lead-in. For CD-DA the number
+	// must be 1-99, or 170 for the lead-out; for non-CD-DA, the track number
+	// must for 255 for the lead-out. It is not required but encouraged to start
+	// with track 1 and increase sequentially. Track numbers must be unique
+	// within a CUESHEET.
+	TrackNum uint8
+	// Track ISRC. This is a 12-digit alphanumeric code. A value of 12 ASCII NUL
+	// characters may be used to denote absence of an ISRC.
+	ISRC []byte
+	// The track type: false for audio, true for non-audio. This corresponds to
+	// the CD-DA Q-channel control bit 3.
+	IsAudio bool
+	// The pre-emphasis flag: false for no pre-emphasis, true for pre-emphasis.
+	// This corresponds to the CD-DA Q-channel control bit 5.
+	HasPreEmphasis bool
+	// The number of track index points. There must be at least one index in
+	// every track in a CUESHEET except for the lead-out track, which must have
+	// zero. For CD-DA, this number may be no more than 100.
 	NumTrackIndexPoints uint8
-	TrackIndexes        []CueSheetTrackIndex
+	// For all tracks except the lead-out track, one or more track index points.
+	TrackIndexes []CueSheetTrackIndex
 }
 
 // A CueSheetTrackIndex contains information about an index point in a track.
 type CueSheetTrackIndex struct {
-	Offset        uint64
+	// Offset in samples, relative to the track offset, of the index point. For
+	// CD-DA, the offset must be evenly divisible by 588 samples (588 samples =
+	// 44100 samples/sec * 1/75th of a sec). Note that the offset is from the
+	// beginning of the track, not the beginning of the audio data.
+	Offset uint64
+	// The index point number. For CD-DA, an index number of 0 corresponds to the
+	// track pre-gap. The first index in a track must have a number of 0 or 1,
+	// and subsequently, index numbers must increase by 1. Index numbers must be
+	// unique within a track.
 	IndexPointNum uint8
 }
 
 // NewCueSheet parses and returns a new CueSheet metadata block.
 func NewCueSheet(buf []byte) (cs *CueSheet, err error) {
-
-	const (
-		//CueSheet
-		IsCompactDiscMask    = 0x80
-		CueSheetReservedMask = 0x7F
-
-		//CueSheetTrack
-		IsAudioMask               = 0x80
-		HasPreEmphasisMask        = 0x40
-		CueSheetTrackReservedMask = 0x3F
-	)
+	// Minimum valid size based on CueSheet with one lead-out track:
+	// len(METADATA_BLOCK_CUESHEET) + len(CUESHEET_TRACK) = 432
+	if len(buf) < 432 {
+		return nil, fmt.Errorf("invalid block size; expected >= 432, got %d.", len(buf))
+	}
 
 	cs = new(CueSheet)
 	b := bytes.NewBuffer(buf)
 
-	//Media catalog number (size: 128 bytes)
+	// Media catalog number (size: 128 bytes).
 	cs.CatalogNum = b.Next(128)
 
-	//The number of lead-in samples (size: 8 bytes)
+	// The number of lead-in samples (size: 8 bytes).
 	cs.NumLeadInSamples = binary.BigEndian.Uint64(b.Next(8))
 
-	//1 bit for IsCompactDisk boolean and 7 bits are reserved.
-	bits := uint8(b.Next(1)[0])
+	const (
+		// CueSheet
+		IsCompactDiscMask    = 0x80
+		CueSheetReservedMask = 0x7F
+	)
+
+	// 1 bit for IsCompactDisk boolean and 7 bits are reserved.
+	bits, err := b.ReadByte()
+	if err != nil {
+		return nil, err
+	}
 
 	if bits&IsCompactDiscMask != 0 {
 		cs.IsCompactDisc = true
 	}
 
-	//Reserved
+	// Reserved
 	if bits&CueSheetReservedMask != 0 {
 		return nil, ErrReservedNotZero
 	}
@@ -478,38 +534,58 @@ func NewCueSheet(buf []byte) (cs *CueSheet, err error) {
 		return nil, ErrReservedNotZero
 	}
 
-	//The number of tracks (size: 1 byte)
-	cs.NumTracks = uint8(b.Next(1)[0])
+	// The number of tracks (size: 1 byte).
+	cs.NumTracks, err = b.ReadByte()
+	if err != nil {
+		return nil, err
+	}
 	if cs.NumTracks < 1 {
 		return nil, ErrMissingLeadOutTrack
 	} else if cs.NumTracks > 100 && cs.IsCompactDisc {
 		return nil, fmt.Errorf(ErrInvalidNumTracksForCompact, cs.NumTracks)
 	}
 
-	for i := 0; i < int(cs.NumTracks); i++ {
+	// Minimum valid size of Tracks:
+	// len(CUESHEET_TRACK) + (NumTracks-1)*len(CUESHEET_TRACK_INDEX) =
+	// 36 + (NumTracks-1)*12
+	TracksMinSize := int(36 + (cs.NumTracks-1)*12)
+	if b.Len() < TracksMinSize {
+		return nil, fmt.Errorf("invalid block size; expected >= %d, got %d.", TracksMinSize, b.Len())
+	}
+	for trackNum := 0; trackNum < int(cs.NumTracks); trackNum++ {
 		ct := new(CueSheetTrack)
 
-		//Track offset in samples (size: 8 bytes)
+		// Track offset in samples (size: 8 bytes).
 		ct.Offset = binary.BigEndian.Uint64(b.Next(8))
 
-		//Track number (size: 1 byte)
-		ct.TrackNum = uint8(b.Next(1)[0])
-
+		// Track number (size: 1 byte).
+		ct.TrackNum, err = b.ReadByte()
+		if err != nil {
+			return nil, err
+		}
 		if ct.TrackNum == 0 {
 			return nil, ErrInvalidTrackNum
 		}
 
-		//Track ISRC (size: 12 bytes)
+		// Track ISRC (size: 12 bytes)
 		ct.ISRC = b.Next(12)
 
-		bits := uint8(b.Next(1)[0])
+		const (
+			// CueSheetTrack
+			IsAudioMask               = 0x80
+			HasPreEmphasisMask        = 0x40
+			CueSheetTrackReservedMask = 0x3F
+		)
 
-		//Is track audio (size: 1 bit)
+		bits, err := b.ReadByte()
+		if err != nil {
+			return nil, err
+		}
+
 		if bits&IsAudioMask != 0 {
 			ct.IsAudio = true
 		}
 
-		//Has pre emphasis (size: 1 bit)
 		if bits&HasPreEmphasisMask != 0 {
 			ct.HasPreEmphasis = true
 		}
@@ -518,26 +594,50 @@ func NewCueSheet(buf []byte) (cs *CueSheet, err error) {
 			return nil, ErrReservedNotZero
 		}
 
-		//Reserved (size: 13 bytes + 6 bits from last byte)
+		// Reserved (size: 13 bytes + 6 bits from last byte).
 		if !isAllZero(b.Next(13)) {
 			return nil, ErrReservedNotZero
 		}
 
-		///Must be at least 1 on regular but must be 0 at lead out
-		//Number of track index points (size: 1 byte)
-		ct.NumTrackIndexPoints = uint8(b.Next(1)[0])
+		// Number of track index points (size: 1 byte).
+		ct.NumTrackIndexPoints, err = b.ReadByte()
+		if err != nil {
+			return nil, err
+		}
+		if trackNum == int(cs.NumTracks-1) {
+			// The lead-out track is always the last track in the CUESHEET. It must
+			// have zero track index points.
+			if ct.NumTrackIndexPoints != 0 {
+				return nil, fmt.Errorf("invalid number of track index points in cuesheet lead-out track; expected 0 got %d.", ct.NumTrackIndexPoints)
+			}
+		} else {
+			// There must be at least one index in every track in a CUESHEET except
+			// for the lead-out track.
+			if ct.NumTrackIndexPoints < 1 {
+				return nil, fmt.Errorf("invalid cuesheet track, too few index points; expected >= 1, got %d.", ct.NumTrackIndexPoints)
+			}
+		}
 
+		// Minimum valid size of TrackIndexes:
+		// len(CUESHEET_TRACK_INDEX)*NumTrackIndexPoints = 12*NumTrackIndexPoints
+		TrackIndexesMinSize := int(12 * ct.NumTrackIndexPoints)
+		if b.Len() < TrackIndexesMinSize {
+			return nil, fmt.Errorf("invalid size of TrackIndexes; expected >= %d, got %d.", TrackIndexesMinSize, b.Len())
+		}
 		for i := 0; i < int(ct.NumTrackIndexPoints); i++ {
-			ct.TrackIndexes = append(ct.TrackIndexes, CueSheetTrackIndex{
-				Offset:        binary.BigEndian.Uint64(b.Next(8)), //Offset in samples (size: 8 bytes)
-				IndexPointNum: uint8(b.Next(1)[0]),                //The index point number (size: 1 byte) ///Help with uint8
-			})
-
-			///All bits must be zero
-			//Reserved (size: 3 bytes)
+			trackIndex := CueSheetTrackIndex{
+				Offset: binary.BigEndian.Uint64(b.Next(8)), // Offset in samples (size: 8 bytes)
+			}
+			// The index point number (size: 1 byte).
+			trackIndex.IndexPointNum, err = b.ReadByte()
+			if err != nil {
+				return nil, err
+			}
+			// Reserved (size: 3 bytes).
 			if !isAllZero(b.Next(3)) {
 				return nil, ErrReservedNotZero
 			}
+			ct.TrackIndexes = append(ct.TrackIndexes, trackIndex)
 		}
 	}
 
