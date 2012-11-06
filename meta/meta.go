@@ -16,9 +16,8 @@ const (
 	ErrInvalidNumTracksForCompact = "invalid number of tracks for a compact disc; expected <= 100, got %d."
 	ErrInvalidPictureType         = "the picture type is invalid (must be <=20): %d"
 	ErrInvalidSampleRate          = "invalid sample rate; expected > 0 and <= 655350, got %d."
-	///ErrInvalidSyncCode            = "sync code is invalid (must be 11111111111110 or 16382 decimal): %d"
-	ErrMalformedVorbisComment = "malformed vorbis comment: %s"
-	ErrUnregisterdAppID       = "unregistered application id: %s."
+	ErrMalformedVorbisComment     = "malformed vorbis comment: %s"
+	ErrUnregisterdAppID           = "unregistered application id: %s."
 )
 
 // Error messages.
@@ -97,6 +96,8 @@ type BlockHeader struct {
 // bytes.
 //
 // Block header format (pseudo code):
+//    // ref: http://flac.sourceforge.net/format.html#metadata_block_header
+//
 //    type METADATA_BLOCK_HEADER struct {
 //       var is_last    bool
 //       var block_type uint7
@@ -175,6 +176,8 @@ type StreamInfo struct {
 // header.Length bytes.
 //
 // Stream info format (pseudo code):
+//    // ref: http://flac.sourceforge.net/format.html#metadata_block_streaminfo
+//
 //    type METADATA_BLOCK_STREAMINFO struct {
 //       var min_block_size  uint16
 //       var max_block_size  uint16
@@ -337,9 +340,12 @@ type Application struct {
 // provided io.Reader should limit the amount of data that can be read to
 // header.Length bytes.
 //
-// ### format (pseudo code):
-//    type METADATA_BLOCK_### struct {
-//       ###
+// Application format (pseudo code):
+//    // ref: http://flac.sourceforge.net/format.html#metadata_block_application
+//
+//    type METADATA_BLOCK_APPLICATION struct {
+//       var ID   uint32
+//       var Data [header.Length-4]byte
 //    }
 func NewApplication(buf []byte) (ap *Application, err error) {
 	if len(buf) < 4 {
@@ -403,6 +409,8 @@ const PlaceholderPoint = 0xFFFFFFFFFFFFFFFF
 // bytes.
 //
 // Seek table format (pseudo code):
+//    // ref: http://flac.sourceforge.net/format.html#metadata_block_seektable
+//
 //    type METADATA_BLOCK_SEEKTABLE struct {
 //       // The number of seek points is implied by the metadata header 'length'
 //       // field, i.e. equal to length / 18.
@@ -468,6 +476,8 @@ type VorbisEntry struct {
 // header.Length bytes.
 //
 // Vorbis comment format (pseudo code):
+//    // ref: http://flac.sourceforge.net/format.html#metadata_block_vorbis_comment
+//
 //    type METADATA_BLOCK_VORBIS_COMMENT struct {
 //       var vendor_length uint32
 //       var vendor_string [vendor_length]byte
@@ -547,7 +557,7 @@ type CueSheet struct {
 	// the media catalog number may be 0 to 128 bytes long; any unused characters
 	// should be right-padded with NUL characters. For CD-DA, this is a thirteen
 	// digit number, followed by 115 NUL bytes.
-	CatalogNum []byte
+	MCN []byte
 	// The number of lead-in samples. This field has meaning only for CD-DA
 	// cuesheets; for other uses it should be 0. For CD-DA, the lead-in is the
 	// TRACK 00 area where the table of contents is stored; more precisely, it is
@@ -560,13 +570,13 @@ type CueSheet struct {
 	// the lead-in stored here is the number of samples up to the first index
 	// point of the first track, not necessarily to INDEX 01 of the first track;
 	// even the first track may have INDEX 00 data.
-	NumLeadInSamples uint64
+	LeadInSampleCount uint64
 	// true if the CUESHEET corresponds to a Compact Disc, else false.
 	IsCompactDisc bool
 	// The number of tracks. Must be at least 1 (because of the requisite
 	// lead-out track). For CD-DA, this number must be no more than 100 (99
 	// regular tracks and one lead-out track).
-	NumTracks uint8
+	TrackCount uint8
 	// One or more tracks. A CUESHEET block is required to have a lead-out track;
 	// it is always the last track in the CUESHEET. For CD-DA, the lead-out track
 	// number must be 170 as specified by the Red Book, otherwise is must be 255.
@@ -601,7 +611,7 @@ type CueSheetTrack struct {
 	// The number of track index points. There must be at least one index in
 	// every track in a CUESHEET except for the lead-out track, which must have
 	// zero. For CD-DA, this number may be no more than 100.
-	NumTrackIndexPoints uint8
+	TrackIndexCount uint8
 	// For all tracks except the lead-out track, one or more track index points.
 	TrackIndexes []CueSheetTrackIndex
 }
@@ -624,9 +634,35 @@ type CueSheetTrackIndex struct {
 // io.Reader should limit the amount of data that can be read to header.Length
 // bytes.
 //
-// ### format (pseudo code):
-//    type METADATA_BLOCK_### struct {
-//       ###
+// Cue sheet format (pseudo code):
+//    // ref: http://flac.sourceforge.net/format.html#metadata_block_cuesheet
+//
+//    type METADATA_BLOCK_CUESHEET struct {
+//       var mcn                  [128]byte
+//       var lead_in_sample_count uint64
+//       var is_compact_disc      bool
+//       var _                    uint7
+//       var _                    [258]byte
+//       var track_count          uint8
+//       var tracks               [track_count]track
+//    }
+//
+//    type track struct {
+//       var offset            uint64
+//       var track_num         uint8
+//       var isrc              [12]byte
+//       var is_audio          bool
+//       var has_pre_emphasis  bool
+//       var _                 uint6
+//       var _                 [13]byte
+//       var track_index_count uint8
+//       var track_indexes     [track_index_count]track_index
+//    }
+//
+//    type track_index {
+//       var offset          uint64
+//       var index_point_num uint8
+//       var _               [3]byte
 //    }
 func NewCueSheet(buf []byte) (cs *CueSheet, err error) {
 	// Minimum valid size based on CueSheet with one lead-out track:
@@ -639,10 +675,10 @@ func NewCueSheet(buf []byte) (cs *CueSheet, err error) {
 	b := bytes.NewBuffer(buf)
 
 	// Media catalog number (size: 128 bytes).
-	cs.CatalogNum = b.Next(128)
+	cs.MCN = b.Next(128)
 
 	// The number of lead-in samples (size: 8 bytes).
-	cs.NumLeadInSamples = binary.BigEndian.Uint64(b.Next(8))
+	cs.LeadInSampleCount = binary.BigEndian.Uint64(b.Next(8))
 
 	const (
 		// CueSheet
@@ -670,24 +706,24 @@ func NewCueSheet(buf []byte) (cs *CueSheet, err error) {
 	}
 
 	// The number of tracks (size: 1 byte).
-	cs.NumTracks, err = b.ReadByte()
+	cs.TrackCount, err = b.ReadByte()
 	if err != nil {
 		return nil, err
 	}
-	if cs.NumTracks < 1 {
+	if cs.TrackCount < 1 {
 		return nil, ErrMissingLeadOutTrack
-	} else if cs.NumTracks > 100 && cs.IsCompactDisc {
-		return nil, fmt.Errorf(ErrInvalidNumTracksForCompact, cs.NumTracks)
+	} else if cs.TrackCount > 100 && cs.IsCompactDisc {
+		return nil, fmt.Errorf(ErrInvalidNumTracksForCompact, cs.TrackCount)
 	}
 
 	// Minimum valid size of Tracks:
-	// len(CUESHEET_TRACK) + (NumTracks-1)*len(CUESHEET_TRACK_INDEX) =
-	// 36 + (NumTracks-1)*12
-	TracksMinSize := int(36 + (cs.NumTracks-1)*12)
+	// len(CUESHEET_TRACK) + (TrackCount-1)*len(CUESHEET_TRACK_INDEX) =
+	// 36 + (TrackCount-1)*12
+	TracksMinSize := int(36 + (cs.TrackCount-1)*12)
 	if b.Len() < TracksMinSize {
 		return nil, fmt.Errorf("invalid block size; expected >= %d, got %d.", TracksMinSize, b.Len())
 	}
-	for trackNum := 0; trackNum < int(cs.NumTracks); trackNum++ {
+	for trackNum := 0; trackNum < int(cs.TrackCount); trackNum++ {
 		ct := new(CueSheetTrack)
 
 		// Track offset in samples (size: 8 bytes).
@@ -735,31 +771,31 @@ func NewCueSheet(buf []byte) (cs *CueSheet, err error) {
 		}
 
 		// Number of track index points (size: 1 byte).
-		ct.NumTrackIndexPoints, err = b.ReadByte()
+		ct.TrackIndexCount, err = b.ReadByte()
 		if err != nil {
 			return nil, err
 		}
-		if trackNum == int(cs.NumTracks-1) {
+		if trackNum == int(cs.TrackCount-1) {
 			// The lead-out track is always the last track in the CUESHEET. It must
 			// have zero track index points.
-			if ct.NumTrackIndexPoints != 0 {
-				return nil, fmt.Errorf("invalid number of track index points in cuesheet lead-out track; expected 0 got %d.", ct.NumTrackIndexPoints)
+			if ct.TrackIndexCount != 0 {
+				return nil, fmt.Errorf("invalid number of track index points in cuesheet lead-out track; expected 0 got %d.", ct.TrackIndexCount)
 			}
 		} else {
 			// There must be at least one index in every track in a CUESHEET except
 			// for the lead-out track.
-			if ct.NumTrackIndexPoints < 1 {
-				return nil, fmt.Errorf("invalid cuesheet track, too few index points; expected >= 1, got %d.", ct.NumTrackIndexPoints)
+			if ct.TrackIndexCount < 1 {
+				return nil, fmt.Errorf("invalid cuesheet track, too few index points; expected >= 1, got %d.", ct.TrackIndexCount)
 			}
 		}
 
 		// Minimum valid size of TrackIndexes:
-		// len(CUESHEET_TRACK_INDEX)*NumTrackIndexPoints = 12*NumTrackIndexPoints
-		TrackIndexesMinSize := int(12 * ct.NumTrackIndexPoints)
+		// len(CUESHEET_TRACK_INDEX)*TrackIndexCount = 12*TrackIndexCount
+		TrackIndexesMinSize := int(12 * ct.TrackIndexCount)
 		if b.Len() < TrackIndexesMinSize {
 			return nil, fmt.Errorf("invalid size of TrackIndexes; expected >= %d, got %d.", TrackIndexesMinSize, b.Len())
 		}
-		ct.TrackIndexes = make([]CueSheetTrackIndex, ct.NumTrackIndexPoints)
+		ct.TrackIndexes = make([]CueSheetTrackIndex, ct.TrackIndexCount)
 		for i := 0; i < len(ct.TrackIndexes); i++ {
 			trackIndex := CueSheetTrackIndex{
 				Offset: binary.BigEndian.Uint64(b.Next(8)), // Offset in samples (size: 8 bytes)
@@ -784,13 +820,48 @@ func NewCueSheet(buf []byte) (cs *CueSheet, err error) {
 // most commonly cover art from CDs. There may be more than one PICTURE block in
 // a file.
 type Picture struct {
+	// The picture type according to the ID3v2 APIC frame:
+	//    0 - Other
+	//    1 - 32x32 pixels 'file icon' (PNG only)
+	//    2 - Other file icon
+	//    3 - Cover (front)
+	//    4 - Cover (back)
+	//    5 - Leaflet page
+	//    6 - Media (e.g. label side of CD)
+	//    7 - Lead artist/lead performer/soloist
+	//    8 - Artist/performer
+	//    9 - Conductor
+	//    10 - Band/Orchestra
+	//    11 - Composer
+	//    12 - Lyricist/text writer
+	//    13 - Recording Location
+	//    14 - During recording
+	//    15 - During performance
+	//    16 - Movie/video screen capture
+	//    17 - A bright coloured fish
+	//    18 - Illustration
+	//    19 - Band/artist logotype
+	//    20 - Publisher/Studio logotype
+	//
+	// Others are reserved and should not be used. There may only be one each of
+	// picture type 1 and 2 in a file.
 	Type       uint32
+	// The MIME type string, in printable ASCII characters 0x20-0x7e. The MIME
+	// type may also be --> to signify that the data part is a URL of the picture
+	// instead of the picture data itself.
 	MIME       string
+	// The description of the picture, in UTF-8.
 	PicDesc    string
+	// The width of the picture in pixels.
 	Width      uint32
+	// The height of the picture in pixels.
 	Height     uint32
+	// The color depth of the picture in bits-per-pixel.
 	ColorDepth uint32
-	NumColors  uint32
+	// For indexed-color pictures (e.g. GIF), the number of colors used, or 0 for
+	// non-indexed pictures.
+	ColorCount uint32
+	// The binary picture data.
 	Data       []byte
 }
 
@@ -798,9 +869,21 @@ type Picture struct {
 // io.Reader should limit the amount of data that can be read to header.Length
 // bytes.
 //
-// ### format (pseudo code):
-//    type METADATA_BLOCK_### struct {
-//       ###
+// Picture format (pseudo code):
+//    // ref: http://flac.sourceforge.net/format.html#metadata_block_picture
+//
+//    type METADATA_BLOCK_PICTURE struct {
+//       var type        uint32
+//       var mime_length uint32
+//       var mime_string [mime_length]byte
+//       var desc_length uint32
+//       var desc_string [desc_length]byte
+//       var width       uint32
+//       var height      uint32
+//       var color_depth uint32
+//       var color_count uint32
+//       var data_length uint32
+//       var data        [data_length]byte
 //    }
 func NewPicture(buf []byte) (p *Picture, err error) {
 	p = new(Picture)
@@ -846,7 +929,7 @@ func NewPicture(buf []byte) (p *Picture, err error) {
 	p.Width = binary.BigEndian.Uint32(b.Next(4))
 	p.Height = binary.BigEndian.Uint32(b.Next(4))
 	p.ColorDepth = binary.BigEndian.Uint32(b.Next(4))
-	p.NumColors = binary.BigEndian.Uint32(b.Next(4))
+	p.ColorCount = binary.BigEndian.Uint32(b.Next(4))
 
 	//Length of the Picture data (size: 4 bytes), Picture data (size: depends on length)
 	p.Data = b.Next(int(binary.BigEndian.Uint32(b.Next(4))))

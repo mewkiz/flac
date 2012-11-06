@@ -29,7 +29,7 @@ const FlacSignature = "fLaC"
 
 // Formatted error strings.
 const (
-	ErrSignatureMismatch         = "invalid flac signature: %s, should be " + FlacSignature
+	ErrSignatureMismatch         = "invalid flac signature: '%s', should be '" + FlacSignature + "'."
 	ErrStreamInfoIsNotFirstBlock = "first block type is invalid: expected '%d' (StreamInfo), got '%d'."
 )
 
