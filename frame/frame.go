@@ -1,14 +1,19 @@
+// Package frame contains functions for parsing FLAC encoded audio data.
 package frame
 
-import "bytes"
-import dbg "fmt"
 import "encoding/binary"
+import "errors"
 import "fmt"
+import "io"
+import dbg "fmt"
 
 const (
-	ErrIsNotNil        = "the reserved bits are not all 0"
 	ErrInvalidSyncCode = "sync code is invalid (must be 11111111111110 or 16382 decimal): %d"
-	ErrInvalidEncoding = "UTF8 invalid encoding"
+)
+
+var (
+	ErrIsNotNil        = errors.New("the reserved bits are not all 0")
+	ErrInvalidEncoding = errors.New("UTF8 invalid encoding")
 )
 
 type Frame struct {
@@ -32,8 +37,8 @@ type SubFrame struct {
 }
 
 type SubFrameHeader struct {
-	frameType  uint8
-	wastedBits []byte
+	subFrameType uint8
+	wastedBits   []byte
 }
 
 type SubFrameConstant struct {
@@ -76,44 +81,56 @@ type RicePartition struct {
 
 type Rice2Partition struct{}
 
-type FrameFooter struct{}
+type FrameFooter struct {
+	CRC uint16
+}
 
-func Decode(block []byte) (f *Frame, err error) {
+
+func Decode(r io.Reader) (f *Frame, err error) {
 	const (
-		SyncCodeMask         = 0xFFFC
-		FirstReservedMask    = 0x0002
-		BlockingStrategyMask = 0x0001
+		syncCodeLen = 2
 
-		BlockSizeInterChannelSamplesMask = 0xF0
-		SampleRateMask                   = 0x0F
-
-		ChannelAssignmentMask = 0xF0
-		SampleSizeMask        = 0x0E
-		SecondReservedMask    = 0x01
+		syncCodeMask                     = 0xFFFC
+		firstReservedMask                = 0x0002
+		blockingStrategyMask             = 0x0001
+		blockSizeInterChannelSamplesMask = 0xF0
+		sampleRateMask                   = 0x0F
+		channelAssignmentMask            = 0xF0
+		sampleSizeMask                   = 0x0E
+		secondReservedMask               = 0x01
 	)
 
 	f = new(Frame)
 
-	buf := bytes.NewBuffer(block)
+	buf := make([]byte, syncCodeLen)
+	_, err = r.Read(buf)
+	if err != nil {
+		return nil, err
+	}
 
 	//Sync Code, Reserved and blocking strategy (size: 2 bytes)
-	bits := binary.BigEndian.Uint16(buf.Next(2))
-	if (SyncCodeMask&bits)>>2 != 16382 {
-		return nil, fmt.Errorf(ErrInvalidSyncCode, (SyncCodeMask&bits)>>2)
+	bits := binary.BigEndian.Uint16(buf)
+	if (syncCodeMask&bits)>>2 != 16382 {
+		return nil, fmt.Errorf(ErrInvalidSyncCode, (syncCodeMask&bits)>>2)
 	}
 
 	//Reserved values most be 0
-	if (FirstReservedMask&bits)>>1 != 0 {
-		return nil, fmt.Errorf(ErrIsNotNil)
+	if (firstReservedMask&bits)>>1 != 0 {
+		return nil, ErrIsNotNil
 	}
 
-	//If BlockingStrategyMask is 0 it has fixed blocksize instead of variable
-	if BlockingStrategyMask&bits != 0 {
+	//If blockingStrategyMask is 0 it has fixed blocksize instead of variable
+	if blockingStrategyMask&bits != 0 {
 		f.Header.HasVariableBlockSize = true
 	}
 
 	// Block size in inter channel samples and Sample rate (size: 1 byte)
-	aByte := buf.Next(1)[0]
+	buf := make([]byte, syncCodeLen)
+	_, err = r.Read(buf)
+	if err != nil {
+		return nil, err
+	}
+	r.Read(p)
 
 	f.Header.BlockSizeInterChannelSamples = uint8((BlockSizeInterChannelSamplesMask & aByte) >> 4)
 	f.Header.SampleRate = uint8(SampleRateMask & aByte)
@@ -125,7 +142,7 @@ func Decode(block []byte) (f *Frame, err error) {
 	f.Header.SampleSize = uint8(SampleSizeMask & aByte >> 1)
 
 	if (SecondReservedMask & bits) != 0 {
-		return nil, fmt.Errorf(ErrIsNotNil)
+		return nil, ErrIsNotNil
 	}
 
 	///I have no idea how to decrypt this part of the spec:
@@ -137,13 +154,73 @@ func Decode(block []byte) (f *Frame, err error) {
 	if f.Header.HasVariableBlockSize {
 
 	} else {
-		// var frameNum uint32
+		var frameNum uint64
 		dbg.Println("Fixed!")
-		readValue, err := getUTF8Num(buf.Next(1))
-		if err != nil {
-			return nil, err
+
+		//Well, as the documentation states, it uses the same method as in UTF-8 to store variable length integers
+		const (
+			endMask        = 0x80
+			invalidMask    = 0xC0
+			twoLeadingMask = 0xC0
+			leadMask       = 0x80
+		)
+
+		// var sampleNum uint32
+
+		b0 := buf.Next(1)[0] //read one byte B0 from the stream
+		switch {
+		case b0&endMask == 0:
+			///if B0 = 0xxxxxxx then the read value is B0 -> end
+			frameNum = uint64(b0)
+		case b0&invalidMask != 128:
+			return nil, ErrInvalidEncoding
+			///- if B0 = 10xxxxxx, the encoding is invalid
+		case b0&twoLeadingMask == 192:
+			var leadOnes uint8
+			for (b0 & leadMask) > 0 {
+				leadOnes++
+				b0 <<= 1
+			}
+			fmt.Println(b0, ":", leadOnes)
+			///determine numLeadingBinary1sMinus1
+			// - if B0 = 11xxxxxx, set L to the number of leading binary 1s minus 1:
+			//      B0 = 110xxxxx -> L = 1
+			//      B0 = 1110xxxx -> L = 2
+			//      B0 = 11110xxx -> L = 3
+			//      B0 = 111110xx -> L = 4
+			//      B0 = 1111110x -> L = 5
+			//      B0 = 11111110 -> L = 6
 		}
-		dbg.Println(readValue)
+
+		fmt.Println("FrameNum:", frameNum)
+
+		/*
+
+
+			- assign the bits following the encoding (the x bits in the examples) to
+			a variable R with a magnitude of at least 56 bits
+			- loop from 1 to L
+			     - left shift R 6 bits
+			     - read B from the stream
+			     - if B does not match 10xxxxxx, the encoding is invalid
+			     - set R = R or <the lower 6 bits from B>
+			- the read value is R
+
+			The following two fields depend on the block size and sample rate index
+			read earlier in the header:
+
+			- If blocksize index = 6, read 8 bits from the stream. The true block
+			size is the read value + 1.
+			- If blocksize index = 7, read 16 bits from the stream. The true block
+			size is the read value + 1.
+
+			- If sample index is 12, read 8 bits from the stream. The true sample
+			rate is the read value * 1000.
+			- If sample index is 13, read 16 bits from the stream. The true sample
+			rate is the read value.
+			- If sample index is 14, read 16 bits from the stream. The true sample
+			rate is the read value * 10.
+		*/
 	}
 
 	// - If blocksize index = 6, read 8 bits from the stream. The true block
@@ -183,73 +260,32 @@ func Decode(block []byte) (f *Frame, err error) {
 
 	f.Header.CRC = uint8(buf.Next(1)[0])
 
-	return f, nil
-}
+	f.Footer.CRC = binary.BigEndian.Uint16(buf.Next(2))
 
-func getUTF8Num(block []byte) (readValue uint64, err error) {
-	//Well, as the documentation states, it uses the same method as in UTF-8 to store variable length integers
 	const (
-		endMask        = 0x80
-		invalidMask    = 0xC0
-		twoLeadingMask = 0xC0
-		leadMask       = 0x80
+		zeroPaddingMask  = 0x80
+		subFrameTypeMask = 0x7E
 	)
 
-	buf := bytes.NewBuffer(block)
+	subFrame := new(SubFrame)
 
-	// var sampleNum uint32
+	c, err := buf.ReadByte()
 
-	b0 := buf.Next(1)[0] //read one byte B0 from the stream
-	switch {
-	case b0&endMask == 0:
-		///if B0 = 0xxxxxxx then the read value is B0 -> end
-		return uint64(b0), nil
-	case b0&invalidMask != 128:
-		return 0, fmt.Errorf(ErrInvalidEncoding)
-		///- if B0 = 10xxxxxx, the encoding is invalid
-	case b0&twoLeadingMask == 192:
-		var leadOnes uint8
-		for (b0 & leadMask) > 0 {
-			leadOnes++
-			b0 <<= 1
-		}
-		fmt.Println(b0, ":", leadOnes)
-		///determine numLeadingBinary1sMinus1
-		// - if B0 = 11xxxxxx, set L to the number of leading binary 1s minus 1:
-		//      B0 = 110xxxxx -> L = 1
-		//      B0 = 1110xxxx -> L = 2
-		//      B0 = 11110xxx -> L = 3
-		//      B0 = 111110xx -> L = 4
-		//      B0 = 1111110x -> L = 5
-		//      B0 = 11111110 -> L = 6
+	//Zero bit padding, to prevent sync-fooling string of 1s
+	if c&zeroPaddingMask != 0 {
+		return nil, ErrIsNotNil
 	}
 
-	/*
-
-
-		- assign the bits following the encoding (the x bits in the examples) to
-		a variable R with a magnitude of at least 56 bits
-		- loop from 1 to L
-		     - left shift R 6 bits
-		     - read B from the stream
-		     - if B does not match 10xxxxxx, the encoding is invalid
-		     - set R = R or <the lower 6 bits from B>
-		- the read value is R
-
-		The following two fields depend on the block size and sample rate index
-		read earlier in the header:
-
-		- If blocksize index = 6, read 8 bits from the stream. The true block
-		size is the read value + 1.
-		- If blocksize index = 7, read 16 bits from the stream. The true block
-		size is the read value + 1.
-
-		- If sample index is 12, read 8 bits from the stream. The true sample
-		rate is the read value * 1000.
-		- If sample index is 13, read 16 bits from the stream. The true sample
-		rate is the read value.
-		- If sample index is 14, read 16 bits from the stream. The true sample
-		rate is the read value * 10.
+	/*	Subframe type:
+		000000 : SUBFRAME_CONSTANT
+		000001 : SUBFRAME_VERBATIM
+		00001x : reserved
+		0001xx : reserved
+		001xxx : if(xxx <= 4) SUBFRAME_FIXED, xxx=order ; else reserved
+		01xxxx : reserved
+		1xxxxx : SUBFRAME_LPC, xxxxx=order-1
 	*/
-	return 0, nil
+	subFrame.Header.subFrameType = c & subFrameTypeMask
+
+	return f, nil
 }

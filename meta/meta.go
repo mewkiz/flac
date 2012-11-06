@@ -5,6 +5,7 @@ import "bytes"
 import "encoding/binary"
 import "errors"
 import "fmt"
+import "io/ioutil"
 import "io"
 import "strings"
 
@@ -333,7 +334,7 @@ type Application struct {
 	// Registered application ID.
 	ID string
 	// Application data.
-	Data []byte ///interface{} type instead?
+	Data []byte
 }
 
 // NewApplication parses and returns a new Application metadata block. The
@@ -347,27 +348,32 @@ type Application struct {
 //       var ID   uint32
 //       var Data [header.Length-4]byte
 //    }
-func NewApplication(buf []byte) (ap *Application, err error) {
-	if len(buf) < 4 {
-		return nil, fmt.Errorf("invalid block size; expected >= 4, got %d.", len(buf))
-	}
+func NewApplication(r io.Reader) (ap *Application, err error) {
+	const (
+		// Application ID (size: 4 bytes).
+		idLen = 4
+	)
 
 	ap = new(Application)
-	b := bytes.NewBuffer(buf)
 
-	// Application ID (size: 4 bytes).
-	ap.ID = string(b.Next(4))
+	buf := make([]byte, idLen)
+	_, err = r.Read(buf)
+	if err != nil {
+		return nil, err
+	}
+
+	ap.ID = string(buf)
+
 	_, ok := RegisteredApplications[ap.ID]
 	if !ok {
 		return nil, fmt.Errorf(ErrUnregisterdAppID, ap.ID)
 	}
 
-	ap.Data = b.Bytes()
-
-	///Make uber switch case for all applications
-	// switch ap.ID {
-
-	// }
+	buf, err = ioutil.ReadAll(r)
+	if err != nil {
+		return nil, err
+	}
+	ap.Data = buf
 
 	return ap, nil
 }
