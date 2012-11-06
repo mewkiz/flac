@@ -103,11 +103,11 @@ func NewStream(r io.ReadSeeker) (s *Stream, err error) {
 				return nil, err
 			}
 		case meta.TypeApplication:
-			st, err := meta.NewApplication(lr)
+			ap, err := meta.NewApplication(lr)
 			if err != nil {
 				return nil, err
 			}
-			s.MetaBlocks = append(s.MetaBlocks, st)
+			s.MetaBlocks = append(s.MetaBlocks, ap)
 		case meta.TypeSeekTable:
 			st, err := meta.NewSeekTable(lr)
 			if err != nil {
@@ -120,10 +120,20 @@ func NewStream(r io.ReadSeeker) (s *Stream, err error) {
 				return nil, err
 			}
 			s.MetaBlocks = append(s.MetaBlocks, vc)
-		/**case meta.TypeCueSheet:
-			newBlock = meta.NewCueSheet
+		/**
+		case meta.TypeCueSheet:
+			cs, err := meta.NewCueSheet(lr)
+			if err != nil {
+				return nil, err
+			}
+			s.MetaBlocks = append(s.MetaBlocks, cs)
+		*/
 		case meta.TypePicture:
-			newBlock = meta.NewPicture*/
+			p, err := meta.NewPicture(lr)
+			if err != nil {
+				return nil, err
+			}
+			s.MetaBlocks = append(s.MetaBlocks, p)
 		default:
 			return nil, fmt.Errorf("block type '%d' not yet supported.", header.BlockType)
 		}

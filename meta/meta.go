@@ -12,7 +12,6 @@ import "strings"
 // Formatted error messages.
 const (
 	ErrInvalidNumTracksForCompact = "invalid number of tracks for a compact disc; expected <= 100, got %d."
-	ErrInvalidPictureType         = "the picture type is invalid (must be <=20): %d"
 )
 
 // Error messages.
@@ -838,24 +837,24 @@ type Picture struct {
 	//
 	// Others are reserved and should not be used. There may only be one each of
 	// picture type 1 and 2 in a file.
-	Type       uint32
+	Type uint32
 	// The MIME type string, in printable ASCII characters 0x20-0x7e. The MIME
 	// type may also be --> to signify that the data part is a URL of the picture
 	// instead of the picture data itself.
-	MIME       string
+	MIME string
 	// The description of the picture, in UTF-8.
-	PicDesc    string
+	Desc string
 	// The width of the picture in pixels.
-	Width      uint32
+	Width uint32
 	// The height of the picture in pixels.
-	Height     uint32
+	Height uint32
 	// The color depth of the picture in bits-per-pixel.
 	ColorDepth uint32
 	// For indexed-color pictures (e.g. GIF), the number of colors used, or 0 for
 	// non-indexed pictures.
 	ColorCount uint32
 	// The binary picture data.
-	Data       []byte
+	Data []byte
 }
 
 // NewPicture parses and returns a new Picture metadata block. The provided
@@ -878,54 +877,86 @@ type Picture struct {
 //       var data_length uint32
 //       var data        [data_length]byte
 //    }
-func NewPicture(buf []byte) (p *Picture, err error) {
+func NewPicture(r io.Reader) (p *Picture, err error) {
+	// Type.
 	p = new(Picture)
-	b := bytes.NewBuffer(buf)
-
-	///Check for multiple pictures of the same type
-
-	//A list of allowed picture types
-	// 0 - Other
-	// 1 - 32x32 pixels 'file icon' (PNG only)
-	// 2 - Other file icon
-	// 3 - Cover (front)
-	// 4 - Cover (back)
-	// 5 - Leaflet page
-	// 6 - Media (e.g. label side of CD)
-	// 7 - Lead artist/lead performer/soloist
-	// 8 - Artist/performer
-	// 9 - Conductor
-	// 10 - Band/Orchestra
-	// 11 - Composer
-	// 12 - Lyricist/text writer
-	// 13 - Recording Location
-	// 14 - During recording
-	// 15 - During performance
-	// 16 - Movie/video screen capture
-	// 17 - A bright coloured fish
-	// 18 - Illustration
-	// 19 - Band/artist logotype
-	// 20 - Publisher/Studio logotype
-
-	//Picture type (size: 4 bytes)
-	p.Type = binary.BigEndian.Uint32(b.Next(4))
+	err = binary.Read(r, binary.BigEndian, &p.Type)
+	if err != nil {
+		return nil, err
+	}
 	if p.Type > 20 {
-		return nil, fmt.Errorf(ErrInvalidPictureType, p.Type)
+		return nil, fmt.Errorf("meta.NewPicture: reserved picture type: %d.", p.Type)
 	}
 
-	//Length of the mime type (size: 4 bytes), Mime type string (size: depends on length)
-	p.MIME = string(b.Next(int(binary.BigEndian.Uint32(b.Next(4)))))
+	// Mime length.
+	var mimeLen uint32
+	err = binary.Read(r, binary.BigEndian, &mimeLen)
+	if err != nil {
+		return nil, err
+	}
 
-	//Length of the Picture description (size: 4 bytes), Description string (size: depends on length)
-	p.PicDesc = string(b.Next(int(binary.BigEndian.Uint32(b.Next(4)))))
+	// Mime string.
+	buf := make([]byte, mimeLen)
+	_, err = r.Read(buf)
+	if err != nil {
+		return nil, err
+	}
+	p.MIME = string(buf)
 
-	p.Width = binary.BigEndian.Uint32(b.Next(4))
-	p.Height = binary.BigEndian.Uint32(b.Next(4))
-	p.ColorDepth = binary.BigEndian.Uint32(b.Next(4))
-	p.ColorCount = binary.BigEndian.Uint32(b.Next(4))
+	// Desc length.
+	var descLen uint32
+	err = binary.Read(r, binary.BigEndian, &descLen)
+	if err != nil {
+		return nil, err
+	}
 
-	//Length of the Picture data (size: 4 bytes), Picture data (size: depends on length)
-	p.Data = b.Next(int(binary.BigEndian.Uint32(b.Next(4))))
+	// Desc string.
+	buf = make([]byte, descLen)
+	_, err = r.Read(buf)
+	if err != nil {
+		return nil, err
+	}
+	p.Desc = string(buf)
+
+	// Width.
+	err = binary.Read(r, binary.BigEndian, &p.Width)
+	if err != nil {
+		return nil, err
+	}
+
+	// Height.
+	err = binary.Read(r, binary.BigEndian, &p.Height)
+	if err != nil {
+		return nil, err
+	}
+
+	// ColorDepth.
+	err = binary.Read(r, binary.BigEndian, &p.ColorDepth)
+	if err != nil {
+		return nil, err
+	}
+
+	// ColorCount.
+	err = binary.Read(r, binary.BigEndian, &p.ColorCount)
+	if err != nil {
+		return nil, err
+	}
+
+	// Data length.
+	var dataLen uint32
+	err = binary.Read(r, binary.BigEndian, &dataLen)
+	if err != nil {
+		return nil, err
+	}
+
+	// Data.
+	p.Data, err = ioutil.ReadAll(r)
+	if err != nil {
+		return nil, err
+	}
+	if len(p.Data) != int(dataLen) {
+		return nil, fmt.Errorf("meta.NewPicture: invalid data length; expected %d, got %d.", dataLen, len(p.Data))
+	}
 
 	return p, nil
 }
