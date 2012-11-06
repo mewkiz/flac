@@ -5,6 +5,7 @@ import "bytes"
 import "encoding/binary"
 import "errors"
 import "fmt"
+import "io"
 import "strings"
 
 // Formatted error messages.
@@ -91,36 +92,46 @@ type BlockHeader struct {
 	Length int
 }
 
-// NewBlockHeader parses and returns a new metadata block header.
-func NewBlockHeader(buf []byte) (h *BlockHeader, err error) {
+// NewBlockHeader parses and returns a new metadata block header. The provided
+// io.Reader should limit the amount of data that can be read to header.Length
+// bytes.
+//
+// Block header format (pseudo code):
+//    type METADATA_BLOCK_HEADER struct {
+//       var is_last    bool
+//       var block_type uint7
+//       var length     uint24
+//    }
+func NewBlockHeader(r io.Reader) (h *BlockHeader, err error) {
 	const (
-		LastBlockMask = 0x80000000
-		TypeMask      = 0x7F000000
-		LengthMask    = 0x00FFFFFF
+		LastBlockMask = 0x80000000 // 1 bit
+		TypeMask      = 0x7F000000 // 7 bits
+		LengthMask    = 0x00FFFFFF // 24 bits
 	)
-
-	if len(buf) != 4 {
-		return nil, fmt.Errorf(ErrInvalidBlockLen, 4, len(buf))
+	var bits uint32
+	err = binary.Read(r, binary.BigEndian, &bits)
+	if err != nil {
+		return nil, err
 	}
 
+	// Is last.
 	h = new(BlockHeader)
-	bits := binary.BigEndian.Uint32(buf)
-
-	// Check if this is the last metadata block.
 	if bits&LastBlockMask != 0 {
 		h.IsLast = true
 	}
 
+	// Block type.
 	h.BlockType = Type(bits & TypeMask >> 24)
-	h.Length = int(bits & LengthMask) // won't overflow, since max is 0x00FFFFFF.
-
 	if h.BlockType >= 7 && h.BlockType <= 126 {
-		// block type 7-126: reserved
-		return nil, ErrReserved
+		// block type 7-126: reserved.
+		return nil, errors.New("meta.NewBlockHeader: Reserved block type.")
 	} else if h.BlockType == 127 {
-		// block type 127: invalid, to avoid confusion with a frame sync code
-		return nil, ErrInvalidBlockType
+		// block type 127: invalid.
+		return nil, errors.New("meta.NewBlockHeader: Invalid block type.")
 	}
+
+	// Length.
+	h.Length = int(bits & LengthMask) // won't overflow, since max is 0x00FFFFFF.
 
 	return h, nil
 }
@@ -143,36 +154,47 @@ type StreamInfo struct {
 	// is limited by the structure of frame headers to 655350Hz. Also, a value of
 	// 0 is invalid.
 	SampleRate uint32
-	// (number of channels)-1. FLAC supports from 1 to 8 channels.
-	NumChannels uint8
-	// (bits per sample)-1. FLAC supports from 4 to 32 bits per sample. Currently
-	// the reference encoder and decoders only support up to 24 bits per sample.
+	// Number of channels. FLAC supports from 1 to 8 channels.
+	ChannelCount uint8
+	// Bits per sample. FLAC supports from 4 to 32 bits per sample. Currently the
+	// reference encoder and decoders only support up to 24 bits per sample.
 	BitsPerSample uint8
 	// Total samples in stream. 'Samples' means inter-channel sample, i.e. one
 	// second of 44.1Khz audio will have 44100 samples regardless of the number
 	// of channels. A value of zero here means the number of total samples is
 	// unknown.
-	NumSamples uint64
+	SampleCount uint64
 	// MD5 signature of the unencoded audio data. This allows the decoder to
 	// determine if an error exists in the audio data even when the error does
 	// not result in an invalid bitstream.
-	MD5 []byte
+	MD5sum [16]byte
 }
 
-// NewStreamInfo parses and returns a new StreamInfo metadata block.
-func NewStreamInfo(buf []byte) (si *StreamInfo, err error) {
-	// A StreamInfo block is always 34 bytes.
-	if len(buf) != 34 {
-		return nil, fmt.Errorf(ErrInvalidBlockLen, 34, len(buf))
-	}
-
+// NewStreamInfo parses and returns a new StreamInfo metadata block. The
+// provided io.Reader should limit the amount of data that can be read to
+// header.Length bytes.
+//
+// Stream info format (pseudo code):
+//    type METADATA_BLOCK_STREAMINFO struct {
+//       var min_block_size  uint16
+//       var max_block_size  uint16
+//       var min_frame_size  uint24
+//       var max_frame_size  uint24
+//       var sample_rate     uint20
+//       var channel_count   uint3 // (number of channels)-1.
+//       var bits_per_sample uint5 // (bits per sample)-1.
+//       var sample_count    uint36
+//       var md5sum          [16]byte
+//    }
+func NewStreamInfo(r io.Reader) (si *StreamInfo, err error) {
+	// Minimum block size.
 	si = new(StreamInfo)
-	b := bytes.NewBuffer(buf)
-
-	// Minimum block size (size: 2 bytes).
-	si.MinBlockSize = binary.BigEndian.Uint16(b.Next(2))
+	err = binary.Read(r, binary.BigEndian, &si.MinBlockSize)
+	if err != nil {
+		return nil, err
+	}
 	if si.MinBlockSize < 16 {
-		return nil, fmt.Errorf(ErrInvalidMinBlockSize, si.MinBlockSize)
+		return nil, fmt.Errorf("meta.NewStreamInfo: invalid min block size; expected >= 16, got %d.", si.MinBlockSize)
 	}
 
 	const (
@@ -180,51 +202,94 @@ func NewStreamInfo(buf []byte) (si *StreamInfo, err error) {
 		MinFrameSizeMask = 0x0000FFFFFF000000 // 24 bits
 		MaxFrameSizeMask = 0x0000000000FFFFFF // 24 bits
 	)
-
 	// In order to keep everything on powers-of-2 boundaries, reads from the
-	// block are grouped thus:
+	// block are grouped accordingly:
 	// MaxBlockSize (16 bits) + MinFrameSize (24 bits) + MaxFrameSize (24 bits) =
 	// 64 bits
-	bits := binary.BigEndian.Uint64(b.Next(8))
-
-	si.MaxBlockSize = uint16(bits & MaxBlockSizeMask >> 48)
-	if si.MaxBlockSize < 16 || si.MaxBlockSize > 65535 {
-		return nil, fmt.Errorf(ErrInvalidMaxBlockSize, si.MaxBlockSize)
+	var bits uint64
+	err = binary.Read(r, binary.BigEndian, &bits)
+	if err != nil {
+		return nil, err
 	}
 
+	// Max block size.
+	si.MaxBlockSize = uint16(bits & MaxBlockSizeMask >> 48)
+	if si.MaxBlockSize < 16 || si.MaxBlockSize > 65535 {
+		return nil, fmt.Errorf("meta.NewStreamInfo: invalid min block size; expected >= 16 and <= 65535, got %d.", si.MaxBlockSize)
+	}
+
+	// Min frame size.
 	si.MinFrameSize = uint32(bits & MinFrameSizeMask >> 24)
+
+	// Max frame size.
 	si.MaxFrameSize = uint32(bits & MaxFrameSizeMask)
 
 	const (
 		SampleRateMask    = 0xFFFFF00000000000 // 20 bits
-		NumChannelsMask   = 0x00000E0000000000 // 3 bits
+		ChannelCountMask  = 0x00000E0000000000 // 3 bits
 		BitsPerSampleMask = 0x000001F000000000 // 5 bits
-		NumSamplesMask    = 0x0000000FFFFFFFFF // 36 bits
+		SampleCountMask   = 0x0000000FFFFFFFFF // 36 bits
 	)
-
 	// In order to keep everything on powers-of-2 boundaries, reads from the
-	// block are grouped thus:
-	// SampleRate (20 bits) + NumChannels (3 bits) + BitsPerSample (5 bits) +
-	// NumSamples (36 bits) = 64 bits
-	bits = binary.BigEndian.Uint64(b.Next(8))
-
-	si.SampleRate = uint32(bits & SampleRateMask >> 44)
-	if si.SampleRate > 655350 || si.SampleRate == 0 {
-		return nil, fmt.Errorf(ErrInvalidSampleRate, si.SampleRate)
+	// block are grouped accordingly:
+	// SampleRate (20 bits) + ChannelCount (3 bits) + BitsPerSample (5 bits) +
+	// SampleCount (36 bits) = 64 bits
+	err = binary.Read(r, binary.BigEndian, &bits)
+	if err != nil {
+		return nil, err
 	}
 
-	// Both NumChannels and BitsPerSample are specified to be subtracted by 1 in
+	// Sample rate.
+	si.SampleRate = uint32(bits & SampleRateMask >> 44)
+	if si.SampleRate > 655350 || si.SampleRate == 0 {
+		return nil, fmt.Errorf("meta.NewStreamInfo: invalid sample rate; expected > 0 and <= 655350, got %d.", si.SampleRate)
+	}
+
+	// Both ChannelCount and BitsPerSample are specified to be subtracted by 1 in
 	// the specification:
 	// http://flac.sourceforge.net/format.html#metadata_block_streaminfo
-	si.NumChannels = uint8(bits&NumChannelsMask>>41) + 1
+
+	// Channel count.
+	si.ChannelCount = uint8(bits&ChannelCountMask>>41) + 1
+	if si.ChannelCount < 1 || si.ChannelCount > 8 {
+		return nil, fmt.Errorf("meta.NewStreamInfo: invalid number of channels; expected >= 1 and <= 8, got %d.", si.ChannelCount)
+	}
+
+	// Bits per sample.
 	si.BitsPerSample = uint8(bits&BitsPerSampleMask>>36) + 1
+	if si.BitsPerSample < 4 || si.BitsPerSample > 32 {
+		return nil, fmt.Errorf("meta.NewStreamInfo: invalid number of bits per sample; expected >= 4 and <= 32, got %d.", si.BitsPerSample)
+	}
 
-	si.NumSamples = bits & NumSamplesMask
+	// Sample count.
+	si.SampleCount = bits & SampleCountMask
 
-	// MD5 signature of unencoded audio data (size: 16 bytes).
-	si.MD5 = b.Next(16)
-
+	// Md5sum MD5 signature of unencoded audio data.
+	_, err = io.ReadFull(r, si.MD5sum[:])
+	if err != nil {
+		return nil, err
+	}
 	return si, nil
+}
+
+// VerifyPadding verifies that the padding metadata block only contains '0'
+// bits.
+func VerifyPadding(r io.Reader) (err error) {
+	// Verify up to 4 kb of padding each iteration.
+	buf := make([]byte, 4096)
+	for {
+		n, err := r.Read(buf)
+		if err != nil {
+			if err == io.EOF {
+				break
+			}
+			return err
+		}
+		if !isAllZero(buf[:n]) {
+			return errors.New("meta.VerifyPadding: invalid padding; must contain only zeroes.")
+		}
+	}
+	return nil
 }
 
 // RegisteredApplications maps from a registered application ID to a
@@ -268,7 +333,14 @@ type Application struct {
 	Data []byte ///interface{} type instead?
 }
 
-// NewApplication parses and returns a new Application metadata block.
+// NewApplication parses and returns a new Application metadata block. The
+// provided io.Reader should limit the amount of data that can be read to
+// header.Length bytes.
+//
+// ### format (pseudo code):
+//    type METADATA_BLOCK_### struct {
+//       ###
+//    }
 func NewApplication(buf []byte) (ap *Application, err error) {
 	if len(buf) < 4 {
 		return nil, fmt.Errorf("invalid block size; expected >= 4, got %d.", len(buf))
@@ -314,49 +386,63 @@ type SeekTable struct {
 type SeekPoint struct {
 	// Sample number of first sample in the target frame, or 0xFFFFFFFFFFFFFFFF
 	// for a placeholder point.
-	SampleNumber uint64
+	SampleNum uint64
 	// Offset (in bytes) from the first byte of the first frame header to the
 	// first byte of the target frame's header.
 	Offset uint64
 	// Number of samples in the target frame.
-	NumSamples uint16
+	SampleCount uint16
 }
 
-// PlaceholderPoint is the sample number used for placeholder points.
+// PlaceholderPoint is the sample number used for placeholder points. For
+// placeholder points, the second and third field values are undefined.
 const PlaceholderPoint = 0xFFFFFFFFFFFFFFFF
 
-// NewSeekTable parses and returns a new SeekTable metadata block.
-func NewSeekTable(buf []byte) (st *SeekTable, err error) {
-	if len(buf)%18 != 0 {
-		return nil, ErrInvalidSeekTableLen
-	}
-
+// NewSeekTable parses and returns a new SeekTable metadata block. The provided
+// io.Reader should limit the amount of data that can be read to header.Length
+// bytes.
+//
+// Seek table format (pseudo code):
+//    type METADATA_BLOCK_SEEKTABLE struct {
+//       // The number of seek points is implied by the metadata header 'length'
+//       // field, i.e. equal to length / 18.
+//       var points []point
+//    }
+//
+//    type point struct {
+//       var sample_num   uint64
+//       var offset       uint64
+//       var sample_count uint16
+//    }
+func NewSeekTable(r io.Reader) (st *SeekTable, err error) {
 	st = new(SeekTable)
-	b := bytes.NewBuffer(buf)
-	numSeekPoints := len(buf) / 18
-
-	// - For placeholder points, the second and third field values are undefined.
-	// - Seek points within a table must be sorted in ascending order by sample
-	//   number.
-	// - Seek points within a table must be unique by sample number, with the
-	//   exception of placeholder points.
-	// - The previous two notes imply that there may be any number of placeholder
-	//   points, but they must all occur at the end of the table.
-	var prevSampleNumber uint64
-	for i := 0; i < numSeekPoints; i++ {
-		point := SeekPoint{
-			SampleNumber: binary.BigEndian.Uint64(b.Next(8)), // Sample number (size: 8 bytes).
-			Offset:       binary.BigEndian.Uint64(b.Next(8)), // Offset  (size: 8 bytes).
-			NumSamples:   binary.BigEndian.Uint16(b.Next(2)), // Number of samples (size: 2 bytes).
+	var hasPrev bool
+	var prevSampleNum uint64
+	for {
+		var point SeekPoint
+		err = binary.Read(r, binary.BigEndian, &point)
+		if err != nil {
+			if err == io.EOF {
+				return st, nil
+			}
+			return nil, err
 		}
-		if prevSampleNumber >= point.SampleNumber && i != 0 {
-			if point.SampleNumber != PlaceholderPoint {
-				return nil, fmt.Errorf("invalid seek point; sample number (%d) not in ascending order.", point.SampleNumber)
+		if hasPrev && prevSampleNum >= point.SampleNum {
+			// - Seek points within a table must be sorted in ascending order by
+			//   sample number.
+			// - Seek points within a table must be unique by sample number, with
+			//   the exception of placeholder points.
+			// - The previous two notes imply that there may be any number of
+			//   placeholder points, but they must all occur at the end of the
+			//   table.
+			if point.SampleNum != PlaceholderPoint {
+				return nil, fmt.Errorf("meta.NewSeekTable: invalid seek point; sample number (%d) not in ascending order.", point.SampleNum)
 			}
 		}
+		prevSampleNum = point.SampleNum
+		hasPrev = true
 		st.Points = append(st.Points, point)
 	}
-
 	return st, nil
 }
 
@@ -377,34 +463,76 @@ type VorbisEntry struct {
 	Value string
 }
 
-// NewVorbisComment parses and returns a new VorbisComment metadata block.
-func NewVorbisComment(buf []byte) (vc *VorbisComment, err error) {
-	b := bytes.NewBuffer(buf)
-
-	vc = new(VorbisComment)
-
-	//Vendor string (size: determined by previous 4 bytes)
-	vc.Vendor = string(b.Next(int(binary.LittleEndian.Uint32(b.Next(4)))))
-
-	//Number of comments (size: 4 bytes)
-	userCommentListLength := binary.LittleEndian.Uint32(b.Next(4))
-
-	for i := 0; i < int(userCommentListLength); i++ {
-		///This might fail on `=a` strings or simply `=` strings
-
-		//The `TYPE=Value` string (size: determined by previous 4 bytes)
-		comment := string(b.Next(int(binary.LittleEndian.Uint32(b.Next(4)))))
-
-		if !strings.Contains(comment, `=`) {
-			return nil, fmt.Errorf(ErrMalformedVorbisComment, comment)
-		}
-
-		//Split at first occurence of `=`
-		nameAndValue := strings.SplitN(comment, "=", 2)
-
-		vc.Entries = append(vc.Entries, VorbisEntry{Name: nameAndValue[0], Value: nameAndValue[1]})
+// NewVorbisComment parses and returns a new VorbisComment metadata block. The
+// provided io.Reader should limit the amount of data that can be read to
+// header.Length bytes.
+//
+// Vorbis comment format (pseudo code):
+//    type METADATA_BLOCK_VORBIS_COMMENT struct {
+//       var vendor_length uint32
+//       var vendor_string [vendor_length]byte
+//       var comment_count uint32
+//       var comments      [comment_count]comment
+//    }
+//
+//    type comment struct {
+//       var vector_length uint32
+//       // vector_string is a name/value pair. Example: "NAME=value".
+//       var vector_string [length]byte
+//    }
+func NewVorbisComment(r io.Reader) (vc *VorbisComment, err error) {
+	// Vendor length.
+	var vendorLen uint32
+	err = binary.Read(r, binary.LittleEndian, &vendorLen)
+	if err != nil {
+		return nil, err
 	}
 
+	// Vendor string.
+	buf := make([]byte, vendorLen)
+	_, err = r.Read(buf)
+	if err != nil {
+		return nil, err
+	}
+	vc = new(VorbisComment)
+	vc.Vendor = string(buf)
+
+	// Comment count.
+	var commentCount uint32
+	err = binary.Read(r, binary.LittleEndian, &commentCount)
+	if err != nil {
+		return nil, err
+	}
+
+	// Comments.
+	vc.Entries = make([]VorbisEntry, commentCount)
+	for i := 0; i < len(vc.Entries); i++ {
+		// Vector length
+		var vectorLen uint32
+		err = binary.Read(r, binary.LittleEndian, &vectorLen)
+		if err != nil {
+			return nil, err
+		}
+
+		// Vector string.
+		buf = make([]byte, vectorLen)
+		_, err = r.Read(buf)
+		if err != nil {
+			return nil, err
+		}
+		vector := string(buf)
+		pos := strings.Index(vector, "=")
+		if pos == -1 {
+			return nil, fmt.Errorf("meta.NewVorbisComment: invalid comment vector; no '=' present in: %s.", vector)
+		}
+
+		// Comment.
+		entry := VorbisEntry{
+			Name:  vector[:pos],
+			Value: vector[pos+1:],
+		}
+		vc.Entries[i] = entry
+	}
 	return vc, nil
 }
 
@@ -492,7 +620,14 @@ type CueSheetTrackIndex struct {
 	IndexPointNum uint8
 }
 
-// NewCueSheet parses and returns a new CueSheet metadata block.
+// NewCueSheet parses and returns a new CueSheet metadata block. The provided
+// io.Reader should limit the amount of data that can be read to header.Length
+// bytes.
+//
+// ### format (pseudo code):
+//    type METADATA_BLOCK_### struct {
+//       ###
+//    }
 func NewCueSheet(buf []byte) (cs *CueSheet, err error) {
 	// Minimum valid size based on CueSheet with one lead-out track:
 	// len(METADATA_BLOCK_CUESHEET) + len(CUESHEET_TRACK) = 432
@@ -624,7 +759,8 @@ func NewCueSheet(buf []byte) (cs *CueSheet, err error) {
 		if b.Len() < TrackIndexesMinSize {
 			return nil, fmt.Errorf("invalid size of TrackIndexes; expected >= %d, got %d.", TrackIndexesMinSize, b.Len())
 		}
-		for i := 0; i < int(ct.NumTrackIndexPoints); i++ {
+		ct.TrackIndexes = make([]CueSheetTrackIndex, ct.NumTrackIndexPoints)
+		for i := 0; i < len(ct.TrackIndexes); i++ {
 			trackIndex := CueSheetTrackIndex{
 				Offset: binary.BigEndian.Uint64(b.Next(8)), // Offset in samples (size: 8 bytes)
 			}
@@ -637,7 +773,7 @@ func NewCueSheet(buf []byte) (cs *CueSheet, err error) {
 			if !isAllZero(b.Next(3)) {
 				return nil, ErrReservedNotZero
 			}
-			ct.TrackIndexes = append(ct.TrackIndexes, trackIndex)
+			ct.TrackIndexes[i] = trackIndex
 		}
 	}
 
@@ -658,7 +794,14 @@ type Picture struct {
 	Data       []byte
 }
 
-// NewPicture parses and returns a new Picture metadata block.
+// NewPicture parses and returns a new Picture metadata block. The provided
+// io.Reader should limit the amount of data that can be read to header.Length
+// bytes.
+//
+// ### format (pseudo code):
+//    type METADATA_BLOCK_### struct {
+//       ###
+//    }
 func NewPicture(buf []byte) (p *Picture, err error) {
 	p = new(Picture)
 	b := bytes.NewBuffer(buf)

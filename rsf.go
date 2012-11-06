@@ -16,14 +16,12 @@ Links:
 // Package rsf (Royal Straight fLaC) implements access to FLAC files.
 package rsf
 
-import "bytes"
 import dbg "fmt"
 import "fmt"
 import "io"
-import "io/ioutil"
 import "os"
 
-import "github.com/mewkiz/rsf/frame"
+///import "github.com/mewkiz/rsf/frame"
 import "github.com/mewkiz/rsf/meta"
 
 // FlacSignature is present at the beginning of each FLAC file.
@@ -54,47 +52,35 @@ func Open(filePath string) (s *Stream, err error) {
 
 // NewStream reads from the provided io.Reader and returns the parsed FLAC
 // bitstream.
-func NewStream(r io.Reader) (s *Stream, err error) {
-	s = new(Stream)
-
-	buf, err := ioutil.ReadAll(r)
-	if err != nil {
-		return nil, err
-	}
-
-	s, err = newStream(buf)
-	if err != nil {
-		return nil, err
-	}
-
-	return s, nil
-}
-
-// newStream parses a FLAC bitstream and returns a new Stream. The basic
-// structure of a FLAC stream is:
+//
+// The basic structure of a FLAC stream is:
 //    - The four byte string "fLaC".
 //    - The STREAMINFO metadata block.
 //    - Zero or more other metadata blocks.
 //    - One or more audio frames.
-func newStream(buf []byte) (s *Stream, err error) {
-	b := bytes.NewBuffer(buf)
-
+func NewStream(r io.ReadSeeker) (s *Stream, err error) {
 	// Check "fLaC" signature (size: 4 bytes).
-	signature := string(b.Next(4))
-	if signature != FlacSignature {
-		return nil, fmt.Errorf(ErrSignatureMismatch, signature)
+	sig := make([]byte, 4)
+	_, err = r.Read(sig)
+	if err != nil {
+		return nil, err
+	}
+	if string(sig) != FlacSignature {
+		return nil, fmt.Errorf(ErrSignatureMismatch, sig)
 	}
 
 	s = new(Stream)
 
 	// Read metadata blocks.
 	isFirst := true
-	for {
-		// Read metadata block header (size: 4 bytes).
-		header, err := meta.NewBlockHeader(b.Next(4))
+	header := new(meta.BlockHeader)
+	for !header.IsLast {
+		// Read metadata block header.
+		header, err = meta.NewBlockHeader(r)
 		if err != nil {
 			return nil, err
 		}
+		dbg.Println("header:", header)
 		if isFirst {
 			if header.BlockType != meta.TypeStreamInfo {
 				// first block type has to be StreamInfo
@@ -102,61 +88,53 @@ func newStream(buf []byte) (s *Stream, err error) {
 			}
 			isFirst = false
 		}
+		lr := &io.LimitedReader{
+			R: r,
+			N: int64(header.Length),
+		}
 		switch header.BlockType {
 		case meta.TypeStreamInfo:
-			si, err := meta.NewStreamInfo(b.Next(header.Length))
+			si, err := meta.NewStreamInfo(lr)
 			if err != nil {
 				return nil, err
 			}
 			s.MetaBlocks = append(s.MetaBlocks, si)
 		case meta.TypePadding:
-			// skip padding.
-			b.Next(header.Length)
-		case meta.TypeApplication:
-			si, err := meta.NewApplication(b.Next(header.Length))
+			err = meta.VerifyPadding(lr)
 			if err != nil {
 				return nil, err
 			}
-			s.MetaBlocks = append(s.MetaBlocks, si)
+		/**case meta.TypeApplication:
+		newBlock = meta.NewApplication*/
 		case meta.TypeSeekTable:
-			si, err := meta.NewSeekTable(b.Next(header.Length))
+			st, err := meta.NewSeekTable(lr)
 			if err != nil {
 				return nil, err
 			}
-			s.MetaBlocks = append(s.MetaBlocks, si)
+			s.MetaBlocks = append(s.MetaBlocks, st)
 		case meta.TypeVorbisComment:
-			si, err := meta.NewVorbisComment(b.Next(header.Length))
+			vc, err := meta.NewVorbisComment(lr)
 			if err != nil {
 				return nil, err
 			}
-			s.MetaBlocks = append(s.MetaBlocks, si)
-		case meta.TypeCueSheet:
-			si, err := meta.NewCueSheet(b.Next(header.Length))
-			if err != nil {
-				return nil, err
-			}
-			s.MetaBlocks = append(s.MetaBlocks, si)
+			s.MetaBlocks = append(s.MetaBlocks, vc)
+		/**case meta.TypeCueSheet:
+			newBlock = meta.NewCueSheet
 		case meta.TypePicture:
-			si, err := meta.NewPicture(b.Next(header.Length))
-			if err != nil {
-				return nil, err
-			}
-			s.MetaBlocks = append(s.MetaBlocks, si)
+			newBlock = meta.NewPicture*/
 		default:
 			return nil, fmt.Errorf("block type '%d' not yet supported.", header.BlockType)
-		}
-
-		if header.IsLast {
-			// Break after last metadata block.
-			break
 		}
 	}
 
 	///Audio frame parsing
 	///Flac decoding
 
-	f, err := frame.Decode(b.Bytes())
-	dbg.Println(f)
+	/**f, err := frame.Decode(b.Bytes())
+	if err != nil {
+		return nil, err
+	}
+	dbg.Println(f)*/
 
 	return s, nil
 }
