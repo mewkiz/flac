@@ -5,6 +5,7 @@ import "bytes"
 import "encoding/binary"
 import "errors"
 import "fmt"
+import "io/ioutil"
 import "io"
 import "strings"
 
@@ -16,9 +17,8 @@ const (
 	ErrInvalidNumTracksForCompact = "invalid number of tracks for a compact disc; expected <= 100, got %d."
 	ErrInvalidPictureType         = "the picture type is invalid (must be <=20): %d"
 	ErrInvalidSampleRate          = "invalid sample rate; expected > 0 and <= 655350, got %d."
-	///ErrInvalidSyncCode            = "sync code is invalid (must be 11111111111110 or 16382 decimal): %d"
-	ErrMalformedVorbisComment = "malformed vorbis comment: %s"
-	ErrUnregisterdAppID       = "unregistered application id: %s."
+	ErrMalformedVorbisComment     = "malformed vorbis comment: %s"
+	ErrUnregisterdAppID           = "unregistered application id: %s."
 )
 
 // Error messages.
@@ -330,7 +330,7 @@ type Application struct {
 	// Registered application ID.
 	ID string
 	// Application data.
-	Data []byte ///interface{} type instead?
+	Data []byte
 }
 
 // NewApplication parses and returns a new Application metadata block. The
@@ -341,27 +341,32 @@ type Application struct {
 //    type METADATA_BLOCK_### struct {
 //       ###
 //    }
-func NewApplication(buf []byte) (ap *Application, err error) {
-	if len(buf) < 4 {
-		return nil, fmt.Errorf("invalid block size; expected >= 4, got %d.", len(buf))
-	}
+func NewApplication(r io.Reader) (ap *Application, err error) {
+	const (
+		// Application ID (size: 4 bytes).
+		idLen = 4
+	)
 
 	ap = new(Application)
-	b := bytes.NewBuffer(buf)
 
-	// Application ID (size: 4 bytes).
-	ap.ID = string(b.Next(4))
+	buf := make([]byte, idLen)
+	_, err = r.Read(buf)
+	if err != nil {
+		return nil, err
+	}
+
+	ap.ID = string(buf)
+
 	_, ok := RegisteredApplications[ap.ID]
 	if !ok {
 		return nil, fmt.Errorf(ErrUnregisterdAppID, ap.ID)
 	}
 
-	ap.Data = b.Bytes()
-
-	///Make uber switch case for all applications
-	// switch ap.ID {
-
-	// }
+	buf, err = ioutil.ReadAll(r)
+	if err != nil {
+		return nil, err
+	}
+	ap.Data = buf
 
 	return ap, nil
 }

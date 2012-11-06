@@ -16,12 +16,11 @@ Links:
 // Package rsf (Royal Straight fLaC) implements access to FLAC files.
 package rsf
 
-import dbg "fmt"
 import "fmt"
 import "io"
 import "os"
 
-///import "github.com/mewkiz/rsf/frame"
+import "github.com/mewkiz/rsf/frame"
 import "github.com/mewkiz/rsf/meta"
 
 // FlacSignature is present at the beginning of each FLAC file.
@@ -80,7 +79,6 @@ func NewStream(r io.ReadSeeker) (s *Stream, err error) {
 		if err != nil {
 			return nil, err
 		}
-		dbg.Println("header:", header)
 		if isFirst {
 			if header.BlockType != meta.TypeStreamInfo {
 				// first block type has to be StreamInfo
@@ -104,8 +102,12 @@ func NewStream(r io.ReadSeeker) (s *Stream, err error) {
 			if err != nil {
 				return nil, err
 			}
-		/**case meta.TypeApplication:
-		newBlock = meta.NewApplication*/
+		case meta.TypeApplication:
+			st, err := meta.NewApplication(lr)
+			if err != nil {
+				return nil, err
+			}
+			s.MetaBlocks = append(s.MetaBlocks, st)
 		case meta.TypeSeekTable:
 			st, err := meta.NewSeekTable(lr)
 			if err != nil {
@@ -130,11 +132,11 @@ func NewStream(r io.ReadSeeker) (s *Stream, err error) {
 	///Audio frame parsing
 	///Flac decoding
 
-	/**f, err := frame.Decode(b.Bytes())
+	f, err := frame.Decode(r)
 	if err != nil {
 		return nil, err
 	}
-	dbg.Println(f)*/
+	dbg.Println(f)
 
 	return s, nil
 }
