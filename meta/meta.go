@@ -11,23 +11,14 @@ import "strings"
 
 // Formatted error messages.
 const (
-	ErrInvalidBlockLen            = "invalid block length; expected %d, got %d."
-	ErrInvalidMaxBlockSize        = "invalid block size; expected >= 16 and <= 65535, got %d."
-	ErrInvalidMinBlockSize        = "invalid block size; expected >= 16, got %d."
 	ErrInvalidNumTracksForCompact = "invalid number of tracks for a compact disc; expected <= 100, got %d."
 	ErrInvalidPictureType         = "the picture type is invalid (must be <=20): %d"
-	ErrInvalidSampleRate          = "invalid sample rate; expected > 0 and <= 655350, got %d."
-	ErrMalformedVorbisComment     = "malformed vorbis comment: %s"
-	ErrUnregisterdAppID           = "unregistered application id: %s."
 )
 
 // Error messages.
 var (
-	ErrInvalidBlockType    = errors.New("invalid block type.")
-	ErrInvalidSeekTableLen = errors.New("invalid block size; seek table not divisible by 18.")
 	ErrInvalidTrackNum     = errors.New("invalid track number; value 0 isn't allowed.")
 	ErrMissingLeadOutTrack = errors.New("cuesheet requires a lead out track.")
-	ErrReserved            = errors.New("reserved value.")
 	ErrReservedNotZero     = errors.New("all reserved bits are not 0.")
 )
 
