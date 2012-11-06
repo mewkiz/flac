@@ -349,26 +349,20 @@ type Application struct {
 //       var Data [header.Length-4]byte
 //    }
 func NewApplication(r io.Reader) (ap *Application, err error) {
-	const (
-		// Application ID (size: 4 bytes).
-		idLen = 4
-	)
-
-	ap = new(Application)
-
-	buf := make([]byte, idLen)
+	// Application ID (size: 4 bytes).
+	buf := make([]byte, 4)
 	_, err = r.Read(buf)
 	if err != nil {
 		return nil, err
 	}
-
+	ap = new(Application)
 	ap.ID = string(buf)
-
 	_, ok := RegisteredApplications[ap.ID]
 	if !ok {
-		return nil, fmt.Errorf(ErrUnregisterdAppID, ap.ID)
+		return nil, fmt.Errorf("meta.NewApplication: unregistered application ID '%s'.", ap.ID)
 	}
 
+	// Data.
 	buf, err = ioutil.ReadAll(r)
 	if err != nil {
 		return nil, err

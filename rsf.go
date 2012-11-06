@@ -20,7 +20,7 @@ import "fmt"
 import "io"
 import "os"
 
-import "github.com/mewkiz/rsf/frame"
+///import "github.com/mewkiz/rsf/frame"
 import "github.com/mewkiz/rsf/meta"
 
 // FlacSignature is present at the beginning of each FLAC file.
@@ -132,11 +132,11 @@ func NewStream(r io.ReadSeeker) (s *Stream, err error) {
 	///Audio frame parsing
 	///Flac decoding
 
-	f, err := frame.Decode(r)
+	/**f, err := frame.Decode(r)
 	if err != nil {
 		return nil, err
 	}
-	dbg.Println(f)
+	dbg.Println(f)*/
 
 	return s, nil
 }
