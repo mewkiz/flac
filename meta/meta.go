@@ -22,19 +22,6 @@ var (
 	ErrReservedNotZero     = errors.New("all reserved bits are not 0.")
 )
 
-/// Might trigger unnesccesary errors
-
-// isAllZero returns true if the value of each byte in the provided slice is 0,
-// and false otherwise.
-func isAllZero(buf []byte) bool {
-	for _, b := range buf {
-		if b != 0 {
-			return false
-		}
-	}
-	return true
-}
-
 // Type is used to identify the metadata block type.
 type Type uint8
 
@@ -285,6 +272,21 @@ func VerifyPadding(r io.Reader) (err error) {
 		}
 	}
 	return nil
+}
+
+/// ### [ note ] ###
+///    - Might trigger unnecessary errors.
+/// ### [/ note ] ###
+
+// isAllZero returns true if the value of each byte in the provided slice is 0,
+// and false otherwise.
+func isAllZero(buf []byte) bool {
+	for _, b := range buf {
+		if b != 0 {
+			return false
+		}
+	}
+	return true
 }
 
 // RegisteredApplications maps from a registered application ID to a
