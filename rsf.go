@@ -1,7 +1,4 @@
 /*
-Todo:
-	Add padding IsAllZero check?
-	Change NewStream() ioutil.ReadAll to bufio.NewReader
 Links:
 	http://code.google.com/p/goflac-meta/source/browse/flacmeta.go
 	http://code.google.com/p/goflac-meta/source/browse/flacmeta_test.go
@@ -23,19 +20,10 @@ import "os"
 ///import "github.com/mewkiz/rsf/frame"
 import "github.com/mewkiz/rsf/meta"
 
-// FlacSignature is present at the beginning of each FLAC file.
-const FlacSignature = "fLaC"
-
-// Formatted error strings.
-const (
-	ErrSignatureMismatch         = "invalid flac signature: '%s', should be '" + FlacSignature + "'."
-	ErrStreamInfoIsNotFirstBlock = "first block type is invalid: expected '%d' (StreamInfo), got '%d'."
-)
-
 // A Stream is a FLAC bitstream.
 type Stream struct {
 	MetaBlocks []interface{}
-	//Frame      []frame.Frame
+	///Frame      []frame.Frame
 }
 
 // Open opens the provided file and returns the parsed FLAC bitstream.
@@ -49,28 +37,31 @@ func Open(filePath string) (s *Stream, err error) {
 	return NewStream(f)
 }
 
+// FlacSignature is present at the beginning of each FLAC file.
+const FlacSignature = "fLaC"
+
 // NewStream reads from the provided io.Reader and returns the parsed FLAC
 // bitstream.
 //
 // The basic structure of a FLAC stream is:
 //    - The four byte string "fLaC".
-//    - The STREAMINFO metadata block.
+//    - The StreamInfo metadata block.
 //    - Zero or more other metadata blocks.
 //    - One or more audio frames.
 func NewStream(r io.ReadSeeker) (s *Stream, err error) {
-	// Check "fLaC" signature (size: 4 bytes).
-	sig := make([]byte, 4)
-	_, err = r.Read(sig)
+	// Verify "fLaC" signature (size: 4 bytes).
+	buf := make([]byte, 4)
+	_, err = r.Read(buf)
 	if err != nil {
 		return nil, err
 	}
-	if string(sig) != FlacSignature {
-		return nil, fmt.Errorf(ErrSignatureMismatch, sig)
+	sig := string(buf)
+	if sig != FlacSignature {
+		return nil, fmt.Errorf("rsf.NewStream: invalid signature; expected '%s', got '%s'.", FlacSignature, sig)
 	}
 
-	s = new(Stream)
-
 	// Read metadata blocks.
+	s = new(Stream)
 	isFirst := true
 	header := new(meta.BlockHeader)
 	for !header.IsLast {
@@ -79,13 +70,17 @@ func NewStream(r io.ReadSeeker) (s *Stream, err error) {
 		if err != nil {
 			return nil, err
 		}
+
+		// Verify block type.
 		if isFirst {
 			if header.BlockType != meta.TypeStreamInfo {
-				// first block type has to be StreamInfo
-				return nil, fmt.Errorf(ErrStreamInfoIsNotFirstBlock, meta.TypeStreamInfo, header.BlockType)
+				// First block type must be StreamInfo.
+				return nil, fmt.Errorf("rsf.NewStream: first block type is invalid; expected %d (StreamInfo), got %d.", meta.TypeStreamInfo, header.BlockType)
 			}
 			isFirst = false
 		}
+
+		// Read metadata block.
 		lr := &io.LimitedReader{
 			R: r,
 			N: int64(header.Length),
@@ -137,14 +132,16 @@ func NewStream(r io.ReadSeeker) (s *Stream, err error) {
 		}
 	}
 
-	///Audio frame parsing
-	///Flac decoding
+	/// Audio frame parsing.
+	/// Flac decoding.
 
-	/**f, err := frame.Decode(r)
+	/**
+	f, err := frame.Decode(r)
 	if err != nil {
 		return nil, err
 	}
-	dbg.Println(f)*/
+	dbg.Println(f)
+	*/
 
 	return s, nil
 }
