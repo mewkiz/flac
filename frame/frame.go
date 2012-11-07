@@ -85,7 +85,6 @@ type FrameFooter struct {
 	CRC uint16
 }
 
-
 func Decode(r io.Reader) (f *Frame, err error) {
 	const (
 		syncCodeLen = 2

@@ -120,14 +120,12 @@ func NewStream(r io.ReadSeeker) (s *Stream, err error) {
 				return nil, err
 			}
 			s.MetaBlocks = append(s.MetaBlocks, vc)
-		/**
 		case meta.TypeCueSheet:
 			cs, err := meta.NewCueSheet(lr)
 			if err != nil {
 				return nil, err
 			}
 			s.MetaBlocks = append(s.MetaBlocks, cs)
-		*/
 		case meta.TypePicture:
 			p, err := meta.NewPicture(lr)
 			if err != nil {

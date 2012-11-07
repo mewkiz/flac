@@ -1,7 +1,6 @@
 // Package meta contains functions for parsing FLAC metadata.
 package meta
 
-import "bytes"
 import "encoding/binary"
 import "errors"
 import "fmt"
@@ -9,17 +8,7 @@ import "io/ioutil"
 import "io"
 import "strings"
 
-// Formatted error messages.
-const (
-	ErrInvalidNumTracksForCompact = "invalid number of tracks for a compact disc; expected <= 100, got %d."
-)
-
-// Error messages.
-var (
-	ErrInvalidTrackNum     = errors.New("invalid track number; value 0 isn't allowed.")
-	ErrMissingLeadOutTrack = errors.New("cuesheet requires a lead out track.")
-	ErrReservedNotZero     = errors.New("all reserved bits are not 0.")
-)
+import "github.com/mewkiz/pkg/readutil"
 
 // Type is used to identify the metadata block type.
 type Type uint8
@@ -77,15 +66,15 @@ type BlockHeader struct {
 //    // ref: http://flac.sourceforge.net/format.html#metadata_block_header
 //
 //    type METADATA_BLOCK_HEADER struct {
-//       var is_last    bool
-//       var block_type uint7
-//       var length     uint24
+//       is_last    bool
+//       block_type uint7
+//       length     uint24
 //    }
 func NewBlockHeader(r io.Reader) (h *BlockHeader, err error) {
 	const (
-		LastBlockMask = 0x80000000 // 1 bit
-		TypeMask      = 0x7F000000 // 7 bits
-		LengthMask    = 0x00FFFFFF // 24 bits
+		IsLastMask = 0x80000000 // 1 bit
+		TypeMask   = 0x7F000000 // 7 bits
+		LengthMask = 0x00FFFFFF // 24 bits
 	)
 	var bits uint32
 	err = binary.Read(r, binary.BigEndian, &bits)
@@ -95,7 +84,7 @@ func NewBlockHeader(r io.Reader) (h *BlockHeader, err error) {
 
 	// Is last.
 	h = new(BlockHeader)
-	if bits&LastBlockMask != 0 {
+	if bits&IsLastMask != 0 {
 		h.IsLast = true
 	}
 
@@ -157,15 +146,15 @@ type StreamInfo struct {
 //    // ref: http://flac.sourceforge.net/format.html#metadata_block_streaminfo
 //
 //    type METADATA_BLOCK_STREAMINFO struct {
-//       var min_block_size  uint16
-//       var max_block_size  uint16
-//       var min_frame_size  uint24
-//       var max_frame_size  uint24
-//       var sample_rate     uint20
-//       var channel_count   uint3 // (number of channels)-1.
-//       var bits_per_sample uint5 // (bits per sample)-1.
-//       var sample_count    uint36
-//       var md5sum          [16]byte
+//       min_block_size  uint16
+//       max_block_size  uint16
+//       min_frame_size  uint24
+//       max_frame_size  uint24
+//       sample_rate     uint20
+//       channel_count   uint3 // (number of channels)-1.
+//       bits_per_sample uint5 // (bits per sample)-1.
+//       sample_count    uint36
+//       md5sum          [16]byte
 //    }
 func NewStreamInfo(r io.Reader) (si *StreamInfo, err error) {
 	// Minimum block size.
@@ -337,13 +326,13 @@ type Application struct {
 //    // ref: http://flac.sourceforge.net/format.html#metadata_block_application
 //
 //    type METADATA_BLOCK_APPLICATION struct {
-//       var ID   uint32
-//       var Data [header.Length-4]byte
+//       ID   uint32
+//       Data [header.Length-4]byte
 //    }
 func NewApplication(r io.Reader) (ap *Application, err error) {
 	// Application ID (size: 4 bytes).
 	buf := make([]byte, 4)
-	_, err = r.Read(buf)
+	_, err = io.ReadFull(r, buf)
 	if err != nil {
 		return nil, err
 	}
@@ -406,13 +395,13 @@ const PlaceholderPoint = 0xFFFFFFFFFFFFFFFF
 //    type METADATA_BLOCK_SEEKTABLE struct {
 //       // The number of seek points is implied by the metadata header 'length'
 //       // field, i.e. equal to length / 18.
-//       var points []point
+//       points []point
 //    }
 //
 //    type point struct {
-//       var sample_num   uint64
-//       var offset       uint64
-//       var sample_count uint16
+//       sample_num   uint64
+//       offset       uint64
+//       sample_count uint16
 //    }
 func NewSeekTable(r io.Reader) (st *SeekTable, err error) {
 	st = new(SeekTable)
@@ -471,16 +460,16 @@ type VorbisEntry struct {
 //    // ref: http://flac.sourceforge.net/format.html#metadata_block_vorbis_comment
 //
 //    type METADATA_BLOCK_VORBIS_COMMENT struct {
-//       var vendor_length uint32
-//       var vendor_string [vendor_length]byte
-//       var comment_count uint32
-//       var comments      [comment_count]comment
+//       vendor_length uint32
+//       vendor_string [vendor_length]byte
+//       comment_count uint32
+//       comments      [comment_count]comment
 //    }
 //
 //    type comment struct {
-//       var vector_length uint32
+//       vector_length uint32
 //       // vector_string is a name/value pair. Example: "NAME=value".
-//       var vector_string [length]byte
+//       vector_string [length]byte
 //    }
 func NewVorbisComment(r io.Reader) (vc *VorbisComment, err error) {
 	// Vendor length.
@@ -518,7 +507,7 @@ func NewVorbisComment(r io.Reader) (vc *VorbisComment, err error) {
 
 		// Vector string.
 		buf = make([]byte, vectorLen)
-		_, err = r.Read(buf)
+		_, err = io.ReadFull(r, buf)
 		if err != nil {
 			return nil, err
 		}
@@ -549,7 +538,7 @@ type CueSheet struct {
 	// the media catalog number may be 0 to 128 bytes long; any unused characters
 	// should be right-padded with NUL characters. For CD-DA, this is a thirteen
 	// digit number, followed by 115 NUL bytes.
-	MCN []byte
+	MCN string
 	// The number of lead-in samples. This field has meaning only for CD-DA
 	// cuesheets; for other uses it should be 0. For CD-DA, the lead-in is the
 	// TRACK 00 area where the table of contents is stored; more precisely, it is
@@ -593,7 +582,7 @@ type CueSheetTrack struct {
 	TrackNum uint8
 	// Track ISRC. This is a 12-digit alphanumeric code. A value of 12 ASCII NUL
 	// characters may be used to denote absence of an ISRC.
-	ISRC []byte
+	ISRC string
 	// The track type: false for audio, true for non-audio. This corresponds to
 	// the CD-DA Q-channel control bit 3.
 	IsAudio bool
@@ -630,178 +619,219 @@ type CueSheetTrackIndex struct {
 //    // ref: http://flac.sourceforge.net/format.html#metadata_block_cuesheet
 //
 //    type METADATA_BLOCK_CUESHEET struct {
-//       var mcn                  [128]byte
-//       var lead_in_sample_count uint64
-//       var is_compact_disc      bool
-//       var _                    uint7
-//       var _                    [258]byte
-//       var track_count          uint8
-//       var tracks               [track_count]track
+//       mcn                  [128]byte
+//       lead_in_sample_count uint64
+//       is_compact_disc      bool
+//       _                    uint7
+//       _                    [258]byte
+//       track_count          uint8
+//       tracks               [track_count]track
 //    }
 //
 //    type track struct {
-//       var offset            uint64
-//       var track_num         uint8
-//       var isrc              [12]byte
-//       var is_audio          bool
-//       var has_pre_emphasis  bool
-//       var _                 uint6
-//       var _                 [13]byte
-//       var track_index_count uint8
-//       var track_indexes     [track_index_count]track_index
+//       offset            uint64
+//       track_num         uint8
+//       isrc              [12]byte
+//       is_audio          bool
+//       has_pre_emphasis  bool
+//       _                 uint6
+//       _                 [13]byte
+//       track_index_count uint8
+//       track_indexes     [track_index_count]track_index
 //    }
 //
 //    type track_index {
-//       var offset          uint64
-//       var index_point_num uint8
-//       var _               [3]byte
+//       offset          uint64
+//       index_point_num uint8
+//       _               [3]byte
 //    }
-func NewCueSheet(buf []byte) (cs *CueSheet, err error) {
-	// Minimum valid size based on CueSheet with one lead-out track:
-	// len(METADATA_BLOCK_CUESHEET) + len(CUESHEET_TRACK) = 432
-	if len(buf) < 432 {
-		return nil, fmt.Errorf("invalid block size; expected >= 432, got %d.", len(buf))
-	}
-
-	cs = new(CueSheet)
-	b := bytes.NewBuffer(buf)
-
+func NewCueSheet(r io.Reader) (cs *CueSheet, err error) {
 	// Media catalog number (size: 128 bytes).
-	cs.MCN = b.Next(128)
+	buf := make([]byte, 128)
+	_, err = r.Read(buf)
+	if err != nil {
+		return nil, err
+	}
+	cs = new(CueSheet)
+	cs.MCN = string(buf)
 
-	// The number of lead-in samples (size: 8 bytes).
-	cs.LeadInSampleCount = binary.BigEndian.Uint64(b.Next(8))
-
-	const (
-		// CueSheet
-		IsCompactDiscMask    = 0x80
-		CueSheetReservedMask = 0x7F
-	)
-
-	// 1 bit for IsCompactDisk boolean and 7 bits are reserved.
-	bits, err := b.ReadByte()
+	// Lead-in sample count.
+	err = binary.Read(r, binary.BigEndian, &cs.LeadInSampleCount)
 	if err != nil {
 		return nil, err
 	}
 
+	const (
+		IsCompactDiscMask    = 0x80 // 1 bit
+		CueSheetReservedMask = 0x7F // 7 bits
+	)
+	bits, err := readutil.ReadByte(r)
+	if err != nil {
+		return nil, err
+	}
+
+	// Is compact disc.
 	if bits&IsCompactDiscMask != 0 {
 		cs.IsCompactDisc = true
 	}
 
-	// Reserved
+	// Reserved.
 	if bits&CueSheetReservedMask != 0 {
-		return nil, ErrReservedNotZero
+		return nil, errors.New("meta.NewCueSheet: all reserved bits must be '0'.")
+	}
+	buf = make([]byte, 258)
+	_, err = r.Read(buf) // 258 reserved bytes.
+	if err != nil {
+		return nil, err
+	}
+	if !isAllZero(buf) {
+		return nil, errors.New("meta.NewCueSheet: all reserved bits must be '0'.")
 	}
 
-	if !isAllZero(b.Next(258)) {
-		return nil, ErrReservedNotZero
+	// Handle error checking of LeadInSampleCount here, since IsCompactDisc is
+	// required.
+	if !cs.IsCompactDisc && cs.LeadInSampleCount != 0 {
+		return nil, fmt.Errorf("meta.NewCueSheet: invalid lead-in sample count for non CD-DA; expected 0, got %d.", cs.LeadInSampleCount)
 	}
 
-	// The number of tracks (size: 1 byte).
-	cs.TrackCount, err = b.ReadByte()
+	// Track count.
+	err = binary.Read(r, binary.BigEndian, &cs.TrackCount)
 	if err != nil {
 		return nil, err
 	}
 	if cs.TrackCount < 1 {
-		return nil, ErrMissingLeadOutTrack
-	} else if cs.TrackCount > 100 && cs.IsCompactDisc {
-		return nil, fmt.Errorf(ErrInvalidNumTracksForCompact, cs.TrackCount)
+		return nil, errors.New("meta.NewCueSheet: at least one track (the lead-out track) is required.")
+	}
+	if cs.TrackCount > 100 && cs.IsCompactDisc {
+		return nil, fmt.Errorf("meta.NewCueSheet: too many tracks for CD-DA cue sheet; expected <= 100, got %d.", cs.TrackCount)
 	}
 
-	// Minimum valid size of Tracks:
-	// len(CUESHEET_TRACK) + (TrackCount-1)*len(CUESHEET_TRACK_INDEX) =
-	// 36 + (TrackCount-1)*12
-	TracksMinSize := int(36 + (cs.TrackCount-1)*12)
-	if b.Len() < TracksMinSize {
-		return nil, fmt.Errorf("invalid block size; expected >= %d, got %d.", TracksMinSize, b.Len())
-	}
-	for trackNum := 0; trackNum < int(cs.TrackCount); trackNum++ {
-		ct := new(CueSheetTrack)
-
-		// Track offset in samples (size: 8 bytes).
-		ct.Offset = binary.BigEndian.Uint64(b.Next(8))
-
-		// Track number (size: 1 byte).
-		ct.TrackNum, err = b.ReadByte()
+	// Tracks.
+	cs.Tracks = make([]CueSheetTrack, cs.TrackCount)
+	for i := 0; i < len(cs.Tracks); i++ {
+		// Track offset.
+		track := &cs.Tracks[i]
+		err = binary.Read(r, binary.BigEndian, &track.Offset)
 		if err != nil {
 			return nil, err
 		}
-		if ct.TrackNum == 0 {
-			return nil, ErrInvalidTrackNum
+		if cs.IsCompactDisc && track.Offset%588 != 0 {
+			return nil, fmt.Errorf("meta.NewCueSheet: invalid track offset (%d) for CD-DA; must be evenly divisible by 588.", track.Offset)
 		}
 
-		// Track ISRC (size: 12 bytes)
-		ct.ISRC = b.Next(12)
-
-		const (
-			// CueSheetTrack
-			IsAudioMask               = 0x80
-			HasPreEmphasisMask        = 0x40
-			CueSheetTrackReservedMask = 0x3F
-		)
-
-		bits, err := b.ReadByte()
+		// Track number.
+		err = binary.Read(r, binary.BigEndian, &track.TrackNum)
 		if err != nil {
 			return nil, err
 		}
-
-		if bits&IsAudioMask != 0 {
-			ct.IsAudio = true
+		if track.TrackNum == 0 {
+			// A track number of 0 is not allowed to avoid conflicting with the
+			// CD-DA spec, which reserves this for the lead-in.
+			return nil, errors.New("meta.NewCueSheet: track number 0 not allowed.")
 		}
-
-		if bits&HasPreEmphasisMask != 0 {
-			ct.HasPreEmphasis = true
-		}
-
-		if bits&CueSheetTrackReservedMask != 0 {
-			return nil, ErrReservedNotZero
-		}
-
-		// Reserved (size: 13 bytes + 6 bits from last byte).
-		if !isAllZero(b.Next(13)) {
-			return nil, ErrReservedNotZero
-		}
-
-		// Number of track index points (size: 1 byte).
-		ct.TrackIndexCount, err = b.ReadByte()
-		if err != nil {
-			return nil, err
-		}
-		if trackNum == int(cs.TrackCount-1) {
-			// The lead-out track is always the last track in the CUESHEET. It must
-			// have zero track index points.
-			if ct.TrackIndexCount != 0 {
-				return nil, fmt.Errorf("invalid number of track index points in cuesheet lead-out track; expected 0 got %d.", ct.TrackIndexCount)
+		if cs.IsCompactDisc {
+			if i == len(cs.Tracks)-1 {
+				if track.TrackNum != 170 {
+					// The lead-out track number must be 170 for CD-DA.
+					return nil, fmt.Errorf("meta.NewCueSheet: invalid lead-out track number for CD-DA; expected 170, got %d.", track.TrackNum)
+				}
+			} else if track.TrackNum > 99 {
+				return nil, fmt.Errorf("meta.NewCueSheet: invalid track number for CD-DA; expected <= 99, got %d.", track.TrackNum)
 			}
 		} else {
-			// There must be at least one index in every track in a CUESHEET except
-			// for the lead-out track.
-			if ct.TrackIndexCount < 1 {
-				return nil, fmt.Errorf("invalid cuesheet track, too few index points; expected >= 1, got %d.", ct.TrackIndexCount)
+			if i == len(cs.Tracks)-1 && track.TrackNum != 255 {
+				// The lead-out track number must be 255 for non-CD-DA.
+				return nil, fmt.Errorf("meta.NewCueSheet: invalid lead-out track number for non CD-DA; expected 255, got %d.", track.TrackNum)
 			}
 		}
 
-		// Minimum valid size of TrackIndexes:
-		// len(CUESHEET_TRACK_INDEX)*TrackIndexCount = 12*TrackIndexCount
-		TrackIndexesMinSize := int(12 * ct.TrackIndexCount)
-		if b.Len() < TrackIndexesMinSize {
-			return nil, fmt.Errorf("invalid size of TrackIndexes; expected >= %d, got %d.", TrackIndexesMinSize, b.Len())
+		// Track ISRC (size: 12 bytes).
+		buf = make([]byte, 12)
+		_, err = r.Read(buf)
+		if err != nil {
+			return nil, err
 		}
-		ct.TrackIndexes = make([]CueSheetTrackIndex, ct.TrackIndexCount)
-		for i := 0; i < len(ct.TrackIndexes); i++ {
-			trackIndex := CueSheetTrackIndex{
-				Offset: binary.BigEndian.Uint64(b.Next(8)), // Offset in samples (size: 8 bytes)
+		track.ISRC = string(buf)
+
+		const (
+			IsAudioMask        = 0x80 // 1 bit
+			HasPreEmphasisMask = 0x40 // 1 bit
+			TrackReservedMask  = 0x3F // 6 bits
+		)
+		bits, err = readutil.ReadByte(r)
+		if err != nil {
+			return nil, err
+		}
+
+		// Is audio.
+		if bits&IsAudioMask != 0 {
+			track.IsAudio = true
+		}
+
+		// Has pre-emphasis.
+		if bits&HasPreEmphasisMask != 0 {
+			track.HasPreEmphasis = true
+		}
+
+		// Reserved.
+		if bits&TrackReservedMask != 0 {
+			return nil, errors.New("meta.NewCueSheet: all reserved bits must be '0'.")
+		}
+		buf = make([]byte, 13)
+		_, err = r.Read(buf) // 13 reserved bytes.
+		if err != nil {
+			return nil, err
+		}
+		if !isAllZero(buf) {
+			return nil, errors.New("meta.NewCueSheet: all reserved bits must be '0'.")
+		}
+
+		// Track index point count.
+		err = binary.Read(r, binary.BigEndian, &track.TrackIndexCount)
+		if err != nil {
+			return nil, err
+		}
+		if i == len(cs.Tracks)-1 {
+			// Lead-out must have zero track index points.
+			if track.TrackIndexCount != 0 {
+				return nil, fmt.Errorf("meta.NewCueSheet: invalid number of track points for the lead-out track; expected 0, got %d.", track.TrackIndexCount)
 			}
-			// The index point number (size: 1 byte).
-			trackIndex.IndexPointNum, err = b.ReadByte()
+		} else {
+			if track.TrackIndexCount < 1 {
+				// Every track, except for the lead-out track, must have at least
+				// one track index point.
+				return nil, fmt.Errorf("meta.NewCueSheet: invalid number of track points; expected >= 1, got %d.", track.TrackIndexCount)
+			}
+			if cs.IsCompactDisc && track.TrackIndexCount > 100 {
+				return nil, fmt.Errorf("meta.NewCueSheet: invalid number of track points for CD-DA; expected <= 100, got %d.", track.TrackIndexCount)
+			}
+		}
+
+		// Track indexes.
+		track.TrackIndexes = make([]CueSheetTrackIndex, track.TrackIndexCount)
+		for j := 0; j < len(track.TrackIndexes); j++ {
+			// Track index point offset.
+			trackIndex := &track.TrackIndexes[j]
+			err = binary.Read(r, binary.BigEndian, &trackIndex.Offset)
 			if err != nil {
 				return nil, err
 			}
-			// Reserved (size: 3 bytes).
-			if !isAllZero(b.Next(3)) {
-				return nil, ErrReservedNotZero
+
+			// Track index point num
+			err = binary.Read(r, binary.BigEndian, &trackIndex.IndexPointNum)
+			if err != nil {
+				return nil, err
 			}
-			ct.TrackIndexes[i] = trackIndex
+
+			// Reserved.
+			buf = make([]byte, 3)
+			_, err = io.ReadFull(r, buf) // 3 reserved bytes.
+			if err != nil {
+				return nil, err
+			}
+			if !isAllZero(buf) {
+				return nil, errors.New("meta.NewCueSheet: all reserved bits must be '0'.")
+			}
 		}
 	}
 
@@ -865,17 +895,17 @@ type Picture struct {
 //    // ref: http://flac.sourceforge.net/format.html#metadata_block_picture
 //
 //    type METADATA_BLOCK_PICTURE struct {
-//       var type        uint32
-//       var mime_length uint32
-//       var mime_string [mime_length]byte
-//       var desc_length uint32
-//       var desc_string [desc_length]byte
-//       var width       uint32
-//       var height      uint32
-//       var color_depth uint32
-//       var color_count uint32
-//       var data_length uint32
-//       var data        [data_length]byte
+//       type        uint32
+//       mime_length uint32
+//       mime_string [mime_length]byte
+//       desc_length uint32
+//       desc_string [desc_length]byte
+//       width       uint32
+//       height      uint32
+//       color_depth uint32
+//       color_count uint32
+//       data_length uint32
+//       data        [data_length]byte
 //    }
 func NewPicture(r io.Reader) (p *Picture, err error) {
 	// Type.
