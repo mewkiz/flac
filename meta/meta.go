@@ -10,12 +10,12 @@ import "strings"
 
 import "github.com/mewkiz/pkg/readutil"
 
-// Type is used to identify the metadata block type.
-type Type uint8
+// BlockType is used to identify the metadata block type.
+type BlockType uint8
 
 // Metadata block types.
 const (
-	TypeStreamInfo Type = iota
+	TypeStreamInfo BlockType = iota
 	TypePadding
 	TypeApplication
 	TypeSeekTable
@@ -24,8 +24,8 @@ const (
 	TypePicture
 )
 
-func (t Type) String() string {
-	m := map[Type]string{
+func (t BlockType) String() string {
+	m := map[BlockType]string{
 		TypeStreamInfo:    "stream info",
 		TypePadding:       "padding",
 		TypeApplication:   "application",
@@ -52,7 +52,7 @@ type BlockHeader struct {
 	//    6: Picture
 	//    7-126: reserved
 	//    127: invalid, to avoid confusion with a frame sync code
-	BlockType Type
+	BlockType BlockType
 	// Length (in bytes) of metadata to follow (does not include the size of the
 	// BlockHeader).
 	Length int
@@ -89,7 +89,7 @@ func NewBlockHeader(r io.Reader) (h *BlockHeader, err error) {
 	}
 
 	// Block type.
-	h.BlockType = Type(bits & TypeMask >> 24)
+	h.BlockType = BlockType(bits & TypeMask >> 24)
 	if h.BlockType >= 7 && h.BlockType <= 126 {
 		// block type 7-126: reserved.
 		return nil, errors.New("meta.NewBlockHeader: Reserved block type.")
@@ -243,7 +243,8 @@ func NewStreamInfo(r io.Reader) (si *StreamInfo, err error) {
 }
 
 // VerifyPadding verifies that the padding metadata block only contains '0'
-// bits.
+// bits. The provided io.Reader should limit the amount of data that can be read
+// to header.Length bytes.
 func VerifyPadding(r io.Reader) (err error) {
 	// Verify up to 4 kb of padding each iteration.
 	buf := make([]byte, 4096)
@@ -382,7 +383,8 @@ type SeekPoint struct {
 }
 
 // PlaceholderPoint is the sample number used for placeholder points. For
-// placeholder points, the second and third field values are undefined.
+// placeholder points, the second and third field values in the SeekPoint
+// structure are undefined.
 const PlaceholderPoint = 0xFFFFFFFFFFFFFFFF
 
 // NewSeekTable parses and returns a new SeekTable metadata block. The provided
