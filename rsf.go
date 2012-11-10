@@ -22,8 +22,13 @@ import "github.com/mewkiz/rsf/meta"
 
 // A Stream is a FLAC bitstream.
 type Stream struct {
-	MetaBlocks []interface{}
+	MetaBlocks []MetaBlock
 	///Frame      []frame.Frame
+}
+
+type MetaBlock struct {
+	Header *meta.BlockHeader
+	Body   interface{}
 }
 
 // Open opens the provided file and returns the parsed FLAC bitstream.
@@ -63,19 +68,23 @@ func NewStream(r io.ReadSeeker) (s *Stream, err error) {
 	// Read metadata blocks.
 	s = new(Stream)
 	isFirst := true
-	header := new(meta.BlockHeader)
-	for !header.IsLast {
+	var isLast bool
+	for !isLast {
+		var block MetaBlock
 		// Read metadata block header.
-		header, err = meta.NewBlockHeader(r)
+		block.Header, err = meta.NewBlockHeader(r)
 		if err != nil {
 			return nil, err
+		}
+		if block.Header.IsLast {
+			isLast = true
 		}
 
 		// Verify block type.
 		if isFirst {
-			if header.BlockType != meta.TypeStreamInfo {
+			if block.Header.BlockType != meta.TypeStreamInfo {
 				// First block type must be StreamInfo.
-				return nil, fmt.Errorf("rsf.NewStream: first block type is invalid; expected %d (StreamInfo), got %d.", meta.TypeStreamInfo, header.BlockType)
+				return nil, fmt.Errorf("rsf.NewStream: first block type is invalid; expected %d (StreamInfo), got %d.", meta.TypeStreamInfo, block.Header.BlockType)
 			}
 			isFirst = false
 		}
@@ -83,52 +92,53 @@ func NewStream(r io.ReadSeeker) (s *Stream, err error) {
 		// Read metadata block.
 		lr := &io.LimitedReader{
 			R: r,
-			N: int64(header.Length),
+			N: int64(block.Header.Length),
 		}
-		switch header.BlockType {
+		switch block.Header.BlockType {
 		case meta.TypeStreamInfo:
-			si, err := meta.NewStreamInfo(lr)
+			block.Body, err = meta.NewStreamInfo(lr)
 			if err != nil {
 				return nil, err
 			}
-			s.MetaBlocks = append(s.MetaBlocks, si)
+			s.MetaBlocks = append(s.MetaBlocks, block)
 		case meta.TypePadding:
 			err = meta.VerifyPadding(lr)
 			if err != nil {
 				return nil, err
 			}
+			s.MetaBlocks = append(s.MetaBlocks, block)
 		case meta.TypeApplication:
-			ap, err := meta.NewApplication(lr)
+			block.Body, err = meta.NewApplication(lr)
 			if err != nil {
 				return nil, err
 			}
-			s.MetaBlocks = append(s.MetaBlocks, ap)
+			s.MetaBlocks = append(s.MetaBlocks, block)
 		case meta.TypeSeekTable:
-			st, err := meta.NewSeekTable(lr)
+			block.Body, err = meta.NewSeekTable(lr)
 			if err != nil {
 				return nil, err
 			}
-			s.MetaBlocks = append(s.MetaBlocks, st)
+			s.MetaBlocks = append(s.MetaBlocks, block)
 		case meta.TypeVorbisComment:
-			vc, err := meta.NewVorbisComment(lr)
+			block.Body, err = meta.NewVorbisComment(lr)
 			if err != nil {
 				return nil, err
 			}
-			s.MetaBlocks = append(s.MetaBlocks, vc)
+			s.MetaBlocks = append(s.MetaBlocks, block)
 		case meta.TypeCueSheet:
-			cs, err := meta.NewCueSheet(lr)
+			block.Body, err = meta.NewCueSheet(lr)
 			if err != nil {
 				return nil, err
 			}
-			s.MetaBlocks = append(s.MetaBlocks, cs)
+			s.MetaBlocks = append(s.MetaBlocks, block)
 		case meta.TypePicture:
-			p, err := meta.NewPicture(lr)
+			block.Body, err = meta.NewPicture(lr)
 			if err != nil {
 				return nil, err
 			}
-			s.MetaBlocks = append(s.MetaBlocks, p)
+			s.MetaBlocks = append(s.MetaBlocks, block)
 		default:
-			return nil, fmt.Errorf("block type '%d' not yet supported.", header.BlockType)
+			return nil, fmt.Errorf("block type '%d' not yet supported.", block.Header.BlockType)
 		}
 	}
 

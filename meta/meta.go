@@ -1,14 +1,15 @@
 // Package meta contains functions for parsing FLAC metadata.
 package meta
 
+import "bytes"
 import "encoding/binary"
 import "errors"
 import "fmt"
-import "io/ioutil"
 import "io"
+import "io/ioutil"
 import "strings"
 
-import "github.com/mewkiz/pkg/readutil"
+import "github.com/mewkiz/pkg/readerutil"
 
 // BlockType is used to identify the metadata block type.
 type BlockType uint8
@@ -58,9 +59,7 @@ type BlockHeader struct {
 	Length int
 }
 
-// NewBlockHeader parses and returns a new metadata block header. The provided
-// io.Reader should limit the amount of data that can be read to header.Length
-// bytes.
+// NewBlockHeader parses and returns a new metadata block header.
 //
 // Block header format (pseudo code):
 //    // ref: http://flac.sourceforge.net/format.html#metadata_block_header
@@ -330,18 +329,18 @@ type Application struct {
 //       ID   uint32
 //       Data [header.Length-4]byte
 //    }
-func NewApplication(r io.Reader) (ap *Application, err error) {
+func NewApplication(r io.Reader) (app *Application, err error) {
 	// Application ID (size: 4 bytes).
 	buf := make([]byte, 4)
 	_, err = io.ReadFull(r, buf)
 	if err != nil {
 		return nil, err
 	}
-	ap = new(Application)
-	ap.ID = string(buf)
-	_, ok := RegisteredApplications[ap.ID]
+	app = new(Application)
+	app.ID = string(buf)
+	_, ok := RegisteredApplications[app.ID]
 	if !ok {
-		return nil, fmt.Errorf("meta.NewApplication: unregistered application ID '%s'.", ap.ID)
+		return nil, fmt.Errorf("meta.NewApplication: unregistered application ID '%s'.", app.ID)
 	}
 
 	// Data.
@@ -349,9 +348,9 @@ func NewApplication(r io.Reader) (ap *Application, err error) {
 	if err != nil {
 		return nil, err
 	}
-	ap.Data = buf
+	app.Data = buf
 
-	return ap, nil
+	return app, nil
 }
 
 // A SeekTable metadata block is an optional block for storing seek points. It
@@ -488,7 +487,7 @@ func NewVorbisComment(r io.Reader) (vc *VorbisComment, err error) {
 		return nil, err
 	}
 	vc = new(VorbisComment)
-	vc.Vendor = string(buf)
+	vc.Vendor = getStringFromSZ(buf)
 
 	// Comment count.
 	var commentCount uint32
@@ -513,7 +512,7 @@ func NewVorbisComment(r io.Reader) (vc *VorbisComment, err error) {
 		if err != nil {
 			return nil, err
 		}
-		vector := string(buf)
+		vector := getStringFromSZ(buf)
 		pos := strings.Index(vector, "=")
 		if pos == -1 {
 			return nil, fmt.Errorf("meta.NewVorbisComment: invalid comment vector; no '=' present in: %s.", vector)
@@ -585,8 +584,7 @@ type CueSheetTrack struct {
 	// Track ISRC. This is a 12-digit alphanumeric code. A value of 12 ASCII NUL
 	// characters may be used to denote absence of an ISRC.
 	ISRC string
-	// The track type: false for audio, true for non-audio. This corresponds to
-	// the CD-DA Q-channel control bit 3.
+	// The track type: true for audio, false for non-audio.
 	IsAudio bool
 	// The pre-emphasis flag: false for no pre-emphasis, true for pre-emphasis.
 	// This corresponds to the CD-DA Q-channel control bit 5.
@@ -611,6 +609,18 @@ type CueSheetTrackIndex struct {
 	// and subsequently, index numbers must increase by 1. Index numbers must be
 	// unique within a track.
 	IndexPointNum uint8
+}
+
+// getStringFromSZ converts the provided byte slice to a string after
+// terminating it at the first occurance of a NULL character.
+func getStringFromSZ(buf []byte) string {
+	// Locate the first NULL character.
+	posNull := bytes.IndexRune(buf, 0)
+	if posNull != -1 {
+		// Terminate the string at first occurance of a NULL character.
+		buf = buf[:posNull]
+	}
+	return string(buf)
 }
 
 // NewCueSheet parses and returns a new CueSheet metadata block. The provided
@@ -655,7 +665,7 @@ func NewCueSheet(r io.Reader) (cs *CueSheet, err error) {
 		return nil, err
 	}
 	cs = new(CueSheet)
-	cs.MCN = string(buf)
+	cs.MCN = getStringFromSZ(buf)
 
 	// Lead-in sample count.
 	err = binary.Read(r, binary.BigEndian, &cs.LeadInSampleCount)
@@ -667,7 +677,7 @@ func NewCueSheet(r io.Reader) (cs *CueSheet, err error) {
 		IsCompactDiscMask    = 0x80 // 1 bit
 		CueSheetReservedMask = 0x7F // 7 bits
 	)
-	bits, err := readutil.ReadByte(r)
+	bits, err := readerutil.ReadByte(r)
 	if err != nil {
 		return nil, err
 	}
@@ -753,20 +763,23 @@ func NewCueSheet(r io.Reader) (cs *CueSheet, err error) {
 		if err != nil {
 			return nil, err
 		}
-		track.ISRC = string(buf)
+		track.ISRC = getStringFromSZ(buf)
 
 		const (
-			IsAudioMask        = 0x80 // 1 bit
+			TrackTypeMask      = 0x80 // 1 bit
 			HasPreEmphasisMask = 0x40 // 1 bit
 			TrackReservedMask  = 0x3F // 6 bits
 		)
-		bits, err = readutil.ReadByte(r)
+		bits, err = readerutil.ReadByte(r)
 		if err != nil {
 			return nil, err
 		}
 
 		// Is audio.
-		if bits&IsAudioMask != 0 {
+		if bits&TrackTypeMask == 0 {
+			// track type:
+			//    0: audio.
+			//    1: non-audio.
 			track.IsAudio = true
 		}
 
@@ -909,15 +922,15 @@ type Picture struct {
 //       data_length uint32
 //       data        [data_length]byte
 //    }
-func NewPicture(r io.Reader) (p *Picture, err error) {
+func NewPicture(r io.Reader) (pic *Picture, err error) {
 	// Type.
-	p = new(Picture)
-	err = binary.Read(r, binary.BigEndian, &p.Type)
+	pic = new(Picture)
+	err = binary.Read(r, binary.BigEndian, &pic.Type)
 	if err != nil {
 		return nil, err
 	}
-	if p.Type > 20 {
-		return nil, fmt.Errorf("meta.NewPicture: reserved picture type: %d.", p.Type)
+	if pic.Type > 20 {
+		return nil, fmt.Errorf("meta.NewPicture: reserved picture type: %d.", pic.Type)
 	}
 
 	// Mime length.
@@ -933,7 +946,7 @@ func NewPicture(r io.Reader) (p *Picture, err error) {
 	if err != nil {
 		return nil, err
 	}
-	p.MIME = string(buf)
+	pic.MIME = getStringFromSZ(buf)
 
 	// Desc length.
 	var descLen uint32
@@ -948,28 +961,28 @@ func NewPicture(r io.Reader) (p *Picture, err error) {
 	if err != nil {
 		return nil, err
 	}
-	p.Desc = string(buf)
+	pic.Desc = getStringFromSZ(buf)
 
 	// Width.
-	err = binary.Read(r, binary.BigEndian, &p.Width)
+	err = binary.Read(r, binary.BigEndian, &pic.Width)
 	if err != nil {
 		return nil, err
 	}
 
 	// Height.
-	err = binary.Read(r, binary.BigEndian, &p.Height)
+	err = binary.Read(r, binary.BigEndian, &pic.Height)
 	if err != nil {
 		return nil, err
 	}
 
 	// ColorDepth.
-	err = binary.Read(r, binary.BigEndian, &p.ColorDepth)
+	err = binary.Read(r, binary.BigEndian, &pic.ColorDepth)
 	if err != nil {
 		return nil, err
 	}
 
 	// ColorCount.
-	err = binary.Read(r, binary.BigEndian, &p.ColorCount)
+	err = binary.Read(r, binary.BigEndian, &pic.ColorCount)
 	if err != nil {
 		return nil, err
 	}
@@ -982,13 +995,13 @@ func NewPicture(r io.Reader) (p *Picture, err error) {
 	}
 
 	// Data.
-	p.Data, err = ioutil.ReadAll(r)
+	pic.Data, err = ioutil.ReadAll(r)
 	if err != nil {
 		return nil, err
 	}
-	if len(p.Data) != int(dataLen) {
-		return nil, fmt.Errorf("meta.NewPicture: invalid data length; expected %d, got %d.", dataLen, len(p.Data))
+	if len(pic.Data) != int(dataLen) {
+		return nil, fmt.Errorf("meta.NewPicture: invalid data length; expected %d, got %d.", dataLen, len(pic.Data))
 	}
 
-	return p, nil
+	return pic, nil
 }
