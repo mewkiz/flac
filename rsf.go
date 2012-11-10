@@ -1,6 +1,5 @@
 /*
 Links:
-	http://code.google.com/p/goflac-meta/source/browse/flacmeta.go
 	http://code.google.com/p/goflac-meta/source/browse/flacmeta_test.go
 	http://flac.sourceforge.net/api/hierarchy.html
 	http://flac.sourceforge.net/documentation_format_overview.html

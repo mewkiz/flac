@@ -241,9 +241,9 @@ func NewStreamInfo(r io.Reader) (si *StreamInfo, err error) {
 	return si, nil
 }
 
-// VerifyPadding verifies that the padding metadata block only contains '0'
-// bits. The provided io.Reader should limit the amount of data that can be read
-// to header.Length bytes.
+// VerifyPadding verifies that the padding metadata block only contains 0 bits.
+// The provided io.Reader should limit the amount of data that can be read to
+// header.Length bytes.
 func VerifyPadding(r io.Reader) (err error) {
 	// Verify up to 4 kb of padding each iteration.
 	buf := make([]byte, 4096)
@@ -689,7 +689,7 @@ func NewCueSheet(r io.Reader) (cs *CueSheet, err error) {
 
 	// Reserved.
 	if bits&CueSheetReservedMask != 0 {
-		return nil, errors.New("meta.NewCueSheet: all reserved bits must be '0'.")
+		return nil, errors.New("meta.NewCueSheet: all reserved bits must be 0.")
 	}
 	buf = make([]byte, 258)
 	_, err = r.Read(buf) // 258 reserved bytes.
@@ -697,7 +697,7 @@ func NewCueSheet(r io.Reader) (cs *CueSheet, err error) {
 		return nil, err
 	}
 	if !isAllZero(buf) {
-		return nil, errors.New("meta.NewCueSheet: all reserved bits must be '0'.")
+		return nil, errors.New("meta.NewCueSheet: all reserved bits must be 0.")
 	}
 
 	// Handle error checking of LeadInSampleCount here, since IsCompactDisc is
@@ -790,7 +790,7 @@ func NewCueSheet(r io.Reader) (cs *CueSheet, err error) {
 
 		// Reserved.
 		if bits&TrackReservedMask != 0 {
-			return nil, errors.New("meta.NewCueSheet: all reserved bits must be '0'.")
+			return nil, errors.New("meta.NewCueSheet: all reserved bits must be 0.")
 		}
 		buf = make([]byte, 13)
 		_, err = r.Read(buf) // 13 reserved bytes.
@@ -798,7 +798,7 @@ func NewCueSheet(r io.Reader) (cs *CueSheet, err error) {
 			return nil, err
 		}
 		if !isAllZero(buf) {
-			return nil, errors.New("meta.NewCueSheet: all reserved bits must be '0'.")
+			return nil, errors.New("meta.NewCueSheet: all reserved bits must be 0.")
 		}
 
 		// Track index point count.
@@ -845,7 +845,7 @@ func NewCueSheet(r io.Reader) (cs *CueSheet, err error) {
 				return nil, err
 			}
 			if !isAllZero(buf) {
-				return nil, errors.New("meta.NewCueSheet: all reserved bits must be '0'.")
+				return nil, errors.New("meta.NewCueSheet: all reserved bits must be 0.")
 			}
 		}
 	}
