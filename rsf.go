@@ -21,13 +21,8 @@ import "github.com/mewkiz/rsf/meta"
 
 // A Stream is a FLAC bitstream.
 type Stream struct {
-	MetaBlocks []MetaBlock
+	MetaBlocks []*meta.Block
 	///Frame      []frame.Frame
-}
-
-type MetaBlock struct {
-	Header *meta.BlockHeader
-	Body   interface{}
 }
 
 // Open opens the provided file and returns the parsed FLAC bitstream.
@@ -69,9 +64,8 @@ func NewStream(r io.ReadSeeker) (s *Stream, err error) {
 	isFirst := true
 	var isLast bool
 	for !isLast {
-		var block MetaBlock
-		// Read metadata block header.
-		block.Header, err = meta.NewBlockHeader(r)
+		// Read metadata block.
+		block, err := meta.NewBlock(r)
 		if err != nil {
 			return nil, err
 		}
@@ -88,57 +82,8 @@ func NewStream(r io.ReadSeeker) (s *Stream, err error) {
 			isFirst = false
 		}
 
-		// Read metadata block.
-		lr := &io.LimitedReader{
-			R: r,
-			N: int64(block.Header.Length),
-		}
-		switch block.Header.BlockType {
-		case meta.TypeStreamInfo:
-			block.Body, err = meta.NewStreamInfo(lr)
-			if err != nil {
-				return nil, err
-			}
-			s.MetaBlocks = append(s.MetaBlocks, block)
-		case meta.TypePadding:
-			err = meta.VerifyPadding(lr)
-			if err != nil {
-				return nil, err
-			}
-			s.MetaBlocks = append(s.MetaBlocks, block)
-		case meta.TypeApplication:
-			block.Body, err = meta.NewApplication(lr)
-			if err != nil {
-				return nil, err
-			}
-			s.MetaBlocks = append(s.MetaBlocks, block)
-		case meta.TypeSeekTable:
-			block.Body, err = meta.NewSeekTable(lr)
-			if err != nil {
-				return nil, err
-			}
-			s.MetaBlocks = append(s.MetaBlocks, block)
-		case meta.TypeVorbisComment:
-			block.Body, err = meta.NewVorbisComment(lr)
-			if err != nil {
-				return nil, err
-			}
-			s.MetaBlocks = append(s.MetaBlocks, block)
-		case meta.TypeCueSheet:
-			block.Body, err = meta.NewCueSheet(lr)
-			if err != nil {
-				return nil, err
-			}
-			s.MetaBlocks = append(s.MetaBlocks, block)
-		case meta.TypePicture:
-			block.Body, err = meta.NewPicture(lr)
-			if err != nil {
-				return nil, err
-			}
-			s.MetaBlocks = append(s.MetaBlocks, block)
-		default:
-			return nil, fmt.Errorf("block type '%d' not yet supported.", block.Header.BlockType)
-		}
+		// Store decoded metadata block.
+		s.MetaBlocks = append(s.MetaBlocks, block)
 	}
 
 	/// Audio frame parsing.

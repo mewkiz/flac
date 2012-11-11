@@ -11,6 +11,54 @@ import "strings"
 
 import "github.com/mewkiz/pkg/readerutil"
 
+// A Block is a metadata block, consisting of a block header and a body.
+type Block struct {
+	// Metadata block header.
+	Header *BlockHeader
+	// Metadata block body: StreamInfo, Application, SeekTable, etc.
+	Body interface{}
+}
+
+// NewBlock parses and returns a new metadata block, which consists of a header
+// and body.
+func NewBlock(r io.Reader) (block *Block, err error) {
+	// Read metadata block header.
+	block = new(Block)
+	block.Header, err = NewBlockHeader(r)
+	if err != nil {
+		return nil, err
+	}
+
+	// Read metadata block.
+	lr := &io.LimitedReader{
+		R: r,
+		N: int64(block.Header.Length),
+	}
+	switch block.Header.BlockType {
+	case TypeStreamInfo:
+		block.Body, err = NewStreamInfo(lr)
+	case TypePadding:
+		err = VerifyPadding(lr)
+	case TypeApplication:
+		block.Body, err = NewApplication(lr)
+	case TypeSeekTable:
+		block.Body, err = NewSeekTable(lr)
+	case TypeVorbisComment:
+		block.Body, err = NewVorbisComment(lr)
+	case TypeCueSheet:
+		block.Body, err = NewCueSheet(lr)
+	case TypePicture:
+		block.Body, err = NewPicture(lr)
+	default:
+		return nil, fmt.Errorf("meta.NewBlock: block type '%d' not yet supported.", block.Header.BlockType)
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	return block, nil
+}
+
 // BlockType is used to identify the metadata block type.
 type BlockType uint8
 
