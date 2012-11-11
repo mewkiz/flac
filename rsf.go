@@ -12,11 +12,12 @@ Links:
 // Package rsf (Royal Straight fLaC) implements access to FLAC files.
 package rsf
 
+import dbg "fmt"
 import "fmt"
 import "io"
 import "os"
 
-///import "github.com/mewkiz/rsf/frame"
+import "github.com/mewkiz/rsf/frame"
 import "github.com/mewkiz/rsf/meta"
 
 // A Stream is a FLAC bitstream.
@@ -89,13 +90,11 @@ func NewStream(r io.ReadSeeker) (s *Stream, err error) {
 	/// Audio frame parsing.
 	/// Flac decoding.
 
-	/**
-	f, err := frame.Decode(r)
+	h, err := frame.NewHeader(r)
 	if err != nil {
 		return nil, err
 	}
-	dbg.Println(f)
-	*/
+	dbg.Printf("frame header: %#v\n", h)
 
 	return s, nil
 }

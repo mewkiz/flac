@@ -1,34 +1,46 @@
 // Package frame contains functions for parsing FLAC encoded audio data.
 package frame
 
+import dbg "fmt"
 import "encoding/binary"
+import "encoding/hex"
 import "errors"
 import "fmt"
 import "io"
-import dbg "fmt"
+import "log"
+import "math"
+import "os"
 
-const (
-	ErrInvalidSyncCode = "sync code is invalid (must be 11111111111110 or 16382 decimal): %d"
-)
-
-var (
-	ErrIsNotNil        = errors.New("the reserved bits are not all 0")
-	ErrInvalidEncoding = errors.New("UTF8 invalid encoding")
-)
+import "github.com/mewkiz/pkg/hashutil/crc8"
 
 type Frame struct {
-	Header    FrameHeader
+	Header    *Header
 	SubFrames []SubFrame
 	Footer    FrameFooter
 }
 
-type FrameHeader struct {
-	HasVariableBlockSize         bool
-	BlockSizeInterChannelSamples uint8
-	SampleRate                   uint8
-	ChannelAssignment            uint8
-	SampleSize                   uint8
-	CRC                          uint8
+// A Header is a frame header, which contains information about the frame like
+// the block size, sample rate, number of channels, etc, and an 8-bit CRC.
+type Header struct {
+	// Blocking strategy:
+	//    false: fixed-blocksize stream.
+	//    true:  variable-blocksize stream.
+	HasVariableBlockSize bool
+	// Block size in inter-channel samples.
+	BlockSize uint16
+	// Sample rate.
+	SampleRate uint32
+	// Channel order specifies the order in which channels are stored in the
+	// frame.
+	ChannelOrder ChannelOrder
+	// Sample size in bits. Get from StreamInfo metadata block if set to 0.
+	SampleSize uint8
+	// Sample number is the frame's starting sample number, used by
+	// variable-blocksize streams.
+	SampleNum uint64
+	// Frame number, used by fixed-blocksize streams. The frame's starting sample
+	// number will be the frame number times the blocksize.
+	FrameNum uint32
 }
 
 type SubFrame struct {
@@ -85,206 +97,424 @@ type FrameFooter struct {
 	CRC uint16
 }
 
-func Decode(r io.Reader) (f *Frame, err error) {
+/**
+f.Footer.CRC = binary.BigEndian.Uint16(buf.Next(2))
+
+const (
+	zeroPaddingMask  = 0x80
+	subFrameTypeMask = 0x7E
+)
+
+subFrame := new(SubFrame)
+
+c, err := buf.ReadByte()
+if err != nil {
+	return err
+}
+
+//Zero bit padding, to prevent sync-fooling string of 1s
+if c&zeroPaddingMask != 0 {
+	return nil, ErrIsNotNil
+}
+
+// Subframe type:
+// 000000 : SUBFRAME_CONSTANT
+// 000001 : SUBFRAME_VERBATIM
+// 00001x : reserved
+// 0001xx : reserved
+// 001xxx : if(xxx <= 4) SUBFRAME_FIXED, xxx=order ; else reserved
+// 01xxxx : reserved
+// 1xxxxx : SUBFRAME_LPC, xxxxx=order-1
+
+subFrame.Header.subFrameType = c & subFrameTypeMask
+*/
+
+// Sync code for frame headers. Bit representation: 11111111111110.
+const SyncCode = 0x3FFE
+
+// ChannelOrder specifies the order in which channels are stored.
+type ChannelOrder uint8
+
+// Channel assignment. The following abbreviations are used:
+//    L:   left
+//    R:   right
+//    C:   center
+//    Lfe: low-frequency effects
+//    Ls:  left surround
+//    Rs:  right surround
+//
+// The first 6 channel constants follow the SMPTE/ITU-R channel order:
+//    L R C Lfe Ls Rs
+const (
+	ChannelMono       ChannelOrder = iota // 1 channel:  mono.
+	ChannelLR                             // 2 channels: left, right
+	ChannelLRC                            // 3 channels: left, right, center
+	ChannelLRLsRs                         // 4 channels: left, right, left surround, right surround
+	ChannelLRCLsRs                        // 5 channels: left, right, center, left surround, right surround
+	ChannelLRCLfeLsRs                     // 6 channels: left, right, center, low-frequency effects, left surround, right surround
+	Channel7                              // 7 channels: not defined
+	Channel8                              // 8 channels: not defined
+	ChannelLSide                          // left/side stereo:  left, side (difference)
+	ChannelSideR                          // side/right stereo: side (difference), right
+	ChannelMidSide                        // mid/side stereo:   mid (average), side (difference)
+)
+
+// NewHeader parses and returns a new frame header.
+//
+// Frame header format (pseudo code):
+//    // ref: http://flac.sourceforge.net/format.html#frame_header
+//
+//    type FRAME_HEADER struct {
+//       sync_code               uint14
+//       _                       uint1
+//       has_variable_block_size bool
+//       block_size_spec         uint4
+//       sample_rate_spec        uint4
+//       channel_assignment      uint4
+//       sample_size_spec        uint3
+//       _                       uint1
+//       if has_variable_block_size {
+//          // "UTF-8" coded int, from 1 to 7 bytes.
+//          sample_num           uint36
+//       } else {
+//          // "UTF-8" coded int, from 1 to 6 bytes.
+//          frame_num            uint31
+//       }
+//       switch block_size_spec {
+//       case 0110:
+//          block_size           uint8  // block_size-1
+//       case 0111:
+//          block_size           uint16 // block_size-1
+//       }
+//       switch sample_rate_spec {
+//       case 1100:
+//          sample_rate          uint8  // sample rate in kHz.
+//       case 1101:
+//          sample_rate          uint16 // sample rate in Hz.
+//       case 1110:
+//          sample_rate          uint16 // sample rate in daHz (tens of Hz).
+//       }
+//       crc8                    uint8
+//    }
+func NewHeader(r io.ReadSeeker) (h *Header, err error) {
+	// Record start offset, which is used when verifying the CRC-8 of the frame
+	// header.
+	start, err := r.Seek(0, os.SEEK_CUR)
+	if err != nil {
+		return nil, err
+	}
+
+	// Read 32 bits which are arranged according to the following masks.
 	const (
-		syncCodeLen = 2
-
-		syncCodeMask                     = 0xFFFC
-		firstReservedMask                = 0x0002
-		blockingStrategyMask             = 0x0001
-		blockSizeInterChannelSamplesMask = 0xF0
-		sampleRateMask                   = 0x0F
-		channelAssignmentMask            = 0xF0
-		sampleSizeMask                   = 0x0E
-		secondReservedMask               = 0x01
+		SyncCodeMask          = 0xFFFC0000 // 14 bits   shift right: 18
+		Reserved1Mask         = 0x00020000 // 1 bit     shift right: 17
+		BlockingStrategyMask  = 0x00010000 // 1 bit     shift right: 16
+		BlockSizeSpecMask     = 0x0000F000 // 4 bits    shift right: 12
+		SampleRateSpecMask    = 0x00000F00 // 4 bits    shift right: 8
+		ChannelAssignmentMask = 0x000000F0 // 4 bits    shift right: 4
+		SampleSizeSpecMask    = 0x0000000E // 3 bits    shift right: 1
+		Reserved2Mask         = 0x00000001 // 1 bit     shift right: 0
 	)
-
-	f = new(Frame)
-
-	buf := make([]byte, syncCodeLen)
-	_, err = r.Read(buf)
+	var bits uint32
+	err = binary.Read(r, binary.BigEndian, &bits)
 	if err != nil {
 		return nil, err
 	}
 
-	//Sync Code, Reserved and blocking strategy (size: 2 bytes)
-	bits := binary.BigEndian.Uint16(buf)
-	if (syncCodeMask&bits)>>2 != 16382 {
-		return nil, fmt.Errorf(ErrInvalidSyncCode, (syncCodeMask&bits)>>2)
+	// Sync code.
+	syncCode := bits & SyncCodeMask >> 18
+	if syncCode != SyncCode {
+		return nil, fmt.Errorf("frame.NewHeader: invalid sync code; expected '%014b', got '%014b'.", SyncCode, syncCode)
 	}
 
-	//Reserved values most be 0
-	if (firstReservedMask&bits)>>1 != 0 {
-		return nil, ErrIsNotNil
+	// Reserved.
+	if bits&Reserved1Mask != 0 {
+		return nil, errors.New("frame.NewHeader: all reserved bits must be 0.")
 	}
 
-	//If blockingStrategyMask is 0 it has fixed blocksize instead of variable
-	if blockingStrategyMask&bits != 0 {
-		f.Header.HasVariableBlockSize = true
+	// Blocking strategy.
+	h = new(Header)
+	if bits&BlockingStrategyMask != 0 {
+		// blocking strategy:
+		//    0: fixed-blocksize.
+		//    1: variable-blocksize.
+		h.HasVariableBlockSize = true
 	}
 
-	// Block size in inter channel samples and Sample rate (size: 1 byte)
-	buf := make([]byte, syncCodeLen)
-	_, err = r.Read(buf)
-	if err != nil {
-		return nil, err
+	// Channel assignment.
+	//    0000-0111: (number of independent channels)-1. Where defined, the
+	//               channel order follows SMPTE/ITU-R recommendations. The
+	//               assignments are as follows:
+	//       1 channel: mono
+	//       2 channels: left, right
+	//       3 channels: left, right, center
+	//       4 channels: left, right, left surround, right surround
+	//       5 channels: left, right, center, left surround, right surround
+	//       6 channels: left, right, center, low-frequency effects, left surround, right surround
+	//       7 channels: not defined
+	//       8 channels: not defined
+	//    1000: left/side stereo:  left, side (difference)
+	//    1001: side/right stereo: side (difference), right
+	//    1010: mid/side stereo:   mid (average), side (difference)
+	//    1011-1111: reserved
+	n := bits & ChannelAssignmentMask >> 4
+	switch {
+	case n >= 0 && n <= 10:
+		// 0000-0111: (number of independent channels)-1. Where defined, the
+		//            channel order follows SMPTE/ITU-R recommendations. The
+		//            assignments are as follows:
+		//    1 channel: mono
+		//    2 channels: left, right
+		//    3 channels: left, right, center
+		//    4 channels: left, right, left surround, right surround
+		//    5 channels: left, right, center, left surround, right surround
+		//    6 channels: left, right, center, low-frequency effects, left surround, right surround
+		//    7 channels: not defined
+		//    8 channels: not defined
+		// 1000: left/side stereo:  left, side (difference)
+		// 1001: side/right stereo: side (difference), right
+		// 1010: mid/side stereo:   mid (average), side (difference)
+		h.ChannelOrder = ChannelOrder(n)
+	case n >= 11 && n <= 15:
+		// 1011-1111: reserved
+		return nil, fmt.Errorf("frame.NewHeader: invalid channel order; reserved bit pattern: %04b.", n)
+	default:
+		// should be unreachable.
+		log.Fatalln(fmt.Errorf("frame.NewHeader: unhandled channel assignment bit pattern: %04b.", n))
 	}
-	r.Read(p)
 
-	f.Header.BlockSizeInterChannelSamples = uint8((BlockSizeInterChannelSamplesMask & aByte) >> 4)
-	f.Header.SampleRate = uint8(SampleRateMask & aByte)
-
-	//Channel Assignment, Sample Size in bits and reserved bit (size: 1 byte)
-	aByte = buf.Next(1)[0]
-
-	f.Header.ChannelAssignment = uint8(ChannelAssignmentMask & aByte >> 4)
-	f.Header.SampleSize = uint8(SampleSizeMask & aByte >> 1)
-
-	if (SecondReservedMask & bits) != 0 {
-		return nil, ErrIsNotNil
+	// Sample size.
+	//    000: get from STREAMINFO metadata block.
+	//    001: 8 bits per sample.
+	//    010: 12 bits per sample.
+	//    011: reserved.
+	//    100: 16 bits per sample.
+	//    101: 20 bits per sample.
+	//    110: 24 bits per sample.
+	//    111: reserved.
+	n = bits & SampleSizeSpecMask >> 1
+	switch n {
+	case 0:
+		// 000: get from STREAMINFO metadata block.
+		/// ### [ todo ] ###
+		///    - Should we try to read StreamInfo from here? We won't always have
+		///      access to it.
+		/// ### [/ todo ] ###
+		log.Println(fmt.Errorf("not yet implemented; sample size: %d.", n))
+	case 1:
+		// 001: 8 bits per sample.
+		h.SampleSize = 8
+	case 2:
+		// 010: 12 bits per sample.
+		h.SampleSize = 12
+	case 3, 7:
+		// 011: reserved.
+		// 111: reserved.
+		return nil, fmt.Errorf("frame.NewHeader: invalid sample size; reserved bit pattern: %03b.", n)
+	case 4:
+		// 100: 16 bits per sample.
+		h.SampleSize = 16
+	case 5:
+		// 101: 20 bits per sample.
+		h.SampleSize = 20
+	case 6:
+		// 110: 24 bits per sample.
+		h.SampleSize = 24
+	default:
+		// should be unreachable.
+		log.Fatalln(fmt.Errorf("frame.NewHeader: unhandled sample size bit pattern: %03b.", n))
 	}
 
-	///I have no idea how to decrypt this part of the spec:
-	///EDIT: holy fuck I found a clue http://comments.gmane.org/gmane.comp.audio.compression.flac.devel/3031
-	// <?> 	if(variable blocksize)
-	//   		<8-56>:"UTF-8" coded sample number (decoded number is 36 bits)
-	// 		else
-	//   		<8-48>:"UTF-8" coded frame number (decoded number is 31 bits)
-	if f.Header.HasVariableBlockSize {
+	// Reserved.
+	if bits&Reserved2Mask != 0 {
+		return nil, errors.New("frame.NewHeader: all reserved bits must be 0.")
+	}
 
-	} else {
-		var frameNum uint64
-		dbg.Println("Fixed!")
-
-		//Well, as the documentation states, it uses the same method as in UTF-8 to store variable length integers
-		const (
-			endMask        = 0x80
-			invalidMask    = 0xC0
-			twoLeadingMask = 0xC0
-			leadMask       = 0x80
-		)
-
-		// var sampleNum uint32
-
-		b0 := buf.Next(1)[0] //read one byte B0 from the stream
-		switch {
-		case b0&endMask == 0:
-			///if B0 = 0xxxxxxx then the read value is B0 -> end
-			frameNum = uint64(b0)
-		case b0&invalidMask != 128:
-			return nil, ErrInvalidEncoding
-			///- if B0 = 10xxxxxx, the encoding is invalid
-		case b0&twoLeadingMask == 192:
-			var leadOnes uint8
-			for (b0 & leadMask) > 0 {
-				leadOnes++
-				b0 <<= 1
-			}
-			fmt.Println(b0, ":", leadOnes)
-			///determine numLeadingBinary1sMinus1
-			// - if B0 = 11xxxxxx, set L to the number of leading binary 1s minus 1:
-			//      B0 = 110xxxxx -> L = 1
-			//      B0 = 1110xxxx -> L = 2
-			//      B0 = 11110xxx -> L = 3
-			//      B0 = 111110xx -> L = 4
-			//      B0 = 1111110x -> L = 5
-			//      B0 = 11111110 -> L = 6
+	// "UTF-8" coded sample number or frame number.
+	if h.HasVariableBlockSize {
+		// Sample number.
+		h.SampleNum, err = decodeUTF8Int(r)
+		if err != nil {
+			return nil, err
 		}
-
-		fmt.Println("FrameNum:", frameNum)
-
-		/*
-
-
-			- assign the bits following the encoding (the x bits in the examples) to
-			a variable R with a magnitude of at least 56 bits
-			- loop from 1 to L
-			     - left shift R 6 bits
-			     - read B from the stream
-			     - if B does not match 10xxxxxx, the encoding is invalid
-			     - set R = R or <the lower 6 bits from B>
-			- the read value is R
-
-			The following two fields depend on the block size and sample rate index
-			read earlier in the header:
-
-			- If blocksize index = 6, read 8 bits from the stream. The true block
-			size is the read value + 1.
-			- If blocksize index = 7, read 16 bits from the stream. The true block
-			size is the read value + 1.
-
-			- If sample index is 12, read 8 bits from the stream. The true sample
-			rate is the read value * 1000.
-			- If sample index is 13, read 16 bits from the stream. The true sample
-			rate is the read value.
-			- If sample index is 14, read 16 bits from the stream. The true sample
-			rate is the read value * 10.
-		*/
+		dbg.Println("UTF-8 decoded sample number:", h.SampleNum)
+	} else {
+		// Frame number.
+		frameNum, err := decodeUTF8Int(r)
+		if err != nil {
+			return nil, err
+		}
+		h.FrameNum = uint32(frameNum)
+		dbg.Println("UTF-8 decoded frame number:", h.FrameNum)
 	}
 
-	// - If blocksize index = 6, read 8 bits from the stream. The true block
-	// size is the read value + 1.
-	// - If blocksize index = 7, read 16 bits from the stream. The true block
-	// size is the read value + 1.
-	///I have no idea how to decrypt this part of the spec:
-	// <?> 	if(blocksize bits == 011x)
-	//    		8/16 bit (blocksize-1)
-	if f.Header.BlockSizeInterChannelSamples == 6 {
-		dbg.Println("True block size is:", uint8(buf.Next(1)[0])+1)
-	} else if f.Header.BlockSizeInterChannelSamples == 7 {
-		dbg.Println("True block size is:", binary.BigEndian.Uint16(buf.Next(2))+1)
+	// Block size.
+	//    0000: reserved.
+	//    0001: 192 samples.
+	//    0010-0101: 576 * (2^(n-2)) samples, i.e. 576/1152/2304/4608.
+	//    0110: get 8 bit (blocksize-1) from end of header.
+	//    0111: get 16 bit (blocksize-1) from end of header.
+	//    1000-1111: 256 * (2^(n-8)) samples, i.e. 256/512/1024/2048/4096/8192/
+	//               16384/32768.
+	n = bits & BlockSizeSpecMask >> 12
+	switch {
+	case n == 0:
+		// 0000: reserved.
+		return nil, errors.New("frame.NewHeader: invalid block size; reserved bit pattern.")
+	case n == 1:
+		// 0001: 192 samples.
+		h.BlockSize = 192
+	case n >= 2 && n <= 5:
+		// 0010-0101: 576 * (2^(n-2)) samples, i.e. 576/1152/2304/4608.
+		h.BlockSize = uint16(576 * math.Pow(2, float64(n-2)))
+	case n == 6:
+		// 0110: get 8 bit (blocksize-1) from end of header.
+		var x uint8
+		err = binary.Read(r, binary.BigEndian, &x)
+		if err != nil {
+			return nil, err
+		}
+		h.BlockSize = uint16(x) + 1
+		dbg.Println("block size: %d (8 bits).", h.BlockSize)
+	case n == 7:
+		// 0111: get 16 bit (blocksize-1) from end of header.
+		var x uint16
+		err = binary.Read(r, binary.BigEndian, &x)
+		if err != nil {
+			return nil, err
+		}
+		h.BlockSize = x + 1
+		dbg.Println("block size: %d (16 bits).", h.BlockSize)
+	case n >= 8 && n <= 15:
+		// 1000-1111: 256 * (2^(n-8)) samples, i.e. 256/512/1024/2048/4096/8192/
+		//            16384/32768.
+		h.BlockSize = uint16(256 * math.Pow(2, float64(n-8)))
+	default:
+		// should be unreachable.
+		log.Fatalln(fmt.Errorf("frame.NewHeader: unhandled block size bit pattern: %04b.", n))
 	}
 
-	// - If sample index is 12, read 8 bits from the stream. The true sample
-	// rate is the read value * 1000.
-	// - If sample index is 13, read 16 bits from the stream. The true sample
-	// rate is the read value.
-	// - If sample index is 14, read 16 bits from the stream. The true sample
-	// rate is the read value * 10.
-	// <?> 	if(sample rate bits == 11xx)
-	//    		8/16 bit sample rate
-	switch f.Header.SampleRate {
+	// Sample rate:
+	//    0000: get from STREAMINFO metadata block.
+	//    0001: 88.2kHz.
+	//    0010: 176.4kHz.
+	//    0011: 192kHz.
+	//    0100: 8kHz.
+	//    0101: 16kHz.
+	//    0110: 22.05kHz.
+	//    0111: 24kHz.
+	//    1000: 32kHz.
+	//    1001: 44.1kHz.
+	//    1010: 48kHz.
+	//    1011: 96kHz.
+	//    1100: get 8 bit sample rate (in kHz) from end of header.
+	//    1101: get 16 bit sample rate (in Hz) from end of header.
+	//    1110: get 16 bit sample rate (in tens of Hz) from end of header.
+	//    1111: invalid, to prevent sync-fooling string of 1s.
+	n = bits & SampleRateSpecMask >> 8
+	switch n {
+	case 0:
+		// 0000: get from STREAMINFO metadata block.
+		/// ### [ todo ] ###
+		///    - add flag to get from StreamInfo.
+		/// ### [/ todo ] ###
+		log.Println(fmt.Errorf("not yet implemented; sample rate: %d.", n))
+	case 1:
+		//0001: 88.2kHz.
+		h.SampleRate = 88200
+	case 2:
+		//0010: 176.4kHz.
+		h.SampleRate = 176400
+	case 3:
+		//0011: 192kHz.
+		h.SampleRate = 192000
+	case 4:
+		//0100: 8kHz.
+		h.SampleRate = 8000
+	case 5:
+		//0101: 16kHz.
+		h.SampleRate = 16000
+	case 6:
+		//0110: 22.05kHz.
+		h.SampleRate = 22050
+	case 7:
+		//0111: 24kHz.
+		h.SampleRate = 24000
+	case 8:
+		//1000: 32kHz.
+		h.SampleRate = 32000
+	case 9:
+		//1001: 44.1kHz.
+		h.SampleRate = 44100
+	case 10:
+		//1010: 48kHz.
+		h.SampleRate = 48000
+	case 11:
+		//1011: 96kHz.
+		h.SampleRate = 96000
 	case 12:
-		dbg.Println("True sample rate is:", uint64(buf.Next(1)[0])*1000)
+		//1100: get 8 bit sample rate (in kHz) from end of header.
+		var sampleRate_kHz uint8
+		err = binary.Read(r, binary.BigEndian, &sampleRate_kHz)
+		if err != nil {
+			return nil, err
+		}
+		dbg.Printf("sample rate: %d kHz.\n", sampleRate_kHz)
+		h.SampleRate = uint32(sampleRate_kHz) * 1000
 	case 13:
-		dbg.Println("True sample rate is:", binary.BigEndian.Uint16(buf.Next(2)))
+		//1101: get 16 bit sample rate (in Hz) from end of header.
+		var sampleRate_Hz uint16
+		err = binary.Read(r, binary.BigEndian, &sampleRate_Hz)
+		if err != nil {
+			return nil, err
+		}
+		dbg.Printf("sample rate: %d Hz.\n", sampleRate_Hz)
+		h.SampleRate = uint32(sampleRate_Hz)
 	case 14:
-		dbg.Println("True sample rate is:", binary.BigEndian.Uint16(buf.Next(2))*10)
+		//1110: get 16 bit sample rate (in tens of Hz) from end of header.
+		var sampleRate_daHz uint16
+		err = binary.Read(r, binary.BigEndian, &sampleRate_daHz)
+		if err != nil {
+			return nil, err
+		}
+		dbg.Printf("sample rate: %d daHz.\n", sampleRate_daHz)
+		h.SampleRate = uint32(sampleRate_daHz) * 10
+	case 15:
+		//1111: invalid, to prevent sync-fooling string of 1s.
+		return nil, fmt.Errorf("frame.NewHeader: invalid sample rate bit pattern: %04b.", n)
+	default:
+		// should be unreachable.
+		log.Fatalln(fmt.Errorf("frame.NewHeader: unhandled sample rate bit pattern: %04b.", n))
 	}
 
-	///Add this
-	// The "blocking strategy" bit must be the same throughout the entire stream.
-	// The "blocking strategy" bit determines how to calculate the sample number of the first sample in the frame. If the bit is 0 (fixed-blocksize), the frame header encodes the frame number as above, and the frame's starting sample number will be the frame number times the blocksize. If it is 1 (variable-blocksize), the frame header encodes the frame's starting sample number itself. (In the case of a fixed-blocksize stream, only the last block may be shorter than the stream blocksize; its starting sample number will be calculated as the frame number times the previous frame's blocksize, or zero if it is the first frame).
-	// The "UTF-8" coding used for the sample/frame number is the same variable length code used to store compressed UCS-2, extended to handle larger input.
-
-	f.Header.CRC = uint8(buf.Next(1)[0])
-
-	f.Footer.CRC = binary.BigEndian.Uint16(buf.Next(2))
-
-	const (
-		zeroPaddingMask  = 0x80
-		subFrameTypeMask = 0x7E
-	)
-
-	subFrame := new(SubFrame)
-
-	c, err := buf.ReadByte()
-
-	//Zero bit padding, to prevent sync-fooling string of 1s
-	if c&zeroPaddingMask != 0 {
-		return nil, ErrIsNotNil
+	// Read the frame header data and calculate the CRC-8.
+	end, err := r.Seek(0, os.SEEK_CUR)
+	if err != nil {
+		return nil, err
+	}
+	_, err = r.Seek(start, os.SEEK_SET)
+	if err != nil {
+		return nil, err
+	}
+	data := make([]byte, end-start)
+	_, err = io.ReadFull(r, data)
+	if err != nil {
+		return nil, err
 	}
 
-	/*	Subframe type:
-		000000 : SUBFRAME_CONSTANT
-		000001 : SUBFRAME_VERBATIM
-		00001x : reserved
-		0001xx : reserved
-		001xxx : if(xxx <= 4) SUBFRAME_FIXED, xxx=order ; else reserved
-		01xxxx : reserved
-		1xxxxx : SUBFRAME_LPC, xxxxx=order-1
-	*/
-	subFrame.Header.subFrameType = c & subFrameTypeMask
+	// Verify the CRC-8.
+	var crc uint8
+	err = binary.Read(r, binary.BigEndian, &crc)
+	if err != nil {
+		return nil, err
+	}
+	got := crc8.ChecksumATM(data)
+	if crc != got {
+		return nil, fmt.Errorf("frame.NewHeader: checksum mismatch; expected 0x%02X, got 0x%02X.", crc, got)
+	}
+	dbg.Println("crc:", crc)
+	dbg.Println("got:", got)
+	dbg.Println(hex.Dump(data))
 
-	return f, nil
+	return h, nil
 }
