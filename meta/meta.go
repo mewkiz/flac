@@ -706,7 +706,7 @@ func getStringFromSZ(buf []byte) string {
 //       _               [3]byte
 //    }
 func NewCueSheet(r io.Reader) (cs *CueSheet, err error) {
-	ErrReservedNotZero := errors.New("meta.NewCueSheet: all reserved bits must be 0.")
+	errReservedNotZero := errors.New("meta.NewCueSheet: all reserved bits must be 0.")
 
 	// Media catalog number (size: 128 bytes).
 	buf := make([]byte, 128)
@@ -739,7 +739,7 @@ func NewCueSheet(r io.Reader) (cs *CueSheet, err error) {
 
 	// Reserved.
 	if bits&CueSheetReservedMask != 0 {
-		return nil, ErrReservedNotZero
+		return nil, errReservedNotZero
 	}
 	buf = make([]byte, 258)
 	_, err = r.Read(buf) // 258 reserved bytes.
@@ -747,7 +747,7 @@ func NewCueSheet(r io.Reader) (cs *CueSheet, err error) {
 		return nil, err
 	}
 	if !isAllZero(buf) {
-		return nil, ErrReservedNotZero
+		return nil, errReservedNotZero
 	}
 
 	// Handle error checking of LeadInSampleCount here, since IsCompactDisc is
@@ -840,7 +840,7 @@ func NewCueSheet(r io.Reader) (cs *CueSheet, err error) {
 
 		// Reserved.
 		if bits&TrackReservedMask != 0 {
-			return nil, ErrReservedNotZero
+			return nil, errReservedNotZero
 		}
 		buf = make([]byte, 13)
 		_, err = r.Read(buf) // 13 reserved bytes.
@@ -848,7 +848,7 @@ func NewCueSheet(r io.Reader) (cs *CueSheet, err error) {
 			return nil, err
 		}
 		if !isAllZero(buf) {
-			return nil, ErrReservedNotZero
+			return nil, errReservedNotZero
 		}
 
 		// Track index point count.
@@ -895,7 +895,7 @@ func NewCueSheet(r io.Reader) (cs *CueSheet, err error) {
 				return nil, err
 			}
 			if !isAllZero(buf) {
-				return nil, ErrReservedNotZero
+				return nil, errReservedNotZero
 			}
 		}
 	}
