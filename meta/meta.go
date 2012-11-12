@@ -535,7 +535,7 @@ func NewVorbisComment(r io.Reader) (vc *VorbisComment, err error) {
 		return nil, err
 	}
 	vc = new(VorbisComment)
-	vc.Vendor = getStringFromSZ(buf)
+	vc.Vendor = string(buf)
 
 	// Comment count.
 	var commentCount uint32
@@ -560,7 +560,7 @@ func NewVorbisComment(r io.Reader) (vc *VorbisComment, err error) {
 		if err != nil {
 			return nil, err
 		}
-		vector := getStringFromSZ(buf)
+		vector := string(buf)
 		pos := strings.Index(vector, "=")
 		if pos == -1 {
 			return nil, fmt.Errorf("meta.NewVorbisComment: invalid comment vector; no '=' present in: %s.", vector)
