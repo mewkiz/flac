@@ -12,6 +12,7 @@ import "math"
 import "os"
 
 import "github.com/mewkiz/pkg/hashutil/crc8"
+import "github.com/mewkiz/pkg/readerutil"
 
 type Frame struct {
 	Header    *Header
@@ -44,13 +45,8 @@ type Header struct {
 }
 
 type SubFrame struct {
-	Header SubFrameHeader
+	Header *SubFrameHeader
 	Block  interface{}
-}
-
-type SubFrameHeader struct {
-	subFrameType uint8
-	wastedBits   []byte
 }
 
 type SubFrameConstant struct {
@@ -517,4 +513,91 @@ func NewHeader(r io.ReadSeeker) (h *Header, err error) {
 	dbg.Println(hex.Dump(data))
 
 	return h, nil
+}
+
+type SubFrameHeader struct {
+	SubFrameType uint8
+	WastedBits   uint8
+}
+
+func NewSubFrameHeader(r io.Reader) (sh *SubFrameHeader, err error) {
+	// Read 8 bits which are arranged according to the following masks.
+	const (
+		PaddingMask      = 0x80 // 1 bit    shift right: 7
+		SubFrameTypeMask = 0x7E // 6 bits   shift right: 1
+		WastedBitsMask   = 0x01 // 1 bit    shift right: 0
+	)
+	bits, err := readerutil.ReadByte(r)
+	if err != nil {
+		return nil, err
+	}
+
+	// Padding.
+	if bits & PaddingMask != 0 {
+		return nil, errors.New("frame.NewSubFrameHeader: invalid padding; must be 0.")
+	}
+
+	// Subframe type.
+	//    000000: SUBFRAME_CONSTANT
+	//    000001: SUBFRAME_VERBATIM
+	//    00001x: reserved
+	//    0001xx: reserved
+	//    001xxx: if(xxx <= 4) SUBFRAME_FIXED, xxx=order ; else reserved
+	//    01xxxx: reserved
+	//    1xxxxx: SUBFRAME_LPC, xxxxx=order-1
+	n := bits & SubFrameTypeMask >> 1
+	switch {
+	case n == 0:
+		// 000000: SUBFRAME_CONSTANT
+		/// ### [ todo ] ###
+		///    - handle subframe constant.
+		/// ### [/ todo ] ###
+		log.Println(fmt.Errorf("not yet implemented; subframe type: %d.", n))
+	case n == 1:
+		// 000001: SUBFRAME_VERBATIM
+		/// ### [ todo ] ###
+		///    - handle subframe verbatim.
+		/// ### [/ todo ] ###
+		log.Println(fmt.Errorf("not yet implemented; subframe type: %d.", n))
+	case n < 8:
+		// 00001x: reserved
+		// 0001xx: reserved
+		return nil, fmt.Errorf("frame.NewSubFrameHeader: invalid subframe type; reserved bit pattern: %06b.", n)
+	case n < 16:
+		// 001xxx: if(xxx <= 4) SUBFRAME_FIXED, xxx=order ; else reserved
+		const orderMask = 0x07
+		order := n & orderMask
+		if order > 4 {
+			return nil, fmt.Errorf("frame.NewSubFrameHeader: invalid subframe type; reserved bit pattern: %06b.", n)
+		}
+		dbg.Println("subframe fixed order:", order)
+		/// ### [ todo ] ###
+		///    - get subframe fixed order.
+		/// ### [/ todo ] ###
+		log.Println(fmt.Errorf("not yet implemented; subframe type: %d.", n))
+	case n < 32:
+		// 01xxxx: reserved
+		return nil, fmt.Errorf("frame.NewSubFrameHeader: invalid subframe type; reserved bit pattern: %06b.", n)
+	case n < 64:
+		// 1xxxxx: SUBFRAME_LPC, xxxxx=order-1
+		const orderMask = 0x1F
+		order := n & orderMask
+		dbg.Println("subframe LPC order:", order)
+		/// ### [ todo ] ###
+		///    - get subframe lpc order.
+		/// ### [/ todo ] ###
+		log.Println(fmt.Errorf("not yet implemented; subframe type: %d.", n))
+	default:
+		// should be unreachable.
+		log.Fatalln(fmt.Errorf("frame.NewSubFrameHeader: unhandled subframe type bit pattern: %06b.", n))
+	}
+
+	// Wasted bits-per-sample.
+	if bits & WastedBitsMask != 0 {
+		/// ### [ todo ] ###
+		///    - handle wasted bits-per-sample.
+		/// ### [/ todo ] ###
+		log.Println(errors.New("not yet implemented; wasted bits-per-sample."))
+	}
+	return sh, nil
 }

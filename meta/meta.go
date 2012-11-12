@@ -716,6 +716,11 @@ func NewCueSheet(r io.Reader) (cs *CueSheet, err error) {
 	}
 	cs = new(CueSheet)
 	cs.MCN = getStringFromSZ(buf)
+	for _, r := range cs.MCN {
+		if r < 0x20 || r > 0x7E {
+			return nil, fmt.Errorf("meta.NewCueSheet: invalid character in media catalog number; expected >= 0x20 and <= 0x7E, got 0x%02X.", r)
+		}
+	}
 
 	// Lead-in sample count.
 	err = binary.Read(r, binary.BigEndian, &cs.LeadInSampleCount)

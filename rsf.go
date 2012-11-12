@@ -96,5 +96,11 @@ func NewStream(r io.ReadSeeker) (s *Stream, err error) {
 	}
 	dbg.Printf("frame header: %#v\n", h)
 
+	sh, err := frame.NewSubFrameHeader(r)
+	if err != nil {
+		return nil, err
+	}
+	dbg.Printf("subframe header: %#v\n", sh)
+
 	return s, nil
 }
