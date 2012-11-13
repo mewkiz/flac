@@ -1002,6 +1002,11 @@ func NewPicture(r io.Reader) (pic *Picture, err error) {
 		return nil, err
 	}
 	pic.MIME = getStringFromSZ(buf)
+	for _, r := range pic.MIME {
+		if r < 0x20 || r > 0x7E {
+			return nil, fmt.Errorf("meta.NewPicture: invalid character in media catalog number; expected >= 0x20 and <= 0x7E, got 0x%02X.", r)
+		}
+	}
 
 	// Desc length.
 	var descLen uint32
