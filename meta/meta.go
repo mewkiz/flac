@@ -30,10 +30,7 @@ func NewBlock(r io.Reader) (block *Block, err error) {
 	}
 
 	// Read metadata block.
-	lr := &io.LimitedReader{
-		R: r,
-		N: int64(block.Header.Length),
-	}
+	lr := io.LimitReader(r, int64(block.Header.Length))
 	switch block.Header.BlockType {
 	case TypeStreamInfo:
 		block.Body, err = NewStreamInfo(lr)
