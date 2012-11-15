@@ -22,6 +22,6 @@ Documentation provided by GoPkgDoc:
 public domain
 -------------
 
-This code is hereby release this code into the *[public domain][]*.
+This code is hereby released into the *[public domain][]*.
 
 [public domain]: https://creativecommons.org/publicdomain/zero/1.0/
