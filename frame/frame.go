@@ -533,7 +533,7 @@ func NewSubFrameHeader(r io.Reader) (sh *SubFrameHeader, err error) {
 	}
 
 	// Padding.
-	if bits & PaddingMask != 0 {
+	if bits&PaddingMask != 0 {
 		return nil, errors.New("frame.NewSubFrameHeader: invalid padding; must be 0.")
 	}
 
@@ -593,7 +593,7 @@ func NewSubFrameHeader(r io.Reader) (sh *SubFrameHeader, err error) {
 	}
 
 	// Wasted bits-per-sample.
-	if bits & WastedBitsMask != 0 {
+	if bits&WastedBitsMask != 0 {
 		/// ### [ todo ] ###
 		///    - handle wasted bits-per-sample.
 		/// ### [/ todo ] ###
