@@ -15,9 +15,9 @@ Documentation provided by GoPkgDoc:
        - [frame][]
        - [meta][]
 
-[rsf]: http://go.pkgdoc.org/github.com/mewkiz/rsf
-[frame]: http://go.pkgdoc.org/github.com/mewkiz/rsf/frame
-[meta]: http://go.pkgdoc.org/github.com/mewkiz/rsf/meta
+[rsf]: http://godoc.org/github.com/mewkiz/rsf
+[frame]: http://godoc.org/github.com/mewkiz/rsf/frame
+[meta]: http://godoc.org/github.com/mewkiz/rsf/meta
 
 public domain
 -------------
