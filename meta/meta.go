@@ -11,7 +11,7 @@ import "strings"
 
 import "github.com/mewkiz/pkg/readerutil"
 
-// A Block is a metadata block, consisting of a block header and a body.
+// A Block is a metadata block, consisting of a block header and a block body.
 type Block struct {
 	// Metadata block header.
 	Header *BlockHeader
@@ -19,8 +19,8 @@ type Block struct {
 	Body interface{}
 }
 
-// NewBlock parses and returns a new metadata block, which consists of a header
-// and body.
+// NewBlock parses and returns a new metadata block, which consists of a block
+// header and a block body.
 func NewBlock(r io.Reader) (block *Block, err error) {
 	// Read metadata block header.
 	block = new(Block)

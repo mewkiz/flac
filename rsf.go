@@ -12,7 +12,6 @@ Links:
 // Package rsf (Royal Straight fLaC) implements access to FLAC files.
 package rsf
 
-import dbg "fmt"
 import "fmt"
 import "io"
 import "os"
@@ -22,8 +21,10 @@ import "github.com/mewkiz/rsf/meta"
 
 // A Stream is a FLAC bitstream.
 type Stream struct {
+	// Metadata blocks.
 	MetaBlocks []*meta.Block
-	///Frame      []frame.Frame
+	// Audio frames.
+	Frames []*frame.Frame
 }
 
 // Open opens the provided file and returns the parsed FLAC bitstream.
@@ -87,20 +88,20 @@ func NewStream(r io.ReadSeeker) (s *Stream, err error) {
 		s.MetaBlocks = append(s.MetaBlocks, block)
 	}
 
-	/// Audio frame parsing.
-	/// Flac decoding.
+	// First block is always a StreamInfo block.
+	si := s.MetaBlocks[0].Body.(*meta.StreamInfo)
 
-	h, err := frame.NewHeader(r)
-	if err != nil {
-		return nil, err
+	/// ### [ todo ] ###
+	///   - check for int overflow.
+	/// ### [/ todo ] ###
+	for i := uint64(0); i < si.SampleCount; {
+		f, err := frame.NewFrame(r)
+		if err != nil {
+			return nil, err
+		}
+		s.Frames = append(s.Frames, f)
+		i += uint64(len(f.SubFrames[0].Samples))
 	}
-	dbg.Printf("frame header: %#v\n", h)
-
-	sh, err := frame.NewSubFrameHeader(r)
-	if err != nil {
-		return nil, err
-	}
-	dbg.Printf("subframe header: %#v\n", sh)
 
 	return s, nil
 }

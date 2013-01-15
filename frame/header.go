@@ -340,7 +340,7 @@ func NewHeader(r io.ReadSeeker) (h *Header, err error) {
 	case 0:
 		// 0000: get from STREAMINFO metadata block.
 		/// ### [ todo ] ###
-		///    - add flag to get from StreamInfo.
+		///    - add flag to get from StreamInfo?
 		/// ### [/ todo ] ###
 		log.Println(fmt.Errorf("not yet implemented; sample rate: %d.", n))
 	case 1:
