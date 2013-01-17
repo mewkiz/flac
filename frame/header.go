@@ -91,36 +91,36 @@ func (order ChannelOrder) ChannelCount() int {
 //    // ref: http://flac.sourceforge.net/format.html#frame_header
 //
 //    type FRAME_HEADER struct {
-//       sync_code               uint14
-//       _                       uint1
-//       has_variable_block_size bool
-//       sample_count_spec       uint4
-//       sample_rate_spec        uint4
-//       channel_assignment      uint4
-//       sample_size_spec        uint3
-//       _                       uint1
-//       if has_variable_block_size {
+//       sync_code                 uint14
+//       _                         uint1
+//       has_variable_sample_count bool   // referred to as "variable blocksize" in the spec.
+//       sample_count_spec         uint4  // referred to as "blocksize" in the spec.
+//       sample_rate_spec          uint4
+//       channel_assignment        uint4
+//       sample_size_spec          uint3
+//       _                         uint1
+//       if has_variable_sample_count {
 //          // "UTF-8" coded int, from 1 to 7 bytes.
-//          sample_num           uint36
+//          sample_num             uint36
 //       } else {
 //          // "UTF-8" coded int, from 1 to 6 bytes.
-//          frame_num            uint31
+//          frame_num              uint31
 //       }
 //       switch sample_count_spec {
 //       case 0110:
-//          sample_count         uint8  // sample_count-1
+//          sample_count           uint8  // sample_count-1
 //       case 0111:
-//          sample_count         uint16 // sample_count-1
+//          sample_count           uint16 // sample_count-1
 //       }
 //       switch sample_rate_spec {
 //       case 1100:
-//          sample_rate          uint8  // sample rate in kHz.
+//          sample_rate            uint8  // sample rate in kHz.
 //       case 1101:
-//          sample_rate          uint16 // sample rate in Hz.
+//          sample_rate            uint16 // sample rate in Hz.
 //       case 1110:
-//          sample_rate          uint16 // sample rate in daHz (tens of Hz).
+//          sample_rate            uint16 // sample rate in daHz (tens of Hz).
 //       }
-//       crc8                    uint8
+//       crc8                      uint8
 //    }
 func NewHeader(r io.ReadSeeker) (h *Header, err error) {
 	// Record start offset, which is used when verifying the CRC-8 of the frame

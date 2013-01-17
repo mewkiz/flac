@@ -107,13 +107,14 @@ type BlockHeader struct {
 // NewBlockHeader parses and returns a new metadata block header.
 //
 // Block header format (pseudo code):
-//    // ref: http://flac.sourceforge.net/format.html#metadata_block_header
 //
 //    type METADATA_BLOCK_HEADER struct {
 //       is_last    bool
 //       block_type uint7
 //       length     uint24
 //    }
+//
+// ref: http://flac.sourceforge.net/format.html#metadata_block_header
 func NewBlockHeader(r io.Reader) (h *BlockHeader, err error) {
 	const (
 		IsLastMask = 0x80000000 // 1 bit
@@ -187,7 +188,6 @@ type StreamInfo struct {
 // header.Length bytes.
 //
 // Stream info format (pseudo code):
-//    // ref: http://flac.sourceforge.net/format.html#metadata_block_streaminfo
 //
 //    type METADATA_BLOCK_STREAMINFO struct {
 //       min_block_size  uint16
@@ -200,6 +200,8 @@ type StreamInfo struct {
 //       sample_count    uint36
 //       md5sum          [16]byte
 //    }
+//
+// ref: http://flac.sourceforge.net/format.html#metadata_block_streaminfo
 func NewStreamInfo(r io.Reader) (si *StreamInfo, err error) {
 	// Minimum block size.
 	si = new(StreamInfo)
@@ -368,12 +370,13 @@ type Application struct {
 // header.Length bytes.
 //
 // Application format (pseudo code):
-//    // ref: http://flac.sourceforge.net/format.html#metadata_block_application
 //
 //    type METADATA_BLOCK_APPLICATION struct {
 //       ID   uint32
 //       Data [header.Length-4]byte
 //    }
+//
+// ref: http://flac.sourceforge.net/format.html#metadata_block_application
 func NewApplication(r io.Reader) (app *Application, err error) {
 	// Application ID (size: 4 bytes).
 	buf := make([]byte, 4)
@@ -436,7 +439,6 @@ const PlaceholderPoint = 0xFFFFFFFFFFFFFFFF
 // bytes.
 //
 // Seek table format (pseudo code):
-//    // ref: http://flac.sourceforge.net/format.html#metadata_block_seektable
 //
 //    type METADATA_BLOCK_SEEKTABLE struct {
 //       // The number of seek points is implied by the metadata header 'length'
@@ -449,6 +451,8 @@ const PlaceholderPoint = 0xFFFFFFFFFFFFFFFF
 //       offset       uint64
 //       sample_count uint16
 //    }
+//
+// ref: http://flac.sourceforge.net/format.html#metadata_block_seektable
 func NewSeekTable(r io.Reader) (st *SeekTable, err error) {
 	st = new(SeekTable)
 	var hasPrev bool
@@ -503,7 +507,6 @@ type VorbisEntry struct {
 // header.Length bytes.
 //
 // Vorbis comment format (pseudo code):
-//    // ref: http://flac.sourceforge.net/format.html#metadata_block_vorbis_comment
 //
 //    type METADATA_BLOCK_VORBIS_COMMENT struct {
 //       vendor_length uint32
@@ -517,6 +520,8 @@ type VorbisEntry struct {
 //       // vector_string is a name/value pair. Example: "NAME=value".
 //       vector_string [length]byte
 //    }
+//
+// ref: http://flac.sourceforge.net/format.html#metadata_block_vorbis_comment
 func NewVorbisComment(r io.Reader) (vc *VorbisComment, err error) {
 	// Vendor length.
 	var vendorLen uint32
@@ -673,7 +678,6 @@ func getStringFromSZ(buf []byte) string {
 // bytes.
 //
 // Cue sheet format (pseudo code):
-//    // ref: http://flac.sourceforge.net/format.html#metadata_block_cuesheet
 //
 //    type METADATA_BLOCK_CUESHEET struct {
 //       mcn                  [128]byte
@@ -702,6 +706,8 @@ func getStringFromSZ(buf []byte) string {
 //       index_point_num uint8
 //       _               [3]byte
 //    }
+//
+// ref: http://flac.sourceforge.net/format.html#metadata_block_cuesheet
 func NewCueSheet(r io.Reader) (cs *CueSheet, err error) {
 	errReservedNotZero := errors.New("meta.NewCueSheet: all reserved bits must be 0.")
 
@@ -959,7 +965,6 @@ type Picture struct {
 // bytes.
 //
 // Picture format (pseudo code):
-//    // ref: http://flac.sourceforge.net/format.html#metadata_block_picture
 //
 //    type METADATA_BLOCK_PICTURE struct {
 //       type        uint32
@@ -974,6 +979,8 @@ type Picture struct {
 //       data_length uint32
 //       data        [data_length]byte
 //    }
+//
+// ref: http://flac.sourceforge.net/format.html#metadata_block_picture
 func NewPicture(r io.Reader) (pic *Picture, err error) {
 	// Type.
 	pic = new(Picture)

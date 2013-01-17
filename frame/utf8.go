@@ -35,6 +35,7 @@ const (
 // decodeUTF8Int decodes a "UTF-8" coded number and returns it.
 //
 // ref: http://permalink.gmane.org/gmane.comp.audio.compression.flac.devel/3033
+//
 // Algorithm description:
 //    - read one byte B0 from the stream
 //    - if B0 = 0xxxxxxx then the read value is B0 -> end

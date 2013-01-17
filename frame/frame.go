@@ -14,7 +14,7 @@ import "github.com/mewkiz/pkg/hashutil/crc16"
 // channel.
 type Frame struct {
 	// Audio frame header.
-	Header    *Header
+	Header *Header
 	// Audio subframes, one per channel.
 	SubFrames []*SubFrame
 }
@@ -23,7 +23,6 @@ type Frame struct {
 // one subframe per channel.
 //
 // Frame format (pseudo code):
-//    // ref: http://flac.sourceforge.net/format.html#frame
 //
 //    type FRAME struct {
 //       header    FRAME_HEADER
@@ -31,6 +30,8 @@ type Frame struct {
 //       _         uint0 to uint7 // zero-padding to byte alignment.
 //       footer    uint16 // CRC-16 of the entire frame, excluding the footer.
 //    }
+//
+// ref: http://flac.sourceforge.net/format.html#frame
 func NewFrame(r io.ReadSeeker) (frame *Frame, err error) {
 	// Record start offset, which is used when verifying the CRC-16 of the frame.
 	start, err := r.Seek(0, os.SEEK_CUR)

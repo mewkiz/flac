@@ -6,14 +6,29 @@ import "fmt"
 
 import "github.com/mewkiz/pkg/bit"
 
+// A SubFrame contains the decoded audio data of a channel.
 type SubFrame struct {
-	Header  *SubHeader
+	// Header specifies the attributes of the subframe, like prediction method
+	// and order, residual coding parameters, etc.
+	Header *SubHeader
+	// Samples contains the decoded audio samples of the channel.
 	Samples []Sample
 }
 
-// Sample is an audio sample. The size of each sample is between 4 and 32 bits.
+// A Sample is an audio sample. The size of each sample is between 4 and 32 bits.
 type Sample uint32
 
+// NewSubFrame parses and returns a new subframe, which consists of a subframe
+// header and encoded audio samples.
+//
+// Subframe format (pseudo code):
+//
+//    type SUBFRAME struct {
+//       header      SUBFRAME_HEADER
+//       enc_samples SUBFRAME_CONSTANT || SUBFRAME_FIXED || SUBFRAME_LPC || SUBFRAME_VERBATIM
+//    }
+//
+// ref: http://flac.sourceforge.net/format.html#subframe
 func (h *Header) NewSubFrame(br bit.Reader) (subframe *SubFrame, err error) {
 	// Parse subframe header.
 	subframe = new(SubFrame)
@@ -26,34 +41,30 @@ func (h *Header) NewSubFrame(br bit.Reader) (subframe *SubFrame, err error) {
 	sh := subframe.Header
 	switch sh.EncType {
 	case EncConstant:
-		sample, err := h.DecodeConstant(br)
-		if err != nil {
-			return nil, err
-		}
-		for i := uint16(0); i < h.SampleCount; i++ {
-			subframe.Samples = append(subframe.Samples, sample)
-		}
+		subframe.Samples, err = h.DecodeConstant(br)
 	case EncFixed:
 		subframe.Samples, err = h.DecodeFixed(br, int(sh.Order))
-		if err != nil {
-			return nil, err
-		}
+	case EncLPC:
+		subframe.Samples, err = h.DecodeLPC(br, int(sh.Order))
+	case EncVerbatim:
+		subframe.Samples, err = h.DecodeVerbatim(br)
 	default:
-		/// ### [ todo ] ###
-		///   - not yet implemented.
-		/// ### [/ todo ] ###
-		return nil, fmt.Errorf("not yet implemented; subframe encoding type: %d.", sh.EncType)
+		return nil, fmt.Errorf("Header.NewSubFrame: unknown subframe encoding type: %d.", sh.EncType)
+	}
+	if err != nil {
+		return nil, err
 	}
 
 	return subframe, nil
 }
 
 // A SubHeader is a subframe header, which contains information about how the
-// subframe samples are encoded.
+// subframe audio samples are encoded.
 type SubHeader struct {
-	// Subframe encoding type:
-	EncType    EncType
-	WastedBits int8
+	// EncType is the subframe encoding type.
+	EncType EncType
+	// WastedBitCount is the number of wasted bits per sample.
+	WastedBitCount int8
 	// Order is used when decoding fixed and LPC-encoded subframes accordingly:
 	//    Fixed: Predictor order.
 	//    LPC:   LPC order.
@@ -74,16 +85,16 @@ const (
 // NewSubHeader parses and returns a new subframe header.
 //
 // Subframe header format (pseudo code):
-//    // ref: http://flac.sourceforge.net/format.html#subframe_header
-//
 //    type SUBFRAME_HEADER struct {
-//       _          uint1
-//       type       uint6
+//       _                uint1 // zero-padding, to prevent sync-fooling string of 1s.
+//       type             uint6
 //       // 0: no wasted bits-per-sample in source subblock, k = 0.
 //       // 1: k wasted bits-per-sample in source subblock, k-1 follows, unary
 //       // coded; e.g. k=3 => 001 follows, k=7 => 0000001 follows.
-//       wastedBits uint1+k
+//       wasted_bit_count uint1+k
 //    }
+//
+// ref: http://flac.sourceforge.net/format.html#subframe_header
 func (h *Header) NewSubHeader(br bit.Reader) (sh *SubHeader, err error) {
 	// Padding, 1 bit.
 	pad, err := br.Read(1)
@@ -91,11 +102,10 @@ func (h *Header) NewSubHeader(br bit.Reader) (sh *SubHeader, err error) {
 		return nil, err
 	}
 	if pad.Uint64() != 0 {
-		return nil, errors.New("frame.NewSubHeader: invalid padding; must be 0.")
+		return nil, errors.New("Header.NewSubHeader: invalid padding; must be 0.")
 	}
 
 	// Subframe type, 6 bits.
-	sh = new(SubHeader)
 	typ, err := br.Read(6)
 	if err != nil {
 		return nil, err
@@ -108,6 +118,7 @@ func (h *Header) NewSubHeader(br bit.Reader) (sh *SubHeader, err error) {
 	//    001xxx: if(xxx <= 4) SUBFRAME_FIXED, xxx=order ; else reserved
 	//    01xxxx: reserved
 	//    1xxxxx: SUBFRAME_LPC, xxxxx=order-1
+	sh = new(SubHeader)
 	n := typ.Uint64()
 	switch {
 	case n == 0:
@@ -119,18 +130,18 @@ func (h *Header) NewSubHeader(br bit.Reader) (sh *SubHeader, err error) {
 	case n < 8:
 		// 00001x: reserved
 		// 0001xx: reserved
-		return nil, fmt.Errorf("frame.NewSubHeader: invalid subframe type; reserved bit pattern: %06b.", n)
+		return nil, fmt.Errorf("Header.NewSubHeader: invalid subframe type; reserved bit pattern: %06b.", n)
 	case n < 16:
 		// 001xxx: if(xxx <= 4) SUBFRAME_FIXED, xxx=order ; else reserved
 		const orderMask = 0x07
 		sh.Order = int8(n) & orderMask
 		if sh.Order > 4 {
-			return nil, fmt.Errorf("frame.NewSubHeader: invalid subframe type; reserved bit pattern: %06b.", n)
+			return nil, fmt.Errorf("Header.NewSubHeader: invalid subframe type; reserved bit pattern: %06b.", n)
 		}
 		sh.EncType = EncFixed
 	case n < 32:
 		// 01xxxx: reserved
-		return nil, fmt.Errorf("frame.NewSubHeader: invalid subframe type; reserved bit pattern: %06b.", n)
+		return nil, fmt.Errorf("Header.NewSubHeader: invalid subframe type; reserved bit pattern: %06b.", n)
 	case n < 64:
 		// 1xxxxx: SUBFRAME_LPC, xxxxx=order-1
 		const orderMask = 0x1F
@@ -138,19 +149,30 @@ func (h *Header) NewSubHeader(br bit.Reader) (sh *SubHeader, err error) {
 		sh.EncType = EncLPC
 	default:
 		// should be unreachable.
-		return nil, fmt.Errorf("frame.NewSubHeader: unhandled subframe type bit pattern: %06b.", n)
+		return nil, fmt.Errorf("Header.NewSubHeader: unhandled subframe type; bit pattern: %06b.", n)
 	}
 
 	// Wasted bits-per-sample, 1+k bits.
-	wastedBits, err := br.Read(1)
+	bits, err := br.Read(1)
 	if err != nil {
 		return nil, err
 	}
-	if wastedBits.Uint64() != 0 {
+	if bits.Uint64() != 0 {
+		// k wasted bits-per-sample in source subblock, k-1 follows, unary coded;
+		// e.g. k=3 => 001 follows, k=7 => 0000001 follows.
 		/// ### [ todo ] ###
-		///    - handle wasted bits-per-sample.
+		///    - verify.
 		/// ### [/ todo ] ###
-		return nil, errors.New("not yet implemented; wasted bits-per-sample.")
+		for {
+			sh.WastedBitCount++
+			bits, err := br.Read(1)
+			if err != nil {
+				return nil, err
+			}
+			if bits.Uint64() == 1 {
+				break
+			}
+		}
 	}
 
 	return sh, nil
@@ -158,16 +180,30 @@ func (h *Header) NewSubHeader(br bit.Reader) (sh *SubHeader, err error) {
 
 // DecodeConstant decodes and returns a sample that is constant throughout the
 // entire subframe.
-func (h *Header) DecodeConstant(br bit.Reader) (sample Sample, err error) {
+//
+// ref: http://flac.sourceforge.net/format.html#subframe_constant
+func (h *Header) DecodeConstant(br bit.Reader) (samples []Sample, err error) {
+	// Decode constant sample.
 	bits, err := br.Read(int(h.SampleSize))
 	if err != nil {
-		return 0, err
+		return nil, err
 	}
-	sample = Sample(bits.Uint64())
+	sample := Sample(bits.Uint64())
 	dbg.Println("constant sample:", sample)
-	return sample, nil
+
+	// Duplicate the constant sample, sample count number of times.
+	for i := uint16(0); i < h.SampleCount; i++ {
+		samples = append(samples, sample)
+	}
+	return samples, nil
 }
 
+// DecodeFixed decodes and returns a slice of samples.
+/// ### [ todo ] ###
+///    - add more details.
+/// ### [/ todo ] ###
+//
+// ref: http://flac.sourceforge.net/format.html#subframe_fixed
 func (h *Header) DecodeFixed(br bit.Reader, order int) (samples []Sample, err error) {
 	// Unencoded warm-up samples:
 	//    n bits = frame's bits-per-sample * predictor order
@@ -177,12 +213,64 @@ func (h *Header) DecodeFixed(br bit.Reader, order int) (samples []Sample, err er
 			return nil, err
 		}
 		sample := Sample(bits.Uint64())
+		dbg.Println("Fixed warm-up sample:", sample)
 		samples = append(samples, sample)
 	}
-	for _, sample := range samples {
-		dbg.Println("warm-up sample:", sample)
+
+	residuals, err := h.DecodeResidual(br, order)
+	if err != nil {
+		return nil, err
+	}
+	_ = residuals
+	return nil, fmt.Errorf("not yet implemented; Fixed encoding.")
+}
+
+// DecodeLPC decodes and returns a slice of samples.
+/// ### [ todo ] ###
+///    - add more details.
+/// ### [/ todo ] ###
+//
+// ref: http://flac.sourceforge.net/format.html#subframe_lpc
+func (h *Header) DecodeLPC(br bit.Reader, order int) (samples []Sample, err error) {
+	// Unencoded warm-up samples:
+	//    n bits = frame's bits-per-sample * lpc order
+	for i := 0; i < order; i++ {
+		bits, err := br.Read(int(h.SampleSize))
+		if err != nil {
+			return nil, err
+		}
+		sample := Sample(bits.Uint64())
+		dbg.Println("LPC warm-up sample:", sample)
+		samples = append(samples, sample)
 	}
 
+	residuals, err := h.DecodeResidual(br, order)
+	if err != nil {
+		return nil, err
+	}
+	_ = residuals
+	return nil, fmt.Errorf("not yet implemented; LPC encoding.")
+}
+
+// DecodeVerbatim decodes and returns a slice of samples, which were unencoded.
+//
+// ref: http://flac.sourceforge.net/format.html#subframe_verbatim
+func (h *Header) DecodeVerbatim(br bit.Reader) (samples []Sample, err error) {
+	// bits-per-sample
+	for i := uint16(0); i < h.SampleCount; i++ {
+		bits, err := br.Read(int(h.SampleSize))
+		if err != nil {
+			return nil, err
+		}
+		sample := Sample(bits.Uint64())
+		dbg.Println("Verbatim sample:", sample)
+		samples = append(samples, sample)
+	}
+	return samples, nil
+}
+
+// ref: http://flac.sourceforge.net/format.html#residual
+func (h *Header) DecodeResidual(br bit.Reader, order int) (residuals []int, err error) {
 	bits, err := br.Read(2)
 	if err != nil {
 		return nil, err
@@ -192,18 +280,21 @@ func (h *Header) DecodeFixed(br bit.Reader, order int) (samples []Sample, err er
 	case 0:
 		// 00: partitioned Rice coding with 4-bit Rice parameter;
 		//     RESIDUAL_CODING_METHOD_PARTITIONED_RICE follows
-		return h.DecodeRice0(br, order)
+		return h.DecodeRice(br, order)
+		if err != nil {
+			return nil, err
+		}
 	case 1:
 		// 01: partitioned Rice coding with 5-bit Rice parameter;
 		//     RESIDUAL_CODING_METHOD_PARTITIONED_RICE2 follows
-		return h.DecodeRice1(br, order)
+		return h.DecodeRice2(br, order)
 	}
 	// 1x: reserved
 	return nil, fmt.Errorf("frame.DecodeFixed: invalid rice coding method; reserved bit pattern: %02b.", rice)
 }
 
 // ref: http://flac.sourceforge.net/format.html#partitioned_rice
-func (h *Header) DecodeRice0(br bit.Reader, order int) (samples []Sample, err error) {
+func (h *Header) DecodeRice(br bit.Reader, order int) (residuals []int, err error) {
 	// Encoding param.
 	bits, err := br.Read(4)
 	param := bits.Uint64()
@@ -224,7 +315,7 @@ func (h *Header) DecodeRice0(br bit.Reader, order int) (samples []Sample, err er
 }
 
 // ref: http://flac.sourceforge.net/format.html#partitioned_rice2
-func (h *Header) DecodeRice1(br bit.Reader, order int) (samples []Sample, err error) {
+func (h *Header) DecodeRice2(br bit.Reader, order int) (residuals []int, err error) {
 	/// ### [ todo ] ###
 	///    - not yet implemented.
 	/// ### [/ todo ] ###
@@ -232,33 +323,17 @@ func (h *Header) DecodeRice1(br bit.Reader, order int) (samples []Sample, err er
 }
 
 /**
-type SubFrameFixed struct {
-	WarmUpSamples []byte
-	Residual      []Residual
-}
-
 type SubFrameLpc struct {
-	WarmUpSamples         []byte
 	Precision             uint8
 	ShiftNeeded           uint8
 	PredictorCoefficients []byte
 }
 
-type SubFrameVerbatim struct {
-	UnencodedSubblock []byte
-}
-
-type Residual struct {
-	UsesRice2 bool
-}
-
 type Rice struct {
-	PartitionOrder uint8
 	Partitions     []RicePartition
 }
 
 type Rice2 struct {
-	PartitionOrder uint8
 	Partitions     []Rice2Partition
 }
 
