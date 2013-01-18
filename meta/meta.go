@@ -15,7 +15,7 @@ import "github.com/mewkiz/pkg/readerutil"
 type Block struct {
 	// Metadata block header.
 	Header *BlockHeader
-	// Metadata block body: StreamInfo, Application, SeekTable, etc.
+	// Metadata block body: *StreamInfo, *Application, *SeekTable, etc.
 	Body interface{}
 }
 
@@ -388,7 +388,7 @@ func NewApplication(r io.Reader) (app *Application, err error) {
 	app.ID = string(buf)
 	_, ok := RegisteredApplications[app.ID]
 	if !ok {
-		return nil, fmt.Errorf("meta.NewApplication: unregistered application ID '%s'.", app.ID)
+		return nil, fmt.Errorf("meta.NewApplication: unregistered application ID %q.", app.ID)
 	}
 
 	// Data.

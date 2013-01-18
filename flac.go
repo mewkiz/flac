@@ -27,7 +27,7 @@ type Stream struct {
 	Frames []*frame.Frame
 }
 
-// Open opens the provided file and returns the parsed FLAC bitstream.
+// Open opens the provided file and returns a parsed FLAC bitstream.
 func Open(filePath string) (s *Stream, err error) {
 	f, err := os.Open(filePath)
 	if err != nil {
@@ -41,24 +41,24 @@ func Open(filePath string) (s *Stream, err error) {
 // FlacSignature is present at the beginning of each FLAC file.
 const FlacSignature = "fLaC"
 
-// NewStream reads from the provided io.Reader and returns the parsed FLAC
+// NewStream reads from the provided io.ReadSeeker and returns a parsed FLAC
 // bitstream.
 //
 // The basic structure of a FLAC stream is:
 //    - The four byte string "fLaC".
-//    - The StreamInfo metadata block.
+//    - The STREAMINFO metadata block.
 //    - Zero or more other metadata blocks.
 //    - One or more audio frames.
 func NewStream(r io.ReadSeeker) (s *Stream, err error) {
 	// Verify "fLaC" signature (size: 4 bytes).
 	buf := make([]byte, 4)
-	_, err = r.Read(buf)
+	_, err = io.ReadFull(r, buf)
 	if err != nil {
 		return nil, err
 	}
 	sig := string(buf)
 	if sig != FlacSignature {
-		return nil, fmt.Errorf("rsf.NewStream: invalid signature; expected '%s', got '%s'.", FlacSignature, sig)
+		return nil, fmt.Errorf("rsf.NewStream: invalid signature; expected %q, got %q.", FlacSignature, sig)
 	}
 
 	// Read metadata blocks.
@@ -75,26 +75,27 @@ func NewStream(r io.ReadSeeker) (s *Stream, err error) {
 			isLast = true
 		}
 
-		// Verify block type.
+		// The first block type must be StreamInfo.
 		if isFirst {
 			if block.Header.BlockType != meta.TypeStreamInfo {
-				// First block type must be StreamInfo.
 				return nil, fmt.Errorf("rsf.NewStream: first block type is invalid; expected %d (StreamInfo), got %d.", meta.TypeStreamInfo, block.Header.BlockType)
 			}
 			isFirst = false
 		}
 
-		// Store decoded metadata block.
+		// Store the decoded metadata block.
 		s.MetaBlocks = append(s.MetaBlocks, block)
 	}
 
-	// First block is always a StreamInfo block.
+	// The first block is always a StreamInfo block.
 	si := s.MetaBlocks[0].Body.(*meta.StreamInfo)
 
+	// Read audio frames.
 	/// ### [ todo ] ###
 	///   - check for int overflow.
 	/// ### [/ todo ] ###
-	for i := uint64(0); i < si.SampleCount; {
+	var i uint64
+	for i < si.SampleCount {
 		f, err := frame.NewFrame(r)
 		if err != nil {
 			return nil, err
