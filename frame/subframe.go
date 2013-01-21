@@ -3,6 +3,7 @@ package frame
 import dbg "fmt"
 import "errors"
 import "fmt"
+import "math"
 
 import "github.com/mewkiz/pkg/bit"
 
@@ -226,7 +227,7 @@ func (h *Header) DecodeFixed(br bit.Reader, predOrder int) (samples []Sample, er
 	/// ### [ todo ] ###
 	///    - not yet implemented.
 	/// ### [/ todo ] ###
-	return nil, fmt.Errorf("not yet implemented; Fixed encoding.")
+	return nil, errors.New("not yet implemented; Fixed encoding.")
 }
 
 // DecodeLPC decodes and returns a slice of samples.
@@ -248,6 +249,42 @@ func (h *Header) DecodeLPC(br bit.Reader, lpcOrder int) (samples []Sample, err e
 		samples = append(samples, sample)
 	}
 
+	// (Quantized linear predictor coefficients' precision in bits) - 1.
+	bits, err := br.Read(4)
+	if err != nil {
+		return nil, err
+	}
+	n := bits.Uint64()
+	if n == 0x0F {
+		// 1111: invalid.
+		return nil, errors.New("Header.DecodeLPC: invalid quantized lpc precision; reserved bit pattern: 1111.")
+	}
+	qlpcPrec := int(n) + 1
+
+	// Quantized linear predictor coefficient shift needed in bits.
+	bits, err = br.Read(5)
+	if err != nil {
+		return nil, err
+	}
+	/// ### [ todo ] ###
+	///    - NOTE: this number is signed two's-complement.
+	///    - special case for negative numbers required?
+	///    - the same goes for qlpcPrec.
+	/// ### [/ todo ] ###
+	qlpcShift := bits.Uint64()
+	_ = qlpcShift
+
+	// Unencoded predictor coefficients.
+	for i := 0; i < lpcOrder; i++ {
+		bits, err = br.Read(qlpcPrec)
+		if err != nil {
+			return nil, err
+		}
+		pc := bits.Uint64()
+		dbg.Println("pc:", pc)
+		_ = pc
+	}
+
 	residuals, err := h.DecodeResidual(br, lpcOrder)
 	if err != nil {
 		return nil, err
@@ -256,7 +293,7 @@ func (h *Header) DecodeLPC(br bit.Reader, lpcOrder int) (samples []Sample, err e
 	/// ### [ todo ] ###
 	///    - not yet implemented.
 	/// ### [/ todo ] ###
-	return nil, fmt.Errorf("not yet implemented; LPC encoding.")
+	return nil, errors.New("not yet implemented; LPC encoding.")
 }
 
 // DecodeVerbatim decodes and returns a slice of samples. The samples are stored
@@ -302,7 +339,7 @@ func (h *Header) DecodeResidual(br bit.Reader, predOrder int) (residuals []int, 
 		return h.DecodeRice2(br, predOrder)
 	}
 	// 1x: reserved
-	return nil, fmt.Errorf("Header.DecodeFixed: invalid residual coding method; reserved bit pattern: %02b.", method)
+	return nil, fmt.Errorf("Header.DecodeResidual: invalid residual coding method; reserved bit pattern: %02b.", method)
 }
 
 // DecodeRice decodes and returns a slice of residuals. The residual coding
@@ -316,11 +353,43 @@ func (h *Header) DecodeRice(br bit.Reader, predOrder int) (residuals []int, err 
 		return nil, err
 	}
 	partOrder := bits.Uint64()
-	_ = partOrder
+
+	// Rice partitions.
+	partCount := int(math.Pow(2, float64(partOrder)))
+	partSampleCount := int(h.SampleCount) / partCount
+	for partNum := 0; partNum < partCount; partNum++ {
+		// Encoding parameter.
+		bits, err := br.Read(4)
+		if err != nil {
+			return nil, err
+		}
+		n := bits.Uint64()
+		if n == 0x0F {
+			// 1111: Escape code, meaning the partition is in unencoded binary form
+			// using n bits per sample; n follows as a 5-bit number.
+			/// ### [ todo ] ###
+			///    - not yet implemented.
+			/// ### [/ todo ] ###
+			return nil, errors.New("not yet implemented; rice encoding parameter escape code.")
+		}
+		riceParam := n
+		_ = riceParam
+
+		dbg.Println("riceParam:", riceParam)
+
+		// Encoded residual.
+		sampleCount := partSampleCount
+		if partNum == 0 {
+			sampleCount -= predOrder
+		}
+
+		dbg.Println("sampleCount:", sampleCount)
+	}
+
 	/// ### [ todo ] ###
 	///    - not yet implemented.
 	/// ### [/ todo ] ###
-	return nil, fmt.Errorf("not yet implemented; rice coding method 0.")
+	return nil, errors.New("not yet implemented; rice coding method 0.")
 }
 
 // DecodeRice2 decodes and returns a slice of residuals. The residual coding
@@ -331,7 +400,7 @@ func (h *Header) DecodeRice2(br bit.Reader, predOrder int) (residuals []int, err
 	/// ### [ todo ] ###
 	///    - not yet implemented.
 	/// ### [/ todo ] ###
-	return nil, fmt.Errorf("not yet implemented; rice coding method 1.")
+	return nil, errors.New("not yet implemented; rice coding method 1.")
 }
 
 /**
