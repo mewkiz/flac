@@ -15,7 +15,7 @@ The rsf (Royal Straight fLaC) package provides support for reading [flac][]
 documentation
 -------------
 
-Documentation provided by GoDoc:
+Documentation provided by GoDoc.
 
    - [rsf][]
        - [frame][]
