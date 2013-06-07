@@ -9,15 +9,19 @@ Links:
 	http://mi.eng.cam.ac.uk/reports/svr-ftp/auto-pdf/robinson_tr156.pdf
 */
 
-// Package rsf (Royal Straight fLaC) implements access to FLAC files.
-package rsf
+// Package flac provides access to FLAC [1] (Free Lossless Audio Codec) files.
+//
+// [1]: http://flac.sourceforge.net/format.html
+package flac
 
-import "fmt"
-import "io"
-import "os"
+import (
+	"fmt"
+	"io"
+	"os"
 
-import "github.com/mewkiz/rsf/frame"
-import "github.com/mewkiz/rsf/meta"
+	"github.com/mewkiz/flac/frame"
+	"github.com/mewkiz/flac/meta"
+)
 
 // A Stream is a FLAC bitstream.
 type Stream struct {
@@ -58,7 +62,7 @@ func NewStream(r io.ReadSeeker) (s *Stream, err error) {
 	}
 	sig := string(buf)
 	if sig != FlacSignature {
-		return nil, fmt.Errorf("rsf.NewStream: invalid signature; expected %q, got %q.", FlacSignature, sig)
+		return nil, fmt.Errorf("flac.NewStream: invalid signature; expected %q, got %q.", FlacSignature, sig)
 	}
 
 	// Read metadata blocks.
@@ -78,7 +82,7 @@ func NewStream(r io.ReadSeeker) (s *Stream, err error) {
 		// The first block type must be StreamInfo.
 		if isFirst {
 			if block.Header.BlockType != meta.TypeStreamInfo {
-				return nil, fmt.Errorf("rsf.NewStream: first block type is invalid; expected %d (StreamInfo), got %d.", meta.TypeStreamInfo, block.Header.BlockType)
+				return nil, fmt.Errorf("flac.NewStream: first block type is invalid; expected %d (StreamInfo), got %d.", meta.TypeStreamInfo, block.Header.BlockType)
 			}
 			isFirst = false
 		}

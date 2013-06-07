@@ -1,15 +1,17 @@
 package frame
 
-import dbg "fmt"
-import "encoding/binary"
-import "errors"
-import "fmt"
-import "io"
-import "log"
-import "math"
-import "os"
+import (
+	"encoding/binary"
+	"errors"
+	dbg "fmt"
+	"fmt"
+	"io"
+	"log"
+	"math"
+	"os"
 
-import "github.com/mewkiz/pkg/hashutil/crc8"
+	"github.com/mewkiz/pkg/hashutil/crc8"
+)
 
 // A Header is a frame header, which contains information about the frame like
 // the block size, sample rate, number of channels, etc, and an 8-bit CRC.

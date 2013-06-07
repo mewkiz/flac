@@ -1,11 +1,13 @@
 package frame
 
-import dbg "fmt"
-import "errors"
-import "fmt"
-import "math"
+import (
+	"errors"
+	dbg "fmt"
+	"fmt"
+	"math"
 
-import "github.com/mewkiz/pkg/bit"
+	"github.com/mewkiz/pkg/bit"
+)
 
 // A SubFrame contains the decoded audio data of a channel.
 type SubFrame struct {

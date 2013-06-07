@@ -1,10 +1,12 @@
 package frame
 
-import "errors"
-import "fmt"
-import "io"
+import (
+	"errors"
+	"fmt"
+	"io"
 
-import "github.com/mewkiz/pkg/readerutil"
+	"github.com/mewkiz/pkg/readerutil"
+)
 
 const (
 	t1 = 0x00 // 0000 0000

@@ -1,14 +1,16 @@
 // Package frame contains functions for parsing FLAC encoded audio data.
 package frame
 
-import "encoding/binary"
-import "errors"
-import "fmt"
-import "io"
-import "os"
+import (
+	"encoding/binary"
+	"errors"
+	"fmt"
+	"io"
+	"os"
 
-import "github.com/mewkiz/pkg/bit"
-import "github.com/mewkiz/pkg/hashutil/crc16"
+	"github.com/mewkiz/pkg/bit"
+	"github.com/mewkiz/pkg/hashutil/crc16"
+)
 
 // A Frame is an audio frame, consisting of a frame header and one subframe per
 // channel.

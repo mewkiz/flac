@@ -4,26 +4,25 @@ WIP
 This project is a *work in progress*. The implementation is *incomplete* and
 subject to change. The documentation can be inaccurate.
 
-rsf
-===
+flac
+====
 
-The rsf (Royal Straight fLaC) package provides support for reading [flac][]
-(Free Lossless Audio Codec) files.
+This package provides access to [FLAC][] (Free Lossless Audio Codec) files.
 
-[flac]: http://flac.sourceforge.net/
+[FLAC]: http://flac.sourceforge.net/format.html
 
-documentation
+Documentation
 -------------
 
 Documentation provided by GoDoc.
 
-   - [rsf][]
-       - [frame][]
-       - [meta][]
+	- [flac][]: implements access to FLAC files.
+		- [frame][]: contains functions for parsing FLAC encoded audio data.
+		- [meta][]: contains functions for parsing FLAC metadata.
 
-[rsf]: http://godoc.org/github.com/mewkiz/rsf
-[frame]: http://godoc.org/github.com/mewkiz/rsf/frame
-[meta]: http://godoc.org/github.com/mewkiz/rsf/meta
+[flac]: http://godoc.org/github.com/mewkiz/flac
+[frame]: http://godoc.org/github.com/mewkiz/flac/frame
+[meta]: http://godoc.org/github.com/mewkiz/flac/meta
 
 public domain
 -------------
