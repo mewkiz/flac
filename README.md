@@ -7,9 +7,9 @@ subject to change. The documentation can be inaccurate.
 flac
 ====
 
-This package provides access to [FLAC][] (Free Lossless Audio Codec) files.
+This package provides access to [FLAC][1] (Free Lossless Audio Codec) files.
 
-[FLAC]: http://flac.sourceforge.net/format.html
+[1]: http://flac.sourceforge.net/format.html
 
 Documentation
 -------------
