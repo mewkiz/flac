@@ -16,9 +16,9 @@ Documentation
 
 Documentation provided by GoDoc.
 
-	- [flac][]: implements access to FLAC files.
-		- [frame][]: contains functions for parsing FLAC encoded audio data.
-		- [meta][]: contains functions for parsing FLAC metadata.
+- [flac][]: implements access to FLAC files.
+	- [frame][]: contains functions for parsing FLAC encoded audio data.
+	- [meta][]: contains functions for parsing FLAC metadata.
 
 [flac]: http://godoc.org/github.com/mewkiz/flac
 [frame]: http://godoc.org/github.com/mewkiz/flac/frame
