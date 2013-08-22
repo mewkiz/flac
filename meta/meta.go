@@ -1,15 +1,17 @@
 // Package meta contains functions for parsing FLAC metadata.
 package meta
 
-import "bytes"
-import "encoding/binary"
-import "errors"
-import "fmt"
-import "io"
-import "io/ioutil"
-import "strings"
+import (
+	"bytes"
+	"encoding/binary"
+	"errors"
+	"fmt"
+	"io"
+	"io/ioutil"
+	"strings"
 
-import "github.com/mewkiz/pkg/readerutil"
+	"github.com/mewkiz/pkg/readerutil"
+)
 
 // A Block is a metadata block, consisting of a block header and a block body.
 type Block struct {
@@ -462,7 +464,7 @@ func NewSeekTable(r io.Reader) (st *SeekTable, err error) {
 		err = binary.Read(r, binary.BigEndian, &point)
 		if err != nil {
 			if err == io.EOF {
-				return st, nil
+				break
 			}
 			return nil, err
 		}
