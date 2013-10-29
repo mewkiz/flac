@@ -72,37 +72,38 @@ const (
 	TypePicture
 )
 
-func (t BlockType) String() string {
-	m := map[BlockType]string{
-		TypeStreamInfo:    "stream info",
-		TypePadding:       "padding",
-		TypeApplication:   "application",
-		TypeSeekTable:     "seek table",
-		TypeVorbisComment: "vorbis comment",
-		TypeCueSheet:      "cue sheet",
-		TypePicture:       "picture",
-	}
-	return m[t]
+// blockTypeName is a map from BlockType to name.
+var blockTypeName = map[BlockType]string{
+	TypeStreamInfo:    "stream info",
+	TypePadding:       "padding",
+	TypeApplication:   "application",
+	TypeSeekTable:     "seek table",
+	TypeVorbisComment: "vorbis comment",
+	TypeCueSheet:      "cue sheet",
+	TypePicture:       "picture",
 }
 
-// A BlockHeader contains type and length about a metadata block.
+func (t BlockType) String() string {
+	return blockTypeName[t]
+}
+
+// A BlockHeader contains type and length information about a metadata block.
 type BlockHeader struct {
 	// IsLast is true if this block is the last metadata block before the audio
-	// blocks, and false otherwise.
+	// frames, and false otherwise.
 	IsLast bool
 	// Block types:
-	//    0: Streaminfo
-	//    1: Padding
-	//    2: Application
-	//    3: Seektable
-	//    4: Vorbis_comment
-	//    5: Cuesheet
-	//    6: Picture
+	//    0:     Streaminfo
+	//    1:     Padding
+	//    2:     Application
+	//    3:     Seektable
+	//    4:     Vorbis_comment
+	//    5:     Cuesheet
+	//    6:     Picture
 	//    7-126: reserved
-	//    127: invalid, to avoid confusion with a frame sync code
+	//    127:   invalid, to avoid confusion with a frame sync code
 	BlockType BlockType
-	// Length (in bytes) of metadata to follow (does not include the size of the
-	// BlockHeader).
+	// Length in bytes of the metadata body.
 	Length int
 }
 
@@ -119,9 +120,9 @@ type BlockHeader struct {
 // ref: http://flac.sourceforge.net/format.html#metadata_block_header
 func NewBlockHeader(r io.Reader) (h *BlockHeader, err error) {
 	const (
-		IsLastMask = 0x80000000 // 1 bit
-		TypeMask   = 0x7F000000 // 7 bits
-		LengthMask = 0x00FFFFFF // 24 bits
+		isLastMask = 0x80000000 // 1 bit
+		typeMask   = 0x7F000000 // 7 bits
+		lengthMask = 0x00FFFFFF // 24 bits
 	)
 	var bits uint32
 	err = binary.Read(r, binary.BigEndian, &bits)
@@ -131,22 +132,22 @@ func NewBlockHeader(r io.Reader) (h *BlockHeader, err error) {
 
 	// Is last.
 	h = new(BlockHeader)
-	if bits&IsLastMask != 0 {
+	if bits&isLastMask != 0 {
 		h.IsLast = true
 	}
 
 	// Block type.
-	h.BlockType = BlockType(bits & TypeMask >> 24)
+	h.BlockType = BlockType(bits & typeMask >> 24)
 	if h.BlockType >= 7 && h.BlockType <= 126 {
 		// block type 7-126: reserved.
-		return nil, errors.New("meta.NewBlockHeader: Reserved block type.")
+		return nil, errors.New("meta.NewBlockHeader: reserved block type.")
 	} else if h.BlockType == 127 {
 		// block type 127: invalid.
-		return nil, errors.New("meta.NewBlockHeader: Invalid block type.")
+		return nil, errors.New("meta.NewBlockHeader: invalid block type.")
 	}
 
 	// Length.
-	h.Length = int(bits & LengthMask) // won't overflow, since max is 0x00FFFFFF.
+	h.Length = int(bits & lengthMask) // won't overflow, since max is 0x00FFFFFF.
 
 	return h, nil
 }
