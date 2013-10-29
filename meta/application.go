@@ -70,7 +70,7 @@ func NewApplication(r io.Reader) (app *Application, err error) {
 	app.ID = string(buf)
 	_, ok := RegisteredApplications[app.ID]
 	if !ok {
-		return nil, fmt.Errorf("meta.NewApplication: unregistered application ID %q.", app.ID)
+		return nil, fmt.Errorf("meta.NewApplication: unregistered application ID %q", app.ID)
 	}
 
 	// Data.

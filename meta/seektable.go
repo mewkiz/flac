@@ -80,7 +80,7 @@ func NewSeekTable(r io.Reader) (st *SeekTable, err error) {
 			//   placeholder points, but they must all occur at the end of the
 			//   table.
 			if point.SampleNum != PlaceholderPoint {
-				return nil, fmt.Errorf("meta.NewSeekTable: invalid seek point; sample number (%d) not in ascending order.", point.SampleNum)
+				return nil, fmt.Errorf("meta.NewSeekTable: invalid seek point; sample number (%d) not in ascending order", point.SampleNum)
 			}
 		}
 		prevSampleNum = point.SampleNum

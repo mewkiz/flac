@@ -152,12 +152,12 @@ func NewHeader(r io.ReadSeeker) (h *Header, err error) {
 	// Sync code.
 	syncCode := bits & SyncCodeMask >> 18
 	if syncCode != SyncCode {
-		return nil, fmt.Errorf("frame.NewHeader: invalid sync code; expected '%014b', got '%014b'.", SyncCode, syncCode)
+		return nil, fmt.Errorf("frame.NewHeader: invalid sync code; expected '%014b', got '%014b'", SyncCode, syncCode)
 	}
 
 	// Reserved.
 	if bits&Reserved1Mask != 0 {
-		return nil, errors.New("frame.NewHeader: all reserved bits must be 0.")
+		return nil, errors.New("frame.NewHeader: all reserved bits must be 0")
 	}
 
 	// Blocking strategy.
@@ -205,10 +205,10 @@ func NewHeader(r io.ReadSeeker) (h *Header, err error) {
 		h.ChannelOrder = ChannelOrder(n)
 	case n >= 11 && n <= 15:
 		// 1011-1111: reserved
-		return nil, fmt.Errorf("frame.NewHeader: invalid channel order; reserved bit pattern: %04b.", n)
+		return nil, fmt.Errorf("frame.NewHeader: invalid channel order; reserved bit pattern: %04b", n)
 	default:
 		// should be unreachable.
-		log.Fatalln(fmt.Errorf("frame.NewHeader: unhandled channel assignment bit pattern: %04b.", n))
+		log.Fatalln(fmt.Errorf("frame.NewHeader: unhandled channel assignment bit pattern: %04b", n))
 	}
 
 	// Sample size.
@@ -228,7 +228,7 @@ func NewHeader(r io.ReadSeeker) (h *Header, err error) {
 		///    - Should we try to read StreamInfo from here? We won't always have
 		///      access to it.
 		/// ### [/ todo ] ###
-		log.Println(fmt.Errorf("not yet implemented; sample size: %d.", n))
+		log.Println(fmt.Errorf("not yet implemented; sample size: %d", n))
 	case 1:
 		// 001: 8 bits per sample.
 		h.SampleSize = 8
@@ -238,7 +238,7 @@ func NewHeader(r io.ReadSeeker) (h *Header, err error) {
 	case 3, 7:
 		// 011: reserved.
 		// 111: reserved.
-		return nil, fmt.Errorf("frame.NewHeader: invalid sample size; reserved bit pattern: %03b.", n)
+		return nil, fmt.Errorf("frame.NewHeader: invalid sample size; reserved bit pattern: %03b", n)
 	case 4:
 		// 100: 16 bits per sample.
 		h.SampleSize = 16
@@ -250,12 +250,12 @@ func NewHeader(r io.ReadSeeker) (h *Header, err error) {
 		h.SampleSize = 24
 	default:
 		// should be unreachable.
-		log.Fatalln(fmt.Errorf("frame.NewHeader: unhandled sample size bit pattern: %03b.", n))
+		log.Fatalln(fmt.Errorf("frame.NewHeader: unhandled sample size bit pattern: %03b", n))
 	}
 
 	// Reserved.
 	if bits&Reserved2Mask != 0 {
-		return nil, errors.New("frame.NewHeader: all reserved bits must be 0.")
+		return nil, errors.New("frame.NewHeader: all reserved bits must be 0")
 	}
 
 	// "UTF-8" coded sample number or frame number.
@@ -288,7 +288,7 @@ func NewHeader(r io.ReadSeeker) (h *Header, err error) {
 	switch {
 	case n == 0:
 		// 0000: reserved.
-		return nil, errors.New("frame.NewHeader: invalid block size; reserved bit pattern.")
+		return nil, errors.New("frame.NewHeader: invalid block size; reserved bit pattern")
 	case n == 1:
 		// 0001: 192 samples.
 		h.SampleCount = 192
@@ -317,7 +317,7 @@ func NewHeader(r io.ReadSeeker) (h *Header, err error) {
 		h.SampleCount = uint16(256 * math.Pow(2, float64(n-8)))
 	default:
 		// should be unreachable.
-		log.Fatalln(fmt.Errorf("frame.NewHeader: unhandled block size bit pattern: %04b.", n))
+		log.Fatalln(fmt.Errorf("frame.NewHeader: unhandled block size bit pattern: %04b", n))
 	}
 
 	// Sample rate:
@@ -344,7 +344,7 @@ func NewHeader(r io.ReadSeeker) (h *Header, err error) {
 		/// ### [ todo ] ###
 		///    - add flag to get from StreamInfo?
 		/// ### [/ todo ] ###
-		log.Println(fmt.Errorf("not yet implemented; sample rate: %d.", n))
+		log.Println(fmt.Errorf("not yet implemented; sample rate: %d", n))
 	case 1:
 		//0001: 88.2kHz.
 		h.SampleRate = 88200
@@ -404,10 +404,10 @@ func NewHeader(r io.ReadSeeker) (h *Header, err error) {
 		h.SampleRate = uint32(sampleRate_daHz) * 10
 	case 15:
 		//1111: invalid, to prevent sync-fooling string of 1s.
-		return nil, fmt.Errorf("frame.NewHeader: invalid sample rate bit pattern: %04b.", n)
+		return nil, fmt.Errorf("frame.NewHeader: invalid sample rate bit pattern: %04b", n)
 	default:
 		// should be unreachable.
-		log.Fatalln(fmt.Errorf("frame.NewHeader: unhandled sample rate bit pattern: %04b.", n))
+		log.Fatalln(fmt.Errorf("frame.NewHeader: unhandled sample rate bit pattern: %04b", n))
 	}
 
 	// Read the frame header data and calculate the CRC-8.
@@ -433,7 +433,7 @@ func NewHeader(r io.ReadSeeker) (h *Header, err error) {
 	}
 	got := crc8.ChecksumATM(data)
 	if crc != got {
-		return nil, fmt.Errorf("frame.NewHeader: checksum mismatch; expected 0x%02X, got 0x%02X.", crc, got)
+		return nil, fmt.Errorf("frame.NewHeader: checksum mismatch; expected 0x%02X, got 0x%02X", crc, got)
 	}
 
 	return h, nil

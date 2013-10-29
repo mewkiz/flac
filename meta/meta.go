@@ -44,7 +44,7 @@ func NewBlock(r io.Reader) (block *Block, err error) {
 	case TypePicture:
 		block.Body, err = NewPicture(lr)
 	default:
-		return nil, fmt.Errorf("meta.NewBlock: block type '%d' not yet supported.", block.Header.BlockType)
+		return nil, fmt.Errorf("meta.NewBlock: block type '%d' not yet supported", block.Header.BlockType)
 	}
 	if err != nil {
 		return nil, err
@@ -135,10 +135,10 @@ func NewBlockHeader(r io.Reader) (h *BlockHeader, err error) {
 	h.BlockType = BlockType(bits & typeMask >> 24)
 	if h.BlockType >= 7 && h.BlockType <= 126 {
 		// block type 7-126: reserved.
-		return nil, errors.New("meta.NewBlockHeader: reserved block type.")
+		return nil, errors.New("meta.NewBlockHeader: reserved block type")
 	} else if h.BlockType == 127 {
 		// block type 127: invalid.
-		return nil, errors.New("meta.NewBlockHeader: invalid block type.")
+		return nil, errors.New("meta.NewBlockHeader: invalid block type")
 	}
 
 	// Length.

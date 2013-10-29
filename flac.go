@@ -62,7 +62,7 @@ func NewStream(r io.ReadSeeker) (s *Stream, err error) {
 	}
 	sig := string(buf)
 	if sig != FlacSignature {
-		return nil, fmt.Errorf("flac.NewStream: invalid signature; expected %q, got %q.", FlacSignature, sig)
+		return nil, fmt.Errorf("flac.NewStream: invalid signature; expected %q, got %q", FlacSignature, sig)
 	}
 
 	// Read metadata blocks.
@@ -82,7 +82,7 @@ func NewStream(r io.ReadSeeker) (s *Stream, err error) {
 		// The first block type must be StreamInfo.
 		if isFirst {
 			if block.Header.BlockType != meta.TypeStreamInfo {
-				return nil, fmt.Errorf("flac.NewStream: first block type is invalid; expected %d (StreamInfo), got %d.", meta.TypeStreamInfo, block.Header.BlockType)
+				return nil, fmt.Errorf("flac.NewStream: first block type is invalid; expected %d (StreamInfo), got %d", meta.TypeStreamInfo, block.Header.BlockType)
 			}
 			isFirst = false
 		}

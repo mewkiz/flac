@@ -87,7 +87,7 @@ func NewVorbisComment(r io.Reader) (vc *VorbisComment, err error) {
 		vector := string(buf)
 		pos := strings.Index(vector, "=")
 		if pos == -1 {
-			return nil, fmt.Errorf("meta.NewVorbisComment: invalid comment vector; no '=' present in: %s.", vector)
+			return nil, fmt.Errorf("meta.NewVorbisComment: invalid comment vector; no '=' present in: %s", vector)
 		}
 
 		// Comment.

@@ -67,7 +67,7 @@ func NewStreamInfo(r io.Reader) (si *StreamInfo, err error) {
 		return nil, err
 	}
 	if si.MinBlockSize < 16 {
-		return nil, fmt.Errorf("meta.NewStreamInfo: invalid min block size; expected >= 16, got %d.", si.MinBlockSize)
+		return nil, fmt.Errorf("meta.NewStreamInfo: invalid min block size; expected >= 16, got %d", si.MinBlockSize)
 	}
 
 	const (
@@ -88,7 +88,7 @@ func NewStreamInfo(r io.Reader) (si *StreamInfo, err error) {
 	// Max block size.
 	si.MaxBlockSize = uint16(bits & MaxBlockSizeMask >> 48)
 	if si.MaxBlockSize < 16 || si.MaxBlockSize > 65535 {
-		return nil, fmt.Errorf("meta.NewStreamInfo: invalid min block size; expected >= 16 and <= 65535, got %d.", si.MaxBlockSize)
+		return nil, fmt.Errorf("meta.NewStreamInfo: invalid min block size; expected >= 16 and <= 65535, got %d", si.MaxBlockSize)
 	}
 
 	// Min frame size.
@@ -115,7 +115,7 @@ func NewStreamInfo(r io.Reader) (si *StreamInfo, err error) {
 	// Sample rate.
 	si.SampleRate = uint32(bits & SampleRateMask >> 44)
 	if si.SampleRate > 655350 || si.SampleRate == 0 {
-		return nil, fmt.Errorf("meta.NewStreamInfo: invalid sample rate; expected > 0 and <= 655350, got %d.", si.SampleRate)
+		return nil, fmt.Errorf("meta.NewStreamInfo: invalid sample rate; expected > 0 and <= 655350, got %d", si.SampleRate)
 	}
 
 	// Both ChannelCount and BitsPerSample are specified to be subtracted by 1 in
@@ -125,13 +125,13 @@ func NewStreamInfo(r io.Reader) (si *StreamInfo, err error) {
 	// Channel count.
 	si.ChannelCount = uint8(bits&ChannelCountMask>>41) + 1
 	if si.ChannelCount < 1 || si.ChannelCount > 8 {
-		return nil, fmt.Errorf("meta.NewStreamInfo: invalid number of channels; expected >= 1 and <= 8, got %d.", si.ChannelCount)
+		return nil, fmt.Errorf("meta.NewStreamInfo: invalid number of channels; expected >= 1 and <= 8, got %d", si.ChannelCount)
 	}
 
 	// Bits per sample.
 	si.BitsPerSample = uint8(bits&BitsPerSampleMask>>36) + 1
 	if si.BitsPerSample < 4 || si.BitsPerSample > 32 {
-		return nil, fmt.Errorf("meta.NewStreamInfo: invalid number of bits per sample; expected >= 4 and <= 32, got %d.", si.BitsPerSample)
+		return nil, fmt.Errorf("meta.NewStreamInfo: invalid number of bits per sample; expected >= 4 and <= 32, got %d", si.BitsPerSample)
 	}
 
 	// Sample count.

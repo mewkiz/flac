@@ -20,7 +20,7 @@ func VerifyPadding(r io.Reader) (err error) {
 			return err
 		}
 		if !isAllZero(buf[:n]) {
-			return errors.New("meta.VerifyPadding: invalid padding; must contain only zeroes.")
+			return errors.New("meta.VerifyPadding: invalid padding; must contain only zeroes")
 		}
 	}
 	return nil

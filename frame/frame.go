@@ -71,7 +71,7 @@ func NewFrame(r io.ReadSeeker) (frame *Frame, err error) {
 			return nil, err
 		}
 		if pad.Uint64() != 0 {
-			return nil, errors.New("frame.NewFrame: invalid padding; must be 0.")
+			return nil, errors.New("frame.NewFrame: invalid padding; must be 0")
 		}
 	}
 
@@ -100,7 +100,7 @@ func NewFrame(r io.ReadSeeker) (frame *Frame, err error) {
 	}
 	got := crc16.ChecksumIBM(data)
 	if crc != got {
-		return nil, fmt.Errorf("frame.NewFrame: checksum mismatch; expected 0x%04X, got 0x%04X.", crc, got)
+		return nil, fmt.Errorf("frame.NewFrame: checksum mismatch; expected 0x%04X, got 0x%04X", crc, got)
 	}
 
 	return frame, nil
