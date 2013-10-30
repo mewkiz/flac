@@ -54,7 +54,8 @@ func Parse(filePath string) (s *Stream, err error) {
 
 // Open validates the FLAC signature of the provided file and returns a handle
 // to the FLAC bitstream. Callers should close the stream when done reading from
-// it.
+// it. Call either Stream.Parse or Stream.ParseBlocks and Stream.ParseFrames to
+// parse the metadata blocks and audio frames.
 func Open(filePath string) (s *Stream, err error) {
 	f, err := os.Open(filePath)
 	if err != nil {
@@ -63,7 +64,7 @@ func Open(filePath string) (s *Stream, err error) {
 	return NewStream(f)
 }
 
-// Close closes the streams underlying reader.
+// Close closes the underlying reader of the stream.
 func (s *Stream) Close() error {
 	r, ok := s.r.(io.Closer)
 	if ok {
@@ -91,7 +92,9 @@ func ParseStream(r io.ReadSeeker) (s *Stream, err error) {
 const FlacSignature = "fLaC"
 
 // NewStream validates the FLAC signature of the provided io.ReadSeeker and
-// returns a handle to the FLAC bitstream.
+// returns a handle to the FLAC bitstream. Call either Stream.Parse or
+// Stream.ParseBlocks and Stream.ParseFrames to parse the metadata blocks and
+// audio frames.
 func NewStream(r io.ReadSeeker) (s *Stream, err error) {
 	// Verify "fLaC" signature (size: 4 bytes).
 	buf := make([]byte, 4)
@@ -109,7 +112,7 @@ func NewStream(r io.ReadSeeker) (s *Stream, err error) {
 }
 
 // Parse reads and parses all metadata blocks and audio frames of the stream.
-// Use ParseBlocks and ParseFrames instead for more granularity.
+// Use Stream.ParseBlocks and Stream.ParseFrames instead for more granularity.
 func (s *Stream) Parse() (err error) {
 	err = s.ParseBlocks(meta.TypeAll)
 	if err != nil {

@@ -38,8 +38,8 @@ func ParseBlock(r io.ReadSeeker) (block *Block, err error) {
 }
 
 // NewBlock reads and parses a metadata block header from the provided
-// io.ReadSeeker and returns a handle to the metadata block. Call Parse to parse
-// the metadata block body and Skip to ignore it.
+// io.ReadSeeker and returns a handle to the metadata block. Call Block.Parse to
+// parse the metadata block body and Block.Skip to ignore it.
 func NewBlock(r io.ReadSeeker) (block *Block, err error) {
 	// Read metadata block header.
 	block = &Block{r: r}
