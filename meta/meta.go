@@ -6,28 +6,54 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"os"
 )
 
 // A Block is a metadata block, consisting of a block header and a block body.
 type Block struct {
+	// The underlying reader of the block.
+	r io.ReadSeeker
 	// Metadata block header.
 	Header *BlockHeader
 	// Metadata block body: *StreamInfo, *Application, *SeekTable, etc.
 	Body interface{}
 }
 
-// NewBlock parses and returns a new metadata block, which consists of a block
-// header and a block body.
-func NewBlock(r io.Reader) (block *Block, err error) {
+// ParseBlock reads from the provided io.ReadSeeker and returns a parsed
+// metadata block. It parses both the header and the body of the metadata block.
+// Use NewBlock instead for more granularity.
+func ParseBlock(r io.ReadSeeker) (block *Block, err error) {
+	block, err = NewBlock(r)
+	if err != nil {
+		return nil, err
+	}
+
+	err = block.Parse()
+	if err != nil {
+		return nil, err
+	}
+
+	return block, nil
+}
+
+// NewBlock reads and parses a metadata block header from the provided
+// io.ReadSeeker and returns a handle to the metadata block. Call Parse to parse
+// the metadata block body and Skip to ignore it.
+func NewBlock(r io.ReadSeeker) (block *Block, err error) {
 	// Read metadata block header.
-	block = new(Block)
+	block = &Block{r: r}
 	block.Header, err = NewBlockHeader(r)
 	if err != nil {
 		return nil, err
 	}
 
+	return block, nil
+}
+
+// Parse reads and parses the metadata block body.
+func (block *Block) Parse() (err error) {
 	// Read metadata block.
-	lr := io.LimitReader(r, int64(block.Header.Length))
+	lr := io.LimitReader(block.r, int64(block.Header.Length))
 	switch block.Header.BlockType {
 	case TypeStreamInfo:
 		block.Body, err = NewStreamInfo(lr)
@@ -44,13 +70,22 @@ func NewBlock(r io.Reader) (block *Block, err error) {
 	case TypePicture:
 		block.Body, err = NewPicture(lr)
 	default:
-		return nil, fmt.Errorf("meta.NewBlock: block type '%d' not yet supported", block.Header.BlockType)
+		return fmt.Errorf("meta.NewBlock: block type '%d' not yet supported", block.Header.BlockType)
 	}
 	if err != nil {
-		return nil, err
+		return err
 	}
 
-	return block, nil
+	return nil
+}
+
+// Skip ignores the contents of the metadata block body.
+func (block *Block) Skip() (err error) {
+	_, err = block.r.Seek(int64(block.Header.Length), os.SEEK_CUR)
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 // BlockType is used to identify the metadata block type.
@@ -65,6 +100,9 @@ const (
 	TypeVorbisComment
 	TypeCueSheet
 	TypePicture
+
+	// TypeAll is a bitmask of all block types.
+	TypeAll = TypeStreamInfo | TypePadding | TypeApplication | TypeSeekTable | TypeVorbisComment | TypeCueSheet | TypePicture
 )
 
 // blockTypeName is a map from BlockType to name.
@@ -159,7 +197,8 @@ func NewBlockHeader(r io.Reader) (h *BlockHeader, err error) {
 	}
 
 	// Length.
-	h.Length = int(bits & lengthMask) // won't overflow, since max is 0x00FFFFFF.
+	// int won't overflow since the max value of Length is 0x00FFFFFF.
+	h.Length = int(bits & lengthMask)
 
 	return h, nil
 }
