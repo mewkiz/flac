@@ -6,8 +6,8 @@ import (
 	"io"
 )
 
-// A StreamInfo metadata block has information about the entire stream. It must
-// be present as the first metadata block in the stream.
+// A StreamInfo metadata block has information about the entire stream. The
+// first metadata block in a FLAC stream must be a StreamInfo metadata block.
 type StreamInfo struct {
 	// The minimum block size (in samples) used in the stream.
 	MinBlockSize uint16
@@ -71,9 +71,9 @@ func NewStreamInfo(r io.Reader) (si *StreamInfo, err error) {
 	}
 
 	const (
-		MaxBlockSizeMask = 0xFFFF000000000000 // 16 bits
-		MinFrameSizeMask = 0x0000FFFFFF000000 // 24 bits
-		MaxFrameSizeMask = 0x0000000000FFFFFF // 24 bits
+		maxBlockSizeMask = 0xFFFF000000000000 // 16 bits
+		minFrameSizeMask = 0x0000FFFFFF000000 // 24 bits
+		maxFrameSizeMask = 0x0000000000FFFFFF // 24 bits
 	)
 	// In order to keep everything on powers-of-2 boundaries, reads from the
 	// block are grouped accordingly:
@@ -86,22 +86,22 @@ func NewStreamInfo(r io.Reader) (si *StreamInfo, err error) {
 	}
 
 	// Max block size.
-	si.MaxBlockSize = uint16(bits & MaxBlockSizeMask >> 48)
+	si.MaxBlockSize = uint16(bits & maxBlockSizeMask >> 48)
 	if si.MaxBlockSize < 16 || si.MaxBlockSize > 65535 {
 		return nil, fmt.Errorf("meta.NewStreamInfo: invalid min block size; expected >= 16 and <= 65535, got %d", si.MaxBlockSize)
 	}
 
 	// Min frame size.
-	si.MinFrameSize = uint32(bits & MinFrameSizeMask >> 24)
+	si.MinFrameSize = uint32(bits & minFrameSizeMask >> 24)
 
 	// Max frame size.
-	si.MaxFrameSize = uint32(bits & MaxFrameSizeMask)
+	si.MaxFrameSize = uint32(bits & maxFrameSizeMask)
 
 	const (
-		SampleRateMask    = 0xFFFFF00000000000 // 20 bits
-		ChannelCountMask  = 0x00000E0000000000 // 3 bits
-		BitsPerSampleMask = 0x000001F000000000 // 5 bits
-		SampleCountMask   = 0x0000000FFFFFFFFF // 36 bits
+		sampleRateMask    = 0xFFFFF00000000000 // 20 bits
+		channelCountMask  = 0x00000E0000000000 // 3 bits
+		bitsPerSampleMask = 0x000001F000000000 // 5 bits
+		sampleCountMask   = 0x0000000FFFFFFFFF // 36 bits
 	)
 	// In order to keep everything on powers-of-2 boundaries, reads from the
 	// block are grouped accordingly:
@@ -113,7 +113,7 @@ func NewStreamInfo(r io.Reader) (si *StreamInfo, err error) {
 	}
 
 	// Sample rate.
-	si.SampleRate = uint32(bits & SampleRateMask >> 44)
+	si.SampleRate = uint32(bits & sampleRateMask >> 44)
 	if si.SampleRate > 655350 || si.SampleRate == 0 {
 		return nil, fmt.Errorf("meta.NewStreamInfo: invalid sample rate; expected > 0 and <= 655350, got %d", si.SampleRate)
 	}
@@ -123,19 +123,19 @@ func NewStreamInfo(r io.Reader) (si *StreamInfo, err error) {
 	// http://flac.sourceforge.net/format.html#metadata_block_streaminfo
 
 	// Channel count.
-	si.ChannelCount = uint8(bits&ChannelCountMask>>41) + 1
+	si.ChannelCount = uint8(bits&channelCountMask>>41) + 1
 	if si.ChannelCount < 1 || si.ChannelCount > 8 {
 		return nil, fmt.Errorf("meta.NewStreamInfo: invalid number of channels; expected >= 1 and <= 8, got %d", si.ChannelCount)
 	}
 
 	// Bits per sample.
-	si.BitsPerSample = uint8(bits&BitsPerSampleMask>>36) + 1
+	si.BitsPerSample = uint8(bits&bitsPerSampleMask>>36) + 1
 	if si.BitsPerSample < 4 || si.BitsPerSample > 32 {
 		return nil, fmt.Errorf("meta.NewStreamInfo: invalid number of bits per sample; expected >= 4 and <= 32, got %d", si.BitsPerSample)
 	}
 
 	// Sample count.
-	si.SampleCount = bits & SampleCountMask
+	si.SampleCount = bits & sampleCountMask
 
 	// Md5sum MD5 signature of unencoded audio data.
 	_, err = io.ReadFull(r, si.MD5sum[:])

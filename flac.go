@@ -50,7 +50,7 @@ const FlacSignature = "fLaC"
 //
 // The basic structure of a FLAC stream is:
 //    - The four byte string "fLaC".
-//    - The STREAMINFO metadata block.
+//    - The StreamInfo metadata block.
 //    - Zero or more other metadata blocks.
 //    - One or more audio frames.
 func NewStream(r io.ReadSeeker) (s *Stream, err error) {
