@@ -58,7 +58,7 @@ type BlockType uint8
 
 // Metadata block types.
 const (
-	TypeStreamInfo BlockType = iota
+	TypeStreamInfo BlockType = 1 << iota
 	TypePadding
 	TypeApplication
 	TypeSeekTable
@@ -87,16 +87,7 @@ type BlockHeader struct {
 	// IsLast is true if this block is the last metadata block before the audio
 	// frames, and false otherwise.
 	IsLast bool
-	// Block types:
-	//    0:     Streaminfo
-	//    1:     Padding
-	//    2:     Application
-	//    3:     Seektable
-	//    4:     Vorbis_comment
-	//    5:     Cuesheet
-	//    6:     Picture
-	//    7-126: reserved
-	//    127:   invalid, to avoid confusion with a frame sync code
+	// Block type.
 	BlockType BlockType
 	// Length in bytes of the metadata body.
 	Length int
@@ -132,13 +123,39 @@ func NewBlockHeader(r io.Reader) (h *BlockHeader, err error) {
 	}
 
 	// Block type.
-	h.BlockType = BlockType(bits & typeMask >> 24)
-	if h.BlockType >= 7 && h.BlockType <= 126 {
-		// block type 7-126: reserved.
-		return nil, errors.New("meta.NewBlockHeader: reserved block type")
-	} else if h.BlockType == 127 {
-		// block type 127: invalid.
-		return nil, errors.New("meta.NewBlockHeader: invalid block type")
+	//    0:     Streaminfo
+	//    1:     Padding
+	//    2:     Application
+	//    3:     Seektable
+	//    4:     Vorbis_comment
+	//    5:     Cuesheet
+	//    6:     Picture
+	//    7-126: reserved
+	//    127:   invalid, to avoid confusion with a frame sync code
+	blockType := bits & typeMask >> 24
+	switch blockType {
+	case 0:
+		h.BlockType = TypeStreamInfo
+	case 1:
+		h.BlockType = TypePadding
+	case 2:
+		h.BlockType = TypeApplication
+	case 3:
+		h.BlockType = TypeSeekTable
+	case 4:
+		h.BlockType = TypeVorbisComment
+	case 5:
+		h.BlockType = TypeCueSheet
+	case 6:
+		h.BlockType = TypePicture
+	default:
+		if blockType >= 7 && blockType <= 126 {
+			// block type 7-126: reserved.
+			return nil, errors.New("meta.NewBlockHeader: reserved block type")
+		} else if blockType == 127 {
+			// block type 127: invalid.
+			return nil, errors.New("meta.NewBlockHeader: invalid block type")
+		}
 	}
 
 	// Length.
