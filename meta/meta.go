@@ -2,11 +2,12 @@
 package meta
 
 import (
-	"encoding/binary"
 	"errors"
 	"fmt"
 	"io"
 	"os"
+
+	"github.com/eaburns/bit"
 )
 
 // A Block is a metadata block, consisting of a block header and a block body.
@@ -143,20 +144,18 @@ type BlockHeader struct {
 //
 // ref: http://flac.sourceforge.net/format.html#metadata_block_header
 func NewBlockHeader(r io.Reader) (h *BlockHeader, err error) {
-	const (
-		isLastMask = 0x80000000 // 1 bit
-		typeMask   = 0x7F000000 // 7 bits
-		lengthMask = 0x00FFFFFF // 24 bits
-	)
-	var bits uint32
-	err = binary.Read(r, binary.BigEndian, &bits)
+	br := bit.NewReader(r)
+	// is_last:    1 bit
+	// block_type: 7 bits
+	// length:     24 bits
+	fields, err := br.ReadFields(1, 7, 24)
 	if err != nil {
 		return nil, err
 	}
 
 	// Is last.
 	h = new(BlockHeader)
-	if bits&isLastMask != 0 {
+	if fields[0] != 0 {
 		h.IsLast = true
 	}
 
@@ -170,7 +169,7 @@ func NewBlockHeader(r io.Reader) (h *BlockHeader, err error) {
 	//    6:     Picture
 	//    7-126: reserved
 	//    127:   invalid, to avoid confusion with a frame sync code
-	blockType := bits & typeMask >> 24
+	blockType := fields[1]
 	switch blockType {
 	case 0:
 		h.BlockType = TypeStreamInfo
@@ -198,7 +197,6 @@ func NewBlockHeader(r io.Reader) (h *BlockHeader, err error) {
 
 	// Length.
 	// int won't overflow since the max value of Length is 0x00FFFFFF.
-	h.Length = int(bits & lengthMask)
-
+	h.Length = int(fields[2])
 	return h, nil
 }
