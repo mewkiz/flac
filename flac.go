@@ -155,7 +155,7 @@ func (s *Stream) ParseBlocks(types meta.BlockType) (err error) {
 
 		// Check if the metadata block type is present in the provided types
 		// bitfield.
-		if block.Header.BlockType & types != 0 {
+		if block.Header.BlockType&types != 0 {
 			// Read metadata block body.
 			err = block.Parse()
 			if err != nil {

@@ -2,8 +2,8 @@ package frame
 
 import (
 	"errors"
-	dbg "fmt"
 	"fmt"
+	dbg "fmt"
 	"math"
 
 	"github.com/mewkiz/pkg/bit"
