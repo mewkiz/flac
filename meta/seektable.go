@@ -71,7 +71,7 @@ func NewSeekTable(r io.Reader) (st *SeekTable, err error) {
 			}
 			return nil, err
 		}
-		if hasPrev && prevSampleNum >= point.SampleNum {
+		if hasPrev && point.SampleNum != PlaceholderPoint {
 			// - Seek points within a table must be sorted in ascending order by
 			//   sample number.
 			// - Seek points within a table must be unique by sample number, with
@@ -79,8 +79,10 @@ func NewSeekTable(r io.Reader) (st *SeekTable, err error) {
 			// - The previous two notes imply that there may be any number of
 			//   placeholder points, but they must all occur at the end of the
 			//   table.
-			if point.SampleNum != PlaceholderPoint {
-				return nil, fmt.Errorf("meta.NewSeekTable: invalid seek point; sample number (%d) not in ascending order", point.SampleNum)
+			if prevSampleNum == point.SampleNum {
+				return nil, fmt.Errorf("meta.NewSeekTable: invalid seek point; sample number (%d) is not unique", point.SampleNum)
+			} else if prevSampleNum > point.SampleNum {
+				return nil, fmt.Errorf("meta.NewSeekTable: invalid seek point; sample number (%d) is not in ascending order", point.SampleNum)
 			}
 		}
 		prevSampleNum = point.SampleNum
