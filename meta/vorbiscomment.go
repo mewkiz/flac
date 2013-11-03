@@ -54,7 +54,7 @@ func NewVorbisComment(r io.Reader) (vc *VorbisComment, err error) {
 
 	// Vendor string.
 	buf := make([]byte, vendorLen)
-	_, err = r.Read(buf)
+	_, err = io.ReadFull(r, buf)
 	if err != nil {
 		return nil, err
 	}
