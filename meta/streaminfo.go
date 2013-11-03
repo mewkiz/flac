@@ -1,9 +1,10 @@
 package meta
 
 import (
-	"encoding/binary"
 	"fmt"
 	"io"
+
+	"github.com/eaburns/bit"
 )
 
 // A StreamInfo metadata block has information about the entire stream. The
@@ -60,84 +61,66 @@ type StreamInfo struct {
 //
 // ref: http://flac.sourceforge.net/format.html#metadata_block_streaminfo
 func NewStreamInfo(r io.Reader) (si *StreamInfo, err error) {
-	// Minimum block size.
-	si = new(StreamInfo)
-	err = binary.Read(r, binary.BigEndian, &si.BlockSizeMin)
+	br := bit.NewReader(r)
+	// field 0: block_size_min  (16 bits)
+	// field 1: block_size_max  (16 bits)
+	// field 2: frame_size_min  (24 bits)
+	// field 3: frame_size_max  (24 bits)
+	// field 4: sample_rate     (20 bits)
+	// field 5: channel_count   (3 bits)
+	// field 6: bits_per_sample (5 bits)
+	// field 7: sample_count    (36 bits)
+	fields, err := br.ReadFields(16, 16, 24, 24, 20, 3, 5, 36)
 	if err != nil {
 		return nil, err
 	}
+
+	// Minimum block size.
+	si = new(StreamInfo)
+	si.BlockSizeMin = uint16(fields[0])
 	if si.BlockSizeMin < 16 {
 		return nil, fmt.Errorf("meta.NewStreamInfo: invalid min block size; expected >= 16, got %d", si.BlockSizeMin)
 	}
 
-	const (
-		blockSizeMaxMask = 0xFFFF000000000000 // 16 bits
-		frameSizeMinMask = 0x0000FFFFFF000000 // 24 bits
-		frameSizeMaxMask = 0x0000000000FFFFFF // 24 bits
-	)
-	// In order to keep everything on powers-of-2 boundaries, reads from the
-	// block are grouped accordingly:
-	// BlockSizeMax (16 bits) + FrameSizeMin (24 bits) + FrameSizeMax (24 bits) =
-	// 64 bits
-	var bits uint64
-	err = binary.Read(r, binary.BigEndian, &bits)
-	if err != nil {
-		return nil, err
-	}
-
-	// Max block size.
-	si.BlockSizeMax = uint16(bits & blockSizeMaxMask >> 48)
+	// Maximum block size.
+	si.BlockSizeMax = uint16(fields[1])
 	if si.BlockSizeMax < 16 || si.BlockSizeMax > 65535 {
 		return nil, fmt.Errorf("meta.NewStreamInfo: invalid min block size; expected >= 16 and <= 65535, got %d", si.BlockSizeMax)
 	}
 
-	// Min frame size.
-	si.FrameSizeMin = uint32(bits & frameSizeMinMask >> 24)
+	// Minimum frame size.
+	si.FrameSizeMin = uint32(fields[2])
 
-	// Max frame size.
-	si.FrameSizeMax = uint32(bits & frameSizeMaxMask)
-
-	const (
-		sampleRateMask    = 0xFFFFF00000000000 // 20 bits
-		channelCountMask  = 0x00000E0000000000 // 3 bits
-		bitsPerSampleMask = 0x000001F000000000 // 5 bits
-		sampleCountMask   = 0x0000000FFFFFFFFF // 36 bits
-	)
-	// In order to keep everything on powers-of-2 boundaries, reads from the
-	// block are grouped accordingly:
-	// SampleRate (20 bits) + ChannelCount (3 bits) + BitsPerSample (5 bits) +
-	// SampleCount (36 bits) = 64 bits
-	err = binary.Read(r, binary.BigEndian, &bits)
-	if err != nil {
-		return nil, err
-	}
+	// Maximum frame size.
+	si.FrameSizeMax = uint32(fields[3])
 
 	// Sample rate.
-	si.SampleRate = uint32(bits & sampleRateMask >> 44)
+	si.SampleRate = uint32(fields[4])
 	if si.SampleRate > 655350 || si.SampleRate == 0 {
 		return nil, fmt.Errorf("meta.NewStreamInfo: invalid sample rate; expected > 0 and <= 655350, got %d", si.SampleRate)
 	}
 
-	// Both ChannelCount and BitsPerSample are specified to be subtracted by 1 in
-	// the specification:
-	// http://flac.sourceforge.net/format.html#metadata_block_streaminfo
+	// According to the specification 1 should be added to both ChannelCount and
+	// BitsPerSample:
+	//
+	// ref: http://flac.sourceforge.net/format.html#metadata_block_streaminfo
 
 	// Channel count.
-	si.ChannelCount = uint8(bits&channelCountMask>>41) + 1
+	si.ChannelCount = uint8(fields[5]) + 1
 	if si.ChannelCount < 1 || si.ChannelCount > 8 {
 		return nil, fmt.Errorf("meta.NewStreamInfo: invalid number of channels; expected >= 1 and <= 8, got %d", si.ChannelCount)
 	}
 
 	// Bits per sample.
-	si.BitsPerSample = uint8(bits&bitsPerSampleMask>>36) + 1
+	si.BitsPerSample = uint8(fields[6]) + 1
 	if si.BitsPerSample < 4 || si.BitsPerSample > 32 {
 		return nil, fmt.Errorf("meta.NewStreamInfo: invalid number of bits per sample; expected >= 4 and <= 32, got %d", si.BitsPerSample)
 	}
 
 	// Sample count.
-	si.SampleCount = bits & sampleCountMask
+	si.SampleCount = fields[7]
 
-	// Md5sum MD5 signature of unencoded audio data.
+	// MD5 signature of the unencoded audio data.
 	_, err = io.ReadFull(r, si.MD5sum[:])
 	if err != nil {
 		return nil, err
