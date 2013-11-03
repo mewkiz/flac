@@ -132,8 +132,7 @@ func NewCueSheet(r io.Reader) (cs *CueSheet, err error) {
 	errReservedNotZero := errors.New("meta.NewCueSheet: all reserved bits must be 0")
 
 	// Media catalog number (size: 128 bytes).
-	buf := make([]byte, 128)
-	_, err = io.ReadFull(r, buf)
+	buf, err := readBytes(r, 128)
 	if err != nil {
 		return nil, err
 	}
@@ -169,8 +168,7 @@ func NewCueSheet(r io.Reader) (cs *CueSheet, err error) {
 	if bits&CueSheetReservedMask != 0 {
 		return nil, errReservedNotZero
 	}
-	buf = make([]byte, 258)
-	_, err = io.ReadFull(r, buf) // 258 reserved bytes.
+	buf, err = readBytes(r, 258) // 258 reserved bytes.
 	if err != nil {
 		return nil, err
 	}
@@ -236,8 +234,7 @@ func NewCueSheet(r io.Reader) (cs *CueSheet, err error) {
 		}
 
 		// Track ISRC (size: 12 bytes).
-		buf = make([]byte, 12)
-		_, err = io.ReadFull(r, buf)
+		buf, err = readBytes(r, 12)
 		if err != nil {
 			return nil, err
 		}
@@ -270,8 +267,7 @@ func NewCueSheet(r io.Reader) (cs *CueSheet, err error) {
 		if bits&TrackReservedMask != 0 {
 			return nil, errReservedNotZero
 		}
-		buf = make([]byte, 13)
-		_, err = io.ReadFull(r, buf) // 13 reserved bytes.
+		buf, err = readBytes(r, 13) // 13 reserved bytes.
 		if err != nil {
 			return nil, err
 		}
@@ -317,8 +313,7 @@ func NewCueSheet(r io.Reader) (cs *CueSheet, err error) {
 			}
 
 			// Reserved.
-			buf = make([]byte, 3)
-			_, err = io.ReadFull(r, buf) // 3 reserved bytes.
+			buf, err = readBytes(r, 3) // 3 reserved bytes.
 			if err != nil {
 				return nil, err
 			}

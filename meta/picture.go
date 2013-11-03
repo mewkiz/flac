@@ -96,8 +96,7 @@ func NewPicture(r io.Reader) (pic *Picture, err error) {
 	}
 
 	// Mime string.
-	buf := make([]byte, mimeLen)
-	_, err = io.ReadFull(r, buf)
+	buf, err := readBytes(r, int(mimeLen))
 	if err != nil {
 		return nil, err
 	}
@@ -116,8 +115,7 @@ func NewPicture(r io.Reader) (pic *Picture, err error) {
 	}
 
 	// Desc string.
-	buf = make([]byte, descLen)
-	_, err = io.ReadFull(r, buf)
+	buf, err = readBytes(r, int(descLen))
 	if err != nil {
 		return nil, err
 	}

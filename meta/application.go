@@ -72,8 +72,7 @@ type Application struct {
 // ref: http://flac.sourceforge.net/format.html#metadata_block_application
 func NewApplication(r io.Reader) (app *Application, err error) {
 	// Application ID (size: 4 bytes).
-	buf := make([]byte, 4)
-	_, err = io.ReadFull(r, buf)
+	buf, err := readBytes(r, 4)
 	if err != nil {
 		return nil, err
 	}
