@@ -10,29 +10,29 @@ import (
 // first metadata block in a FLAC stream must be a StreamInfo metadata block.
 type StreamInfo struct {
 	// The minimum block size (in samples) used in the stream.
-	MinBlockSize uint16
+	BlockSizeMin uint16
 	// The maximum block size (in samples) used in the stream.
-	// (MinBlockSize == MaxBlockSize) implies a fixed-blocksize stream.
-	MaxBlockSize uint16
-	// The minimum frame size (in bytes) used in the stream. May be 0 to imply
-	// the value is not known.
-	MinFrameSize uint32
-	// The maximum frame size (in bytes) used in the stream. May be 0 to imply
-	// the value is not known.
-	MaxFrameSize uint32
+	// (BlockSizeMin == BlockSizeMax) implies a fixed-blocksize stream.
+	BlockSizeMax uint16
+	// The minimum frame size (in bytes) used in the stream. A value of 0 implies
+	// that the minimum frame size is not known.
+	FrameSizeMin uint32
+	// The maximum frame size (in bytes) used in the stream. A value of 0 implies
+	// that the maximum frame size is not known.
+	FrameSizeMax uint32
 	// Sample rate in Hz. Though 20 bits are available, the maximum sample rate
-	// is limited by the structure of frame headers to 655350Hz. Also, a value of
-	// 0 is invalid.
+	// is limited by the structure of frame headers to 655350Hz. A value of 0 is
+	// invalid.
 	SampleRate uint32
 	// Number of channels. FLAC supports from 1 to 8 channels.
 	ChannelCount uint8
 	// Bits per sample. FLAC supports from 4 to 32 bits per sample. Currently the
 	// reference encoder and decoders only support up to 24 bits per sample.
 	BitsPerSample uint8
-	// Total samples in stream. 'Samples' means inter-channel sample, i.e. one
-	// second of 44.1Khz audio will have 44100 samples regardless of the number
-	// of channels. A value of zero here means the number of total samples is
-	// unknown.
+	// Total number of samples in stream. This refers to inter-channel samples,
+	// i.e. one second of 44.1Khz audio will have 44100 samples regardless of the
+	// number of channels. A value of 0 implies that the number is channels is
+	// not known.
 	SampleCount uint64
 	// MD5 signature of the unencoded audio data. This allows the decoder to
 	// determine if an error exists in the audio data even when the error does
@@ -47,10 +47,10 @@ type StreamInfo struct {
 // Stream info format (pseudo code):
 //
 //    type METADATA_BLOCK_STREAMINFO struct {
-//       min_block_size  uint16
-//       max_block_size  uint16
-//       min_frame_size  uint24
-//       max_frame_size  uint24
+//       block_size_min  uint16
+//       block_size_max  uint16
+//       frame_size_min  uint24
+//       frame_size_max  uint24
 //       sample_rate     uint20
 //       channel_count   uint3 // (number of channels)-1.
 //       bits_per_sample uint5 // (bits per sample)-1.
@@ -62,22 +62,22 @@ type StreamInfo struct {
 func NewStreamInfo(r io.Reader) (si *StreamInfo, err error) {
 	// Minimum block size.
 	si = new(StreamInfo)
-	err = binary.Read(r, binary.BigEndian, &si.MinBlockSize)
+	err = binary.Read(r, binary.BigEndian, &si.BlockSizeMin)
 	if err != nil {
 		return nil, err
 	}
-	if si.MinBlockSize < 16 {
-		return nil, fmt.Errorf("meta.NewStreamInfo: invalid min block size; expected >= 16, got %d", si.MinBlockSize)
+	if si.BlockSizeMin < 16 {
+		return nil, fmt.Errorf("meta.NewStreamInfo: invalid min block size; expected >= 16, got %d", si.BlockSizeMin)
 	}
 
 	const (
-		maxBlockSizeMask = 0xFFFF000000000000 // 16 bits
-		minFrameSizeMask = 0x0000FFFFFF000000 // 24 bits
-		maxFrameSizeMask = 0x0000000000FFFFFF // 24 bits
+		blockSizeMaxMask = 0xFFFF000000000000 // 16 bits
+		frameSizeMinMask = 0x0000FFFFFF000000 // 24 bits
+		frameSizeMaxMask = 0x0000000000FFFFFF // 24 bits
 	)
 	// In order to keep everything on powers-of-2 boundaries, reads from the
 	// block are grouped accordingly:
-	// MaxBlockSize (16 bits) + MinFrameSize (24 bits) + MaxFrameSize (24 bits) =
+	// BlockSizeMax (16 bits) + FrameSizeMin (24 bits) + FrameSizeMax (24 bits) =
 	// 64 bits
 	var bits uint64
 	err = binary.Read(r, binary.BigEndian, &bits)
@@ -86,16 +86,16 @@ func NewStreamInfo(r io.Reader) (si *StreamInfo, err error) {
 	}
 
 	// Max block size.
-	si.MaxBlockSize = uint16(bits & maxBlockSizeMask >> 48)
-	if si.MaxBlockSize < 16 || si.MaxBlockSize > 65535 {
-		return nil, fmt.Errorf("meta.NewStreamInfo: invalid min block size; expected >= 16 and <= 65535, got %d", si.MaxBlockSize)
+	si.BlockSizeMax = uint16(bits & blockSizeMaxMask >> 48)
+	if si.BlockSizeMax < 16 || si.BlockSizeMax > 65535 {
+		return nil, fmt.Errorf("meta.NewStreamInfo: invalid min block size; expected >= 16 and <= 65535, got %d", si.BlockSizeMax)
 	}
 
 	// Min frame size.
-	si.MinFrameSize = uint32(bits & minFrameSizeMask >> 24)
+	si.FrameSizeMin = uint32(bits & frameSizeMinMask >> 24)
 
 	// Max frame size.
-	si.MaxFrameSize = uint32(bits & maxFrameSizeMask)
+	si.FrameSizeMax = uint32(bits & frameSizeMaxMask)
 
 	const (
 		sampleRateMask    = 0xFFFFF00000000000 // 20 bits
