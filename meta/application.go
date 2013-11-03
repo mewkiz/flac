@@ -6,11 +6,11 @@ import (
 	"io/ioutil"
 )
 
-// RegisteredApplications maps from a registered application ID to a
+// registeredApplications maps from a registered application ID to a
 // description.
 //
 // ref: http://flac.sourceforge.net/id.html
-var RegisteredApplications = map[string]string{
+var registeredApplications = map[ID]string{
 	"ATCH": "FlacFile",
 	"BSOL": "beSolo",
 	"BUGS": "Bugs Player",
@@ -36,13 +36,24 @@ var RegisteredApplications = map[string]string{
 	"xmcd": "xmcd",
 }
 
+// An ID is a 4 byte identifier of a registered application.
+type ID string
+
+func (id ID) String() string {
+	s, ok := registeredApplications[id]
+	if ok {
+		return s
+	}
+	return fmt.Sprintf("<unregistered ID: %q>", string(id))
+}
+
 // An Application metadata block is for use by third-party applications. The
 // only mandatory field is a 32-bit identifier. This ID is granted upon request
 // to an application by the FLAC maintainers. The remainder of the block is
 // defined by the registered application.
 type Application struct {
 	// Registered application ID.
-	ID string
+	ID ID
 	// Application data.
 	Data []byte
 }
@@ -66,11 +77,10 @@ func NewApplication(r io.Reader) (app *Application, err error) {
 	if err != nil {
 		return nil, err
 	}
-	app = new(Application)
-	app.ID = string(buf)
-	_, ok := RegisteredApplications[app.ID]
+	app = &Application{ID: ID(buf)}
+	_, ok := registeredApplications[app.ID]
 	if !ok {
-		return nil, fmt.Errorf("meta.NewApplication: unregistered application ID %q", app.ID)
+		return nil, fmt.Errorf("meta.NewApplication: unregistered application ID %q", string(app.ID))
 	}
 
 	// Data.
