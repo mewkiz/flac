@@ -102,8 +102,10 @@ const (
 	TypeCueSheet
 	TypePicture
 
-	// TypeAll is a bitmask of all block types.
-	TypeAll = TypeStreamInfo | TypePadding | TypeApplication | TypeSeekTable | TypeVorbisComment | TypeCueSheet | TypePicture
+	// TypeAll is a bitmask of all block types, except padding.
+	TypeAll = TypeStreamInfo | TypeApplication | TypeSeekTable | TypeVorbisComment | TypeCueSheet | TypePicture
+	// TypeAllStrict is a bitmask of all block types, including padding.
+	TypeAllStrict = TypeStreamInfo | TypePadding | TypeApplication | TypeSeekTable | TypeVorbisComment | TypeCueSheet | TypePicture
 )
 
 // blockTypeName is a map from BlockType to name.

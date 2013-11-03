@@ -64,7 +64,7 @@ func TestParseBlocks(t *testing.T) {
 		}
 		defer s.Close()
 
-		err = s.ParseBlocks(meta.TypeAll)
+		err = s.ParseBlocks(meta.TypeAllStrict)
 		if err != nil {
 			t.Fatal(err)
 		}
