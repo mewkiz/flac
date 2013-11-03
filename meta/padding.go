@@ -10,9 +10,9 @@ import (
 // header.Length bytes.
 func VerifyPadding(r io.Reader) (err error) {
 	// Verify up to 4 kb of padding each iteration.
-	buf := make([]byte, 4096)
+	var buf [4096]byte
 	for {
-		n, err := r.Read(buf)
+		n, err := r.Read(buf[:])
 		if err != nil {
 			if err == io.EOF {
 				break
@@ -25,10 +25,6 @@ func VerifyPadding(r io.Reader) (err error) {
 	}
 	return nil
 }
-
-/// ### [ note ] ###
-///    - Might trigger unnecessary errors.
-/// ### [/ note ] ###
 
 // isAllZero returns true if the value of each byte in the provided slice is 0,
 // and false otherwise.
