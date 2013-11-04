@@ -13,7 +13,7 @@ import (
 // significantly reduced. Each seek point takes 18 bytes, so 1% resolution
 // within a stream adds less than 2k.
 //
-// There can be only one SEEKTABLE in a stream, but the table can have any
+// There can be only one SeekTable in a stream, but the table can have any
 // number of seek points. There is also a special 'placeholder' seekpoint which
 // will be ignored by decoders but which can be used to reserve space for future
 // seek point insertion.

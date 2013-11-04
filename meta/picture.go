@@ -8,7 +8,7 @@ import (
 )
 
 // A Picture metadata block is for storing pictures associated with the file,
-// most commonly cover art from CDs. There may be more than one PICTURE block in
+// most commonly cover art from CDs. There may be more than one Picture block in
 // a file.
 type Picture struct {
 	// The picture type according to the ID3v2 APIC frame:

@@ -11,7 +11,7 @@ import (
 // name/value pairs. Values are encoded using UTF-8. It is an implementation of
 // the Vorbis comment specification (without the framing bit). This is the only
 // officially supported tagging mechanism in FLAC. There may be only one
-// VORBIS_COMMENT block in a stream. In some external documentation, Vorbis
+// VorbisComment block in a stream. In some external documentation, Vorbis
 // comments are called FLAC tags to lessen confusion.
 type VorbisComment struct {
 	Vendor  string

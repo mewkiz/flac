@@ -10,10 +10,10 @@ import (
 	"github.com/mewkiz/pkg/readerutil"
 )
 
-// A CueSheet metadata block is for storing various information that can be used
-// in a cue sheet. It supports track and index points, compatible with Red Book
-// CD digital audio discs, as well as other CD-DA metadata such as media catalog
-// number and track ISRCs. The CUESHEET block is especially useful for backing
+// A CueSheet metadata block stores various information that can be used in a
+// cue sheet. It supports track and index points, compatible with Red Book CD
+// digital audio discs, as well as other CD-DA metadata such as media catalog
+// number and track ISRCs. The CueSheet block is especially useful for backing
 // up CD-DA discs, but it can be used as a general purpose cueing mechanism for
 // playback.
 type CueSheet struct {
@@ -35,14 +35,14 @@ type CueSheet struct {
 	// point of the first track, not necessarily to INDEX 01 of the first track;
 	// even the first track may have INDEX 00 data.
 	LeadInSampleCount uint64
-	// true if the CUESHEET corresponds to a Compact Disc, else false.
+	// true if the CueSheet corresponds to a Compact Disc, else false.
 	IsCompactDisc bool
 	// The number of tracks. Must be at least 1 (because of the requisite
 	// lead-out track). For CD-DA, this number must be no more than 100 (99
 	// regular tracks and one lead-out track).
 	TrackCount uint8
-	// One or more tracks. A CUESHEET block is required to have a lead-out track;
-	// it is always the last track in the CUESHEET. For CD-DA, the lead-out track
+	// One or more tracks. A CueSheet block is required to have a lead-out track;
+	// it is always the last track in the CueSheet. For CD-DA, the lead-out track
 	// number must be 170 as specified by the Red Book, otherwise is must be 255.
 	Tracks []CueSheetTrack
 }
@@ -61,7 +61,7 @@ type CueSheetTrack struct {
 	// must be 1-99, or 170 for the lead-out; for non-CD-DA, the track number
 	// must for 255 for the lead-out. It is not required but encouraged to start
 	// with track 1 and increase sequentially. Track numbers must be unique
-	// within a CUESHEET.
+	// within a CueSheet.
 	TrackNum uint8
 	// Track ISRC. This is a 12-digit alphanumeric code. A value of 12 ASCII NUL
 	// characters may be used to denote absence of an ISRC.
@@ -72,7 +72,7 @@ type CueSheetTrack struct {
 	// This corresponds to the CD-DA Q-channel control bit 5.
 	HasPreEmphasis bool
 	// The number of track index points. There must be at least one index in
-	// every track in a CUESHEET except for the lead-out track, which must have
+	// every track in a CueSheet except for the lead-out track, which must have
 	// zero. For CD-DA, this number may be no more than 100.
 	TrackIndexCount uint8
 	// For all tracks except the lead-out track, one or more track index points.
