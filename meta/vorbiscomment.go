@@ -24,7 +24,7 @@ type VorbisEntry struct {
 	Value string
 }
 
-// NewVorbisComment parses and returns a new VorbisComment metadata block. The
+// ParseVorbisComment parses and returns a new VorbisComment metadata block. The
 // provided io.Reader should limit the amount of data that can be read to
 // header.Length bytes.
 //
@@ -44,7 +44,7 @@ type VorbisEntry struct {
 //    }
 //
 // ref: http://flac.sourceforge.net/format.html#metadata_block_vorbis_comment
-func NewVorbisComment(r io.Reader) (vc *VorbisComment, err error) {
+func ParseVorbisComment(r io.Reader) (vc *VorbisComment, err error) {
 	// Vendor length.
 	var vendorLen uint32
 	err = binary.Read(r, binary.LittleEndian, &vendorLen)
@@ -86,7 +86,7 @@ func NewVorbisComment(r io.Reader) (vc *VorbisComment, err error) {
 			vector := string(buf)
 			pos := strings.Index(vector, "=")
 			if pos == -1 {
-				return nil, fmt.Errorf("meta.NewVorbisComment: invalid comment vector; no '=' present in: %q", vector)
+				return nil, fmt.Errorf("meta.ParseVorbisComment: invalid comment vector; no '=' present in: %q", vector)
 			}
 
 			// Comment.

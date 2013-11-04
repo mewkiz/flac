@@ -58,7 +58,7 @@ type Application struct {
 	Data []byte
 }
 
-// NewApplication parses and returns a new Application metadata block. The
+// ParseApplication parses and returns a new Application metadata block. The
 // provided io.Reader should limit the amount of data that can be read to
 // header.Length bytes.
 //
@@ -70,7 +70,7 @@ type Application struct {
 //    }
 //
 // ref: http://flac.sourceforge.net/format.html#metadata_block_application
-func NewApplication(r io.Reader) (app *Application, err error) {
+func ParseApplication(r io.Reader) (app *Application, err error) {
 	// Application ID (size: 4 bytes).
 	buf, err := readBytes(r, 4)
 	if err != nil {
@@ -79,7 +79,7 @@ func NewApplication(r io.Reader) (app *Application, err error) {
 	app = &Application{ID: ID(buf)}
 	_, ok := registeredApplications[app.ID]
 	if !ok {
-		return nil, fmt.Errorf("meta.NewApplication: unregistered application ID %q", string(app.ID))
+		return nil, fmt.Errorf("meta.ParseApplication: unregistered application ID %q", string(app.ID))
 	}
 
 	// Data.

@@ -93,7 +93,7 @@ type CueSheetTrackIndex struct {
 	IndexPointNum uint8
 }
 
-// NewCueSheet parses and returns a new CueSheet metadata block. The provided
+// ParseCueSheet parses and returns a new CueSheet metadata block. The provided
 // io.Reader should limit the amount of data that can be read to header.Length
 // bytes.
 //
@@ -128,8 +128,8 @@ type CueSheetTrackIndex struct {
 //    }
 //
 // ref: http://flac.sourceforge.net/format.html#metadata_block_cuesheet
-func NewCueSheet(r io.Reader) (cs *CueSheet, err error) {
-	errReservedNotZero := errors.New("meta.NewCueSheet: all reserved bits must be 0")
+func ParseCueSheet(r io.Reader) (cs *CueSheet, err error) {
+	errReservedNotZero := errors.New("meta.ParseCueSheet: all reserved bits must be 0")
 
 	// Media catalog number (size: 128 bytes).
 	buf, err := readBytes(r, 128)
@@ -140,7 +140,7 @@ func NewCueSheet(r io.Reader) (cs *CueSheet, err error) {
 	cs.MCN = getStringFromSZ(buf)
 	for _, r := range cs.MCN {
 		if r < 0x20 || r > 0x7E {
-			return nil, fmt.Errorf("meta.NewCueSheet: invalid character in media catalog number; expected >= 0x20 and <= 0x7E, got 0x%02X", r)
+			return nil, fmt.Errorf("meta.ParseCueSheet: invalid character in media catalog number; expected >= 0x20 and <= 0x7E, got 0x%02X", r)
 		}
 	}
 
@@ -178,7 +178,7 @@ func NewCueSheet(r io.Reader) (cs *CueSheet, err error) {
 	// Handle error checking of LeadInSampleCount here, since IsCompactDisc is
 	// required.
 	if !cs.IsCompactDisc && cs.LeadInSampleCount != 0 {
-		return nil, fmt.Errorf("meta.NewCueSheet: invalid lead-in sample count for non CD-DA; expected 0, got %d", cs.LeadInSampleCount)
+		return nil, fmt.Errorf("meta.ParseCueSheet: invalid lead-in sample count for non CD-DA; expected 0, got %d", cs.LeadInSampleCount)
 	}
 
 	// Track count.
@@ -187,10 +187,10 @@ func NewCueSheet(r io.Reader) (cs *CueSheet, err error) {
 		return nil, err
 	}
 	if cs.TrackCount < 1 {
-		return nil, errors.New("meta.NewCueSheet: at least one track (the lead-out track) is required")
+		return nil, errors.New("meta.ParseCueSheet: at least one track (the lead-out track) is required")
 	}
 	if cs.IsCompactDisc && cs.TrackCount > 100 {
-		return nil, fmt.Errorf("meta.NewCueSheet: too many tracks for CD-DA cue sheet; expected <= 100, got %d", cs.TrackCount)
+		return nil, fmt.Errorf("meta.ParseCueSheet: too many tracks for CD-DA cue sheet; expected <= 100, got %d", cs.TrackCount)
 	}
 
 	// Tracks.
@@ -203,7 +203,7 @@ func NewCueSheet(r io.Reader) (cs *CueSheet, err error) {
 			return nil, err
 		}
 		if cs.IsCompactDisc && track.Offset%588 != 0 {
-			return nil, fmt.Errorf("meta.NewCueSheet: invalid track offset (%d) for CD-DA; must be evenly divisible by 588", track.Offset)
+			return nil, fmt.Errorf("meta.ParseCueSheet: invalid track offset (%d) for CD-DA; must be evenly divisible by 588", track.Offset)
 		}
 
 		// Track number.
@@ -214,21 +214,21 @@ func NewCueSheet(r io.Reader) (cs *CueSheet, err error) {
 		if track.TrackNum == 0 {
 			// A track number of 0 is not allowed to avoid conflicting with the
 			// CD-DA spec, which reserves this for the lead-in.
-			return nil, errors.New("meta.NewCueSheet: track number 0 not allowed")
+			return nil, errors.New("meta.ParseCueSheet: track number 0 not allowed")
 		}
 		if cs.IsCompactDisc {
 			if i == len(cs.Tracks)-1 {
 				if track.TrackNum != 170 {
 					// The lead-out track number must be 170 for CD-DA.
-					return nil, fmt.Errorf("meta.NewCueSheet: invalid lead-out track number for CD-DA; expected 170, got %d", track.TrackNum)
+					return nil, fmt.Errorf("meta.ParseCueSheet: invalid lead-out track number for CD-DA; expected 170, got %d", track.TrackNum)
 				}
 			} else if track.TrackNum > 99 {
-				return nil, fmt.Errorf("meta.NewCueSheet: invalid track number for CD-DA; expected <= 99, got %d", track.TrackNum)
+				return nil, fmt.Errorf("meta.ParseCueSheet: invalid track number for CD-DA; expected <= 99, got %d", track.TrackNum)
 			}
 		} else {
 			if i == len(cs.Tracks)-1 && track.TrackNum != 255 {
 				// The lead-out track number must be 255 for non-CD-DA.
-				return nil, fmt.Errorf("meta.NewCueSheet: invalid lead-out track number for non CD-DA; expected 255, got %d", track.TrackNum)
+				return nil, fmt.Errorf("meta.ParseCueSheet: invalid lead-out track number for non CD-DA; expected 255, got %d", track.TrackNum)
 			}
 		}
 
@@ -280,16 +280,16 @@ func NewCueSheet(r io.Reader) (cs *CueSheet, err error) {
 		if i == len(cs.Tracks)-1 {
 			// Lead-out must have zero track index points.
 			if track.TrackIndexCount != 0 {
-				return nil, fmt.Errorf("meta.NewCueSheet: invalid number of track points for the lead-out track; expected 0, got %d", track.TrackIndexCount)
+				return nil, fmt.Errorf("meta.ParseCueSheet: invalid number of track points for the lead-out track; expected 0, got %d", track.TrackIndexCount)
 			}
 		} else {
 			if track.TrackIndexCount < 1 {
 				// Every track, except for the lead-out track, must have at least
 				// one track index point.
-				return nil, fmt.Errorf("meta.NewCueSheet: invalid number of track points; expected >= 1, got %d", track.TrackIndexCount)
+				return nil, fmt.Errorf("meta.ParseCueSheet: invalid number of track points; expected >= 1, got %d", track.TrackIndexCount)
 			}
 			if cs.IsCompactDisc && track.TrackIndexCount > 100 {
-				return nil, fmt.Errorf("meta.NewCueSheet: invalid number of track points for CD-DA; expected <= 100, got %d", track.TrackIndexCount)
+				return nil, fmt.Errorf("meta.ParseCueSheet: invalid number of track points for CD-DA; expected <= 100, got %d", track.TrackIndexCount)
 			}
 		}
 

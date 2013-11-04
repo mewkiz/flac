@@ -56,7 +56,7 @@ type Picture struct {
 	Data []byte
 }
 
-// NewPicture parses and returns a new Picture metadata block. The provided
+// ParsePicture parses and returns a new Picture metadata block. The provided
 // io.Reader should limit the amount of data that can be read to header.Length
 // bytes.
 //
@@ -77,7 +77,7 @@ type Picture struct {
 //    }
 //
 // ref: http://flac.sourceforge.net/format.html#metadata_block_picture
-func NewPicture(r io.Reader) (pic *Picture, err error) {
+func ParsePicture(r io.Reader) (pic *Picture, err error) {
 	// Type.
 	pic = new(Picture)
 	err = binary.Read(r, binary.BigEndian, &pic.Type)
@@ -85,7 +85,7 @@ func NewPicture(r io.Reader) (pic *Picture, err error) {
 		return nil, err
 	}
 	if pic.Type > 20 {
-		return nil, fmt.Errorf("meta.NewPicture: reserved picture type: %d", pic.Type)
+		return nil, fmt.Errorf("meta.ParsePicture: reserved picture type: %d", pic.Type)
 	}
 
 	// Mime length.
@@ -103,7 +103,7 @@ func NewPicture(r io.Reader) (pic *Picture, err error) {
 	pic.MIME = getStringFromSZ(buf)
 	for _, r := range pic.MIME {
 		if r < 0x20 || r > 0x7E {
-			return nil, fmt.Errorf("meta.NewPicture: invalid character in MIME type; expected >= 0x20 and <= 0x7E, got 0x%02X", r)
+			return nil, fmt.Errorf("meta.ParsePicture: invalid character in MIME type; expected >= 0x20 and <= 0x7E, got 0x%02X", r)
 		}
 	}
 
@@ -158,7 +158,7 @@ func NewPicture(r io.Reader) (pic *Picture, err error) {
 		return nil, err
 	}
 	if len(pic.Data) != int(dataLen) {
-		return nil, fmt.Errorf("meta.NewPicture: invalid data length; expected %d, got %d", dataLen, len(pic.Data))
+		return nil, fmt.Errorf("meta.ParsePicture: invalid data length; expected %d, got %d", dataLen, len(pic.Data))
 	}
 
 	return pic, nil

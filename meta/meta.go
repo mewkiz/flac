@@ -43,7 +43,7 @@ func ParseBlock(r io.ReadSeeker) (block *Block, err error) {
 func NewBlock(r io.ReadSeeker) (block *Block, err error) {
 	// Read metadata block header.
 	block = &Block{r: r}
-	block.Header, err = NewBlockHeader(r)
+	block.Header, err = ParseBlockHeader(r)
 	if err != nil {
 		return nil, err
 	}
@@ -57,21 +57,21 @@ func (block *Block) Parse() (err error) {
 	lr := io.LimitReader(block.r, int64(block.Header.Length))
 	switch block.Header.BlockType {
 	case TypeStreamInfo:
-		block.Body, err = NewStreamInfo(lr)
+		block.Body, err = ParseStreamInfo(lr)
 	case TypePadding:
 		err = VerifyPadding(lr)
 	case TypeApplication:
-		block.Body, err = NewApplication(lr)
+		block.Body, err = ParseApplication(lr)
 	case TypeSeekTable:
-		block.Body, err = NewSeekTable(lr)
+		block.Body, err = ParseSeekTable(lr)
 	case TypeVorbisComment:
-		block.Body, err = NewVorbisComment(lr)
+		block.Body, err = ParseVorbisComment(lr)
 	case TypeCueSheet:
-		block.Body, err = NewCueSheet(lr)
+		block.Body, err = ParseCueSheet(lr)
 	case TypePicture:
-		block.Body, err = NewPicture(lr)
+		block.Body, err = ParsePicture(lr)
 	default:
-		return fmt.Errorf("meta.NewBlock: block type '%d' not yet supported", block.Header.BlockType)
+		return fmt.Errorf("Block.ParseBlock: block type '%d' not yet supported", block.Header.BlockType)
 	}
 	if err != nil {
 		return err
@@ -134,7 +134,7 @@ type BlockHeader struct {
 	Length int
 }
 
-// NewBlockHeader parses and returns a new metadata block header.
+// ParseBlockHeader parses and returns a new metadata block header.
 //
 // Block header format (pseudo code):
 //
@@ -145,7 +145,7 @@ type BlockHeader struct {
 //    }
 //
 // ref: http://flac.sourceforge.net/format.html#metadata_block_header
-func NewBlockHeader(r io.Reader) (h *BlockHeader, err error) {
+func ParseBlockHeader(r io.Reader) (h *BlockHeader, err error) {
 	br := bit.NewReader(r)
 	// field 0: is_last    (1 bit)
 	// field 1: block_type (7 bits)
@@ -190,10 +190,10 @@ func NewBlockHeader(r io.Reader) (h *BlockHeader, err error) {
 	default:
 		if blockType >= 7 && blockType <= 126 {
 			// block type 7-126: reserved.
-			return nil, errors.New("meta.NewBlockHeader: reserved block type")
+			return nil, errors.New("meta.ParseBlockHeader: reserved block type")
 		} else if blockType == 127 {
 			// block type 127: invalid.
-			return nil, errors.New("meta.NewBlockHeader: invalid block type")
+			return nil, errors.New("meta.ParseBlockHeader: invalid block type")
 		}
 	}
 

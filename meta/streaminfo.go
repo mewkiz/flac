@@ -41,7 +41,7 @@ type StreamInfo struct {
 	MD5sum [16]byte
 }
 
-// NewStreamInfo parses and returns a new StreamInfo metadata block. The
+// ParseStreamInfo parses and returns a new StreamInfo metadata block. The
 // provided io.Reader should limit the amount of data that can be read to
 // header.Length bytes.
 //
@@ -60,7 +60,7 @@ type StreamInfo struct {
 //    }
 //
 // ref: http://flac.sourceforge.net/format.html#metadata_block_streaminfo
-func NewStreamInfo(r io.Reader) (si *StreamInfo, err error) {
+func ParseStreamInfo(r io.Reader) (si *StreamInfo, err error) {
 	br := bit.NewReader(r)
 	// field 0: block_size_min  (16 bits)
 	// field 1: block_size_max  (16 bits)
@@ -79,13 +79,13 @@ func NewStreamInfo(r io.Reader) (si *StreamInfo, err error) {
 	si = new(StreamInfo)
 	si.BlockSizeMin = uint16(fields[0])
 	if si.BlockSizeMin < 16 {
-		return nil, fmt.Errorf("meta.NewStreamInfo: invalid min block size; expected >= 16, got %d", si.BlockSizeMin)
+		return nil, fmt.Errorf("meta.ParseStreamInfo: invalid min block size; expected >= 16, got %d", si.BlockSizeMin)
 	}
 
 	// Maximum block size.
 	si.BlockSizeMax = uint16(fields[1])
 	if si.BlockSizeMax < 16 || si.BlockSizeMax > 65535 {
-		return nil, fmt.Errorf("meta.NewStreamInfo: invalid min block size; expected >= 16 and <= 65535, got %d", si.BlockSizeMax)
+		return nil, fmt.Errorf("meta.ParseStreamInfo: invalid min block size; expected >= 16 and <= 65535, got %d", si.BlockSizeMax)
 	}
 
 	// Minimum frame size.
@@ -97,7 +97,7 @@ func NewStreamInfo(r io.Reader) (si *StreamInfo, err error) {
 	// Sample rate.
 	si.SampleRate = uint32(fields[4])
 	if si.SampleRate > 655350 || si.SampleRate == 0 {
-		return nil, fmt.Errorf("meta.NewStreamInfo: invalid sample rate; expected > 0 and <= 655350, got %d", si.SampleRate)
+		return nil, fmt.Errorf("meta.ParseStreamInfo: invalid sample rate; expected > 0 and <= 655350, got %d", si.SampleRate)
 	}
 
 	// According to the specification 1 should be added to both ChannelCount and
@@ -108,13 +108,13 @@ func NewStreamInfo(r io.Reader) (si *StreamInfo, err error) {
 	// Channel count.
 	si.ChannelCount = uint8(fields[5]) + 1
 	if si.ChannelCount < 1 || si.ChannelCount > 8 {
-		return nil, fmt.Errorf("meta.NewStreamInfo: invalid number of channels; expected >= 1 and <= 8, got %d", si.ChannelCount)
+		return nil, fmt.Errorf("meta.ParseStreamInfo: invalid number of channels; expected >= 1 and <= 8, got %d", si.ChannelCount)
 	}
 
 	// Bits per sample.
 	si.BitsPerSample = uint8(fields[6]) + 1
 	if si.BitsPerSample < 4 || si.BitsPerSample > 32 {
-		return nil, fmt.Errorf("meta.NewStreamInfo: invalid number of bits per sample; expected >= 4 and <= 32, got %d", si.BitsPerSample)
+		return nil, fmt.Errorf("meta.ParseStreamInfo: invalid number of bits per sample; expected >= 4 and <= 32, got %d", si.BitsPerSample)
 	}
 
 	// Sample count.

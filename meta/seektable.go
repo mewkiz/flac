@@ -39,9 +39,9 @@ type SeekPoint struct {
 // structure are undefined.
 const PlaceholderPoint = 0xFFFFFFFFFFFFFFFF
 
-// NewSeekTable parses and returns a new SeekTable metadata block. The provided
-// io.Reader should limit the amount of data that can be read to header.Length
-// bytes.
+// ParseSeekTable parses and returns a new SeekTable metadata block. The
+// provided io.Reader should limit the amount of data that can be read to
+// header.Length bytes.
 //
 // Seek table format (pseudo code):
 //
@@ -58,7 +58,7 @@ const PlaceholderPoint = 0xFFFFFFFFFFFFFFFF
 //    }
 //
 // ref: http://flac.sourceforge.net/format.html#metadata_block_seektable
-func NewSeekTable(r io.Reader) (st *SeekTable, err error) {
+func ParseSeekTable(r io.Reader) (st *SeekTable, err error) {
 	st = new(SeekTable)
 	var hasPrev bool
 	var prevSampleNum uint64
@@ -80,9 +80,9 @@ func NewSeekTable(r io.Reader) (st *SeekTable, err error) {
 			//   placeholder points, but they must all occur at the end of the
 			//   table.
 			if prevSampleNum == point.SampleNum {
-				return nil, fmt.Errorf("meta.NewSeekTable: invalid seek point; sample number (%d) is not unique", point.SampleNum)
+				return nil, fmt.Errorf("meta.ParseSeekTable: invalid seek point; sample number (%d) is not unique", point.SampleNum)
 			} else if prevSampleNum > point.SampleNum {
-				return nil, fmt.Errorf("meta.NewSeekTable: invalid seek point; sample number (%d) is not in ascending order", point.SampleNum)
+				return nil, fmt.Errorf("meta.ParseSeekTable: invalid seek point; sample number (%d) is not in ascending order", point.SampleNum)
 			}
 		}
 		prevSampleNum = point.SampleNum
