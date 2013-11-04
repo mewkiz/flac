@@ -12,7 +12,7 @@ Links:
 // Package flac provides access to FLAC [1] (Free Lossless Audio Codec) files.
 //
 // The basic structure of a FLAC bitstream is:
-//    - The four byte string "fLaC".
+//    - The four byte string signature "fLaC".
 //    - The StreamInfo metadata block.
 //    - Zero or more other metadata blocks.
 //    - One or more audio frames.
@@ -31,12 +31,12 @@ import (
 
 // A Stream is a FLAC bitstream.
 type Stream struct {
-	// The underlying reader of the stream.
-	r io.ReadSeeker
 	// Metadata blocks.
 	MetaBlocks []*meta.Block
 	// Audio frames.
 	Frames []*frame.Frame
+	// The underlying reader of the stream.
+	r io.ReadSeeker
 }
 
 // Parse reads the provided file and returns a parsed FLAC bitstream. It parses
