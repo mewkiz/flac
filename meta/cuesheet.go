@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/mewkiz/pkg/readerutil"
+	"github.com/eaburns/bit"
 )
 
 // A CueSheet metadata block stores various information that can be used in a
@@ -35,7 +35,7 @@ type CueSheet struct {
 	// point of the first track, not necessarily to INDEX 01 of the first track;
 	// even the first track may have INDEX 00 data.
 	LeadInSampleCount uint64
-	// true if the CueSheet corresponds to a Compact Disc, else false.
+	// Specifies whether the CueSheet corresponds to a Compact Disc or not.
 	IsCompactDisc bool
 	// The number of tracks. Must be at least 1 (because of the requisite
 	// lead-out track). For CD-DA, this number must be no more than 100 (99
@@ -150,22 +150,21 @@ func NewCueSheet(r io.Reader) (cs *CueSheet, err error) {
 		return nil, err
 	}
 
-	const (
-		IsCompactDiscMask    = 0x80 // 1 bit
-		CueSheetReservedMask = 0x7F // 7 bits
-	)
-	bits, err := readerutil.ReadByte(r)
+	br := bit.NewReader(r)
+	// field 0: is_compact_disc (1 bit)
+	// field 1: reserved        (7 bits)
+	fields, err := br.ReadFields(1, 7)
 	if err != nil {
 		return nil, err
 	}
 
 	// Is compact disc.
-	if bits&IsCompactDiscMask != 0 {
+	if fields[0] != 0 {
 		cs.IsCompactDisc = true
 	}
 
 	// Reserved.
-	if bits&CueSheetReservedMask != 0 {
+	if fields[1] != 0 {
 		return nil, errReservedNotZero
 	}
 	buf, err = readBytes(r, 258) // 258 reserved bytes.
@@ -190,7 +189,7 @@ func NewCueSheet(r io.Reader) (cs *CueSheet, err error) {
 	if cs.TrackCount < 1 {
 		return nil, errors.New("meta.NewCueSheet: at least one track (the lead-out track) is required")
 	}
-	if cs.TrackCount > 100 && cs.IsCompactDisc {
+	if cs.IsCompactDisc && cs.TrackCount > 100 {
 		return nil, fmt.Errorf("meta.NewCueSheet: too many tracks for CD-DA cue sheet; expected <= 100, got %d", cs.TrackCount)
 	}
 
@@ -240,18 +239,16 @@ func NewCueSheet(r io.Reader) (cs *CueSheet, err error) {
 		}
 		track.ISRC = getStringFromSZ(buf)
 
-		const (
-			TrackTypeMask      = 0x80 // 1 bit
-			HasPreEmphasisMask = 0x40 // 1 bit
-			TrackReservedMask  = 0x3F // 6 bits
-		)
-		bits, err = readerutil.ReadByte(r)
+		// field 0: is_audio          (1 bit)
+		// field 1: has_pre_emphasis  (1 bit)
+		// field 2: reserved          (6 bits)
+		fields, err = br.ReadFields(1, 1, 6)
 		if err != nil {
 			return nil, err
 		}
 
 		// Is audio.
-		if bits&TrackTypeMask == 0 {
+		if fields[0] == 0 {
 			// track type:
 			//    0: audio.
 			//    1: non-audio.
@@ -259,12 +256,12 @@ func NewCueSheet(r io.Reader) (cs *CueSheet, err error) {
 		}
 
 		// Has pre-emphasis.
-		if bits&HasPreEmphasisMask != 0 {
+		if fields[1] != 0 {
 			track.HasPreEmphasis = true
 		}
 
 		// Reserved.
-		if bits&TrackReservedMask != 0 {
+		if fields[2] != 0 {
 			return nil, errReservedNotZero
 		}
 		buf, err = readBytes(r, 13) // 13 reserved bytes.
@@ -297,28 +294,30 @@ func NewCueSheet(r io.Reader) (cs *CueSheet, err error) {
 		}
 
 		// Track indexes.
-		track.TrackIndexes = make([]CueSheetTrackIndex, track.TrackIndexCount)
-		for j := 0; j < len(track.TrackIndexes); j++ {
-			// Track index point offset.
-			trackIndex := &track.TrackIndexes[j]
-			err = binary.Read(r, binary.BigEndian, &trackIndex.Offset)
-			if err != nil {
-				return nil, err
-			}
+		if track.TrackIndexCount > 0 {
+			track.TrackIndexes = make([]CueSheetTrackIndex, track.TrackIndexCount)
+			for j := 0; j < len(track.TrackIndexes); j++ {
+				// Track index point offset.
+				trackIndex := &track.TrackIndexes[j]
+				err = binary.Read(r, binary.BigEndian, &trackIndex.Offset)
+				if err != nil {
+					return nil, err
+				}
 
-			// Track index point num
-			err = binary.Read(r, binary.BigEndian, &trackIndex.IndexPointNum)
-			if err != nil {
-				return nil, err
-			}
+				// Track index point num
+				err = binary.Read(r, binary.BigEndian, &trackIndex.IndexPointNum)
+				if err != nil {
+					return nil, err
+				}
 
-			// Reserved.
-			buf, err = readBytes(r, 3) // 3 reserved bytes.
-			if err != nil {
-				return nil, err
-			}
-			if !isAllZero(buf) {
-				return nil, errReservedNotZero
+				// Reserved.
+				buf, err = readBytes(r, 3) // 3 reserved bytes.
+				if err != nil {
+					return nil, err
+				}
+				if !isAllZero(buf) {
+					return nil, errReservedNotZero
+				}
 			}
 		}
 	}
