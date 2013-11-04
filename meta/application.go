@@ -47,10 +47,10 @@ func (id ID) String() string {
 	return fmt.Sprintf("<unregistered ID: %q>", string(id))
 }
 
-// An Application metadata block is for use by third-party applications. The
-// only mandatory field is a 32-bit identifier. This ID is granted upon request
-// to an application by the FLAC maintainers. The remainder of the block is
-// defined by the registered application.
+// An Application metadata block is used by third-party applications. The only
+// mandatory field is a 32-bit identifier. This ID is granted upon request to an
+// application by the FLAC maintainers. The remainder of the block is defined by
+// the registered application.
 type Application struct {
 	// Registered application ID.
 	ID ID

@@ -7,9 +7,9 @@ import (
 	"io/ioutil"
 )
 
-// A Picture metadata block is for storing pictures associated with the file,
-// most commonly cover art from CDs. There may be more than one Picture block in
-// a file.
+// A Picture metadata block stores pictures associated with the file, most
+// commonly cover art from CDs. There may be more than one Picture block in a
+// file.
 type Picture struct {
 	// The picture type according to the ID3v2 APIC frame:
 	//    0 - Other

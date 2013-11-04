@@ -7,12 +7,12 @@ import (
 	"strings"
 )
 
-// A VorbisComment metadata block is for storing a list of human-readable
-// name/value pairs. Values are encoded using UTF-8. It is an implementation of
-// the Vorbis comment specification (without the framing bit). This is the only
-// officially supported tagging mechanism in FLAC. There may be only one
-// VorbisComment block in a stream. In some external documentation, Vorbis
-// comments are called FLAC tags to lessen confusion.
+// A VorbisComment metadata block stores a list of human-readable name/value
+// pairs. Values are encoded using UTF-8. It is an implementation of the Vorbis
+// comment specification (without the framing bit). This is the only officially
+// supported tagging mechanism in FLAC. There may be only one VorbisComment
+// block in a stream. In some external documentation, Vorbis comments are called
+// FLAC tags to lessen confusion.
 type VorbisComment struct {
 	Vendor  string
 	Entries []VorbisEntry
