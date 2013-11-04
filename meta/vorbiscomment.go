@@ -68,32 +68,34 @@ func NewVorbisComment(r io.Reader) (vc *VorbisComment, err error) {
 	}
 
 	// Comments.
-	vc.Entries = make([]VorbisEntry, commentCount)
-	for i := 0; i < len(vc.Entries); i++ {
-		// Vector length
-		var vectorLen uint32
-		err = binary.Read(r, binary.LittleEndian, &vectorLen)
-		if err != nil {
-			return nil, err
-		}
+	if commentCount > 0 {
+		vc.Entries = make([]VorbisEntry, commentCount)
+		for i := 0; i < len(vc.Entries); i++ {
+			// Vector length
+			var vectorLen uint32
+			err = binary.Read(r, binary.LittleEndian, &vectorLen)
+			if err != nil {
+				return nil, err
+			}
 
-		// Vector string.
-		buf, err = readBytes(r, int(vectorLen))
-		if err != nil {
-			return nil, err
-		}
-		vector := string(buf)
-		pos := strings.Index(vector, "=")
-		if pos == -1 {
-			return nil, fmt.Errorf("meta.NewVorbisComment: invalid comment vector; no '=' present in: %s", vector)
-		}
+			// Vector string.
+			buf, err = readBytes(r, int(vectorLen))
+			if err != nil {
+				return nil, err
+			}
+			vector := string(buf)
+			pos := strings.Index(vector, "=")
+			if pos == -1 {
+				return nil, fmt.Errorf("meta.NewVorbisComment: invalid comment vector; no '=' present in: %q", vector)
+			}
 
-		// Comment.
-		entry := VorbisEntry{
-			Name:  vector[:pos],
-			Value: vector[pos+1:],
+			// Comment.
+			entry := VorbisEntry{
+				Name:  vector[:pos],
+				Value: vector[pos+1:],
+			}
+			vc.Entries[i] = entry
 		}
-		vc.Entries[i] = entry
 	}
 	return vc, nil
 }

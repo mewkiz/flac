@@ -50,14 +50,14 @@ var golden = []struct {
 			},
 			{
 				Header: &meta.BlockHeader{IsLast: true, BlockType: 0x10, Length: 40},
-				Body:   &meta.VorbisComment{Vendor: "reference libFLAC 1.2.1 20070917", Entries: []meta.VorbisEntry{}},
+				Body:   &meta.VorbisComment{Vendor: "reference libFLAC 1.2.1 20070917"},
 			},
 		},
 	},
 }
 
 func TestParseBlocks(t *testing.T) {
-	for _, g := range golden {
+	for i, g := range golden {
 		s, err := flac.Open(g.name)
 		if err != nil {
 			t.Fatal(err)
@@ -69,8 +69,8 @@ func TestParseBlocks(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		for i, got := range s.MetaBlocks {
-			want := g.blocks[i]
+		for j, got := range s.MetaBlocks {
+			want := g.blocks[j]
 			if !reflect.DeepEqual(want.Header, got.Header) {
 				t.Errorf("i=%d: metadata block headers differ; expected %#v, got %#v.", i, want.Header, got.Header)
 			}
