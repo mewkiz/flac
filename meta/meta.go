@@ -147,9 +147,9 @@ type BlockHeader struct {
 // ref: http://flac.sourceforge.net/format.html#metadata_block_header
 func NewBlockHeader(r io.Reader) (h *BlockHeader, err error) {
 	br := bit.NewReader(r)
-	// is_last:    1 bit
-	// block_type: 7 bits
-	// length:     24 bits
+	// field 0: is_last    (1 bit)
+	// field 1: block_type (7 bits)
+	// field 2: length     (24 bits)
 	fields, err := br.ReadFields(1, 7, 24)
 	if err != nil {
 		return nil, err
