@@ -38,8 +38,8 @@ type Picture struct {
 	// picture type 1 and 2 in a file.
 	Type uint32
 	// The MIME type string, in printable ASCII characters 0x20-0x7e. The MIME
-	// type may also be --> to signify that the data part is a URL of the picture
-	// instead of the picture data itself.
+	// type may also be `-->` to signify that the data part is a URL of the
+	// picture instead of the picture data itself.
 	MIME string
 	// The description of the picture, in UTF-8.
 	Desc string
