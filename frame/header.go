@@ -10,7 +10,6 @@ import (
 	"math"
 
 	"github.com/eaburns/bit"
-	"github.com/mewkiz/pkg/hashutil"
 	"github.com/mewkiz/pkg/hashutil/crc8"
 )
 
@@ -125,10 +124,11 @@ func (order ChannelOrder) ChannelCount() int {
 //       }
 //       crc8                      uint8
 //    }
-func NewHeader(r io.Reader) (h *Header, err error) {
+func NewHeader(r io.Reader) (hdr *Header, err error) {
 	// Create a new hash reader which adds the data from all read operations to a
 	// running hash.
-	hr := hashutil.NewHashReader(r, crc8.NewATM())
+	h := crc8.NewATM()
+	hr := io.TeeReader(r, h)
 
 	br := bit.NewReader(hr)
 	// field 0: sync_code                 (14 bits)
@@ -158,13 +158,13 @@ func NewHeader(r io.Reader) (h *Header, err error) {
 	}
 
 	// Blocking strategy.
-	h = new(Header)
+	hdr = new(Header)
 	// field 2: has_variable_sample_count (1 bit)
 	if fields[2] != 0 {
 		// blocking strategy:
 		//    0: fixed-sample count.
 		//    1: variable-sample count.
-		h.HasVariableSampleCount = true
+		hdr.HasVariableSampleCount = true
 	}
 
 	// Channel assignment.
@@ -201,7 +201,7 @@ func NewHeader(r io.Reader) (h *Header, err error) {
 		// 1000: left/side stereo:  left, side (difference)
 		// 1001: side/right stereo: side (difference), right
 		// 1010: mid/side stereo:   mid (average), side (difference)
-		h.ChannelOrder = ChannelOrder(n)
+		hdr.ChannelOrder = ChannelOrder(n)
 	case n >= 11 && n <= 15:
 		// 1011-1111: reserved
 		return nil, fmt.Errorf("frame.NewHeader: invalid channel order; reserved bit pattern: %04b", n)
@@ -231,23 +231,23 @@ func NewHeader(r io.Reader) (h *Header, err error) {
 		log.Println(fmt.Errorf("not yet implemented; sample size spec: %d", n))
 	case 1:
 		// 001: 8 bits per sample.
-		h.SampleSize = 8
+		hdr.SampleSize = 8
 	case 2:
 		// 010: 12 bits per sample.
-		h.SampleSize = 12
+		hdr.SampleSize = 12
 	case 3, 7:
 		// 011: reserved.
 		// 111: reserved.
 		return nil, fmt.Errorf("frame.NewHeader: invalid sample size; reserved bit pattern: %03b", n)
 	case 4:
 		// 100: 16 bits per sample.
-		h.SampleSize = 16
+		hdr.SampleSize = 16
 	case 5:
 		// 101: 20 bits per sample.
-		h.SampleSize = 20
+		hdr.SampleSize = 20
 	case 6:
 		// 110: 24 bits per sample.
-		h.SampleSize = 24
+		hdr.SampleSize = 24
 	default:
 		// should be unreachable.
 		panic(fmt.Errorf("frame.NewHeader: unhandled sample size bit pattern: %03b", n))
@@ -260,21 +260,21 @@ func NewHeader(r io.Reader) (h *Header, err error) {
 	}
 
 	// "UTF-8" coded sample number or frame number.
-	if h.HasVariableSampleCount {
+	if hdr.HasVariableSampleCount {
 		// Sample number.
-		h.SampleNum, err = decodeUTF8Int(hr)
+		hdr.SampleNum, err = decodeUTF8Int(hr)
 		if err != nil {
 			return nil, err
 		}
-		dbg.Println("UTF-8 decoded sample number:", h.SampleNum)
+		dbg.Println("UTF-8 decoded sample number:", hdr.SampleNum)
 	} else {
 		// Frame number.
 		frameNum, err := decodeUTF8Int(hr)
 		if err != nil {
 			return nil, err
 		}
-		h.FrameNum = uint32(frameNum)
-		dbg.Println("UTF-8 decoded frame number:", h.FrameNum)
+		hdr.FrameNum = uint32(frameNum)
+		dbg.Println("UTF-8 decoded frame number:", hdr.FrameNum)
 	}
 
 	// Block size.
@@ -293,10 +293,10 @@ func NewHeader(r io.Reader) (h *Header, err error) {
 		return nil, errors.New("frame.NewHeader: invalid block size; reserved bit pattern")
 	case n == 1:
 		// 0001: 192 samples.
-		h.SampleCount = 192
+		hdr.SampleCount = 192
 	case n >= 2 && n <= 5:
 		// 0010-0101: 576 * (2^(n-2)) samples, i.e. 576/1152/2304/4608.
-		h.SampleCount = uint16(576 * math.Pow(2, float64(n-2)))
+		hdr.SampleCount = uint16(576 * math.Pow(2, float64(n-2)))
 	case n == 6:
 		// 0110: get 8 bit (sampleCount-1) from end of header.
 		var x uint8
@@ -304,7 +304,7 @@ func NewHeader(r io.Reader) (h *Header, err error) {
 		if err != nil {
 			return nil, err
 		}
-		h.SampleCount = uint16(x) + 1
+		hdr.SampleCount = uint16(x) + 1
 	case n == 7:
 		// 0111: get 16 bit (sampleCount-1) from end of header.
 		var x uint16
@@ -312,11 +312,11 @@ func NewHeader(r io.Reader) (h *Header, err error) {
 		if err != nil {
 			return nil, err
 		}
-		h.SampleCount = x + 1
+		hdr.SampleCount = x + 1
 	case n >= 8 && n <= 15:
 		// 1000-1111: 256 * (2^(n-8)) samples, i.e. 256/512/1024/2048/4096/8192/
 		//            16384/32768.
-		h.SampleCount = uint16(256 * math.Pow(2, float64(n-8)))
+		hdr.SampleCount = uint16(256 * math.Pow(2, float64(n-8)))
 	default:
 		// should be unreachable.
 		panic(fmt.Errorf("frame.NewHeader: unhandled block size bit pattern: %04b", n))
@@ -350,37 +350,37 @@ func NewHeader(r io.Reader) (h *Header, err error) {
 		log.Println(fmt.Errorf("not yet implemented; sample rate: %d", n))
 	case 1:
 		//0001: 88.2kHz.
-		h.SampleRate = 88200
+		hdr.SampleRate = 88200
 	case 2:
 		//0010: 176.4kHz.
-		h.SampleRate = 176400
+		hdr.SampleRate = 176400
 	case 3:
 		//0011: 192kHz.
-		h.SampleRate = 192000
+		hdr.SampleRate = 192000
 	case 4:
 		//0100: 8kHz.
-		h.SampleRate = 8000
+		hdr.SampleRate = 8000
 	case 5:
 		//0101: 16kHz.
-		h.SampleRate = 16000
+		hdr.SampleRate = 16000
 	case 6:
 		//0110: 22.05kHz.
-		h.SampleRate = 22050
+		hdr.SampleRate = 22050
 	case 7:
 		//0111: 24kHz.
-		h.SampleRate = 24000
+		hdr.SampleRate = 24000
 	case 8:
 		//1000: 32kHz.
-		h.SampleRate = 32000
+		hdr.SampleRate = 32000
 	case 9:
 		//1001: 44.1kHz.
-		h.SampleRate = 44100
+		hdr.SampleRate = 44100
 	case 10:
 		//1010: 48kHz.
-		h.SampleRate = 48000
+		hdr.SampleRate = 48000
 	case 11:
 		//1011: 96kHz.
-		h.SampleRate = 96000
+		hdr.SampleRate = 96000
 	case 12:
 		//1100: get 8 bit sample rate (in kHz) from end of header.
 		var sampleRate_kHz uint8
@@ -388,7 +388,7 @@ func NewHeader(r io.Reader) (h *Header, err error) {
 		if err != nil {
 			return nil, err
 		}
-		h.SampleRate = uint32(sampleRate_kHz) * 1000
+		hdr.SampleRate = uint32(sampleRate_kHz) * 1000
 	case 13:
 		//1101: get 16 bit sample rate (in Hz) from end of header.
 		var sampleRate_Hz uint16
@@ -396,7 +396,7 @@ func NewHeader(r io.Reader) (h *Header, err error) {
 		if err != nil {
 			return nil, err
 		}
-		h.SampleRate = uint32(sampleRate_Hz)
+		hdr.SampleRate = uint32(sampleRate_Hz)
 	case 14:
 		//1110: get 16 bit sample rate (in tens of Hz) from end of header.
 		var sampleRate_daHz uint16
@@ -404,7 +404,7 @@ func NewHeader(r io.Reader) (h *Header, err error) {
 		if err != nil {
 			return nil, err
 		}
-		h.SampleRate = uint32(sampleRate_daHz) * 10
+		hdr.SampleRate = uint32(sampleRate_daHz) * 10
 	case 15:
 		//1111: invalid, to prevent sync-fooling string of 1s.
 		return nil, fmt.Errorf("frame.NewHeader: invalid sample rate bit pattern: %04b", n)
@@ -414,12 +414,10 @@ func NewHeader(r io.Reader) (h *Header, err error) {
 	}
 
 	// Verify the CRC-8.
-	got := hr.Sum8()
-	// Disable hashing on hr.
-	hr.Hash = nil
+	got := h.Sum8()
 
 	var want uint8
-	err = binary.Read(hr, binary.BigEndian, &want)
+	err = binary.Read(r, binary.BigEndian, &want)
 	if err != nil {
 		return nil, err
 	}
@@ -427,5 +425,5 @@ func NewHeader(r io.Reader) (h *Header, err error) {
 		return nil, fmt.Errorf("frame.NewHeader: checksum mismatch; expected 0x%02X, got 0x%02X", want, got)
 	}
 
-	return h, nil
+	return hdr, nil
 }

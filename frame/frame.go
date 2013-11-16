@@ -7,7 +7,6 @@ import (
 	"io"
 
 	"github.com/eaburns/bit"
-	"github.com/mewkiz/pkg/hashutil"
 	"github.com/mewkiz/pkg/hashutil/crc16"
 )
 
@@ -36,7 +35,8 @@ type Frame struct {
 func NewFrame(r io.Reader) (frame *Frame, err error) {
 	// Create a new hash reader which adds the data from all read operations to a
 	// running hash.
-	hr := hashutil.NewHashReader(r, crc16.NewIBM())
+	h := crc16.NewIBM()
+	hr := io.TeeReader(r, h)
 
 	// Frame header.
 	frame = new(Frame)
@@ -47,9 +47,9 @@ func NewFrame(r io.Reader) (frame *Frame, err error) {
 
 	// Subframes.
 	br := bit.NewReader(hr)
-	h := frame.Header
-	for i := 0; i < h.ChannelOrder.ChannelCount(); i++ {
-		subframe, err := h.NewSubFrame(br)
+	hdr := frame.Header
+	for i := 0; i < hdr.ChannelOrder.ChannelCount(); i++ {
+		subframe, err := hdr.NewSubFrame(br)
 		if err != nil {
 			return nil, err
 		}
@@ -80,12 +80,10 @@ func NewFrame(r io.Reader) (frame *Frame, err error) {
 	// Frame footer.
 
 	// Verify the CRC-16.
-	got := hr.Sum16()
-	// Disable hashing on hr.
-	hr.Hash = nil
+	got := h.Sum16()
 
 	var want uint16
-	err = binary.Read(hr, binary.BigEndian, &want)
+	err = binary.Read(r, binary.BigEndian, &want)
 	if err != nil {
 		return nil, err
 	}
