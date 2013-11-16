@@ -84,13 +84,13 @@ func NewFrame(r io.Reader) (frame *Frame, err error) {
 	// Disable hashing on hr.
 	hr.Hash = nil
 
-	var crc uint16
-	err = binary.Read(hr, binary.BigEndian, &crc)
+	var want uint16
+	err = binary.Read(hr, binary.BigEndian, &want)
 	if err != nil {
 		return nil, err
 	}
-	if crc != got {
-		return nil, fmt.Errorf("frame.NewFrame: checksum mismatch; expected 0x%04X, got 0x%04X", crc, got)
+	if got != want {
+		return nil, fmt.Errorf("frame.NewFrame: checksum mismatch; expected 0x%04X, got 0x%04X", want, got)
 	}
 
 	return frame, nil

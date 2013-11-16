@@ -9,6 +9,7 @@ import (
 	"log"
 	"math"
 
+	"github.com/eaburns/bit"
 	"github.com/mewkiz/pkg/hashutil"
 	"github.com/mewkiz/pkg/hashutil/crc8"
 )
@@ -129,37 +130,37 @@ func NewHeader(r io.Reader) (h *Header, err error) {
 	// running hash.
 	hr := hashutil.NewHashReader(r, crc8.NewATM())
 
-	// Read 32 bits which are arranged according to the following masks.
-	const (
-		SyncCodeMask          = 0xFFFC0000 // 14 bits   shift right: 18
-		Reserved1Mask         = 0x00020000 // 1 bit     shift right: 17
-		BlockingStrategyMask  = 0x00010000 // 1 bit     shift right: 16
-		SampleCountSpecMask   = 0x0000F000 // 4 bits    shift right: 12
-		SampleRateSpecMask    = 0x00000F00 // 4 bits    shift right: 8
-		ChannelAssignmentMask = 0x000000F0 // 4 bits    shift right: 4
-		SampleSizeSpecMask    = 0x0000000E // 3 bits    shift right: 1
-		Reserved2Mask         = 0x00000001 // 1 bit     shift right: 0
-	)
-	var bits uint32
-	err = binary.Read(hr, binary.BigEndian, &bits)
+	br := bit.NewReader(hr)
+	// field 0: sync_code                 (14 bits)
+	// field 1: reserved                  (1 bit)
+	// field 2: has_variable_sample_count (1 bit)
+	// field 3: sample_count_spec         (4 bits)
+	// field 4: sample_rate_spec          (4 bits)
+	// field 5: channel_assignment        (4 bits)
+	// field 6: sample_size_spec          (3 bits)
+	// field 7: reserved                  (1 bit)
+	fields, err := br.ReadFields(14, 1, 1, 4, 4, 4, 3, 1)
 	if err != nil {
 		return nil, err
 	}
 
 	// Sync code.
-	syncCode := bits & SyncCodeMask >> 18
+	// field 0: sync_code (14 bits)
+	syncCode := fields[0]
 	if syncCode != SyncCode {
 		return nil, fmt.Errorf("frame.NewHeader: invalid sync code; expected '%014b', got '%014b'", SyncCode, syncCode)
 	}
 
 	// Reserved.
-	if bits&Reserved1Mask != 0 {
+	// field 1: reserved (1 bit)
+	if fields[1] != 0 {
 		return nil, errors.New("frame.NewHeader: all reserved bits must be 0")
 	}
 
 	// Blocking strategy.
 	h = new(Header)
-	if bits&BlockingStrategyMask != 0 {
+	// field 2: has_variable_sample_count (1 bit)
+	if fields[2] != 0 {
 		// blocking strategy:
 		//    0: fixed-sample count.
 		//    1: variable-sample count.
@@ -182,7 +183,8 @@ func NewHeader(r io.Reader) (h *Header, err error) {
 	//    1001: side/right stereo: side (difference), right
 	//    1010: mid/side stereo:   mid (average), side (difference)
 	//    1011-1111: reserved
-	n := bits & ChannelAssignmentMask >> 4
+	// field 5: channel_assignment (4 bits)
+	n := fields[5]
 	switch {
 	case n >= 0 && n <= 10:
 		// 0000-0111: (number of independent channels)-1. Where defined, the
@@ -205,7 +207,7 @@ func NewHeader(r io.Reader) (h *Header, err error) {
 		return nil, fmt.Errorf("frame.NewHeader: invalid channel order; reserved bit pattern: %04b", n)
 	default:
 		// should be unreachable.
-		log.Fatalln(fmt.Errorf("frame.NewHeader: unhandled channel assignment bit pattern: %04b", n))
+		panic(fmt.Errorf("frame.NewHeader: unhandled channel assignment bit pattern: %04b", n))
 	}
 
 	// Sample size.
@@ -217,7 +219,8 @@ func NewHeader(r io.Reader) (h *Header, err error) {
 	//    101: 20 bits per sample.
 	//    110: 24 bits per sample.
 	//    111: reserved.
-	n = bits & SampleSizeSpecMask >> 1
+	// field 6: sample_size_spec (3 bits)
+	n = fields[6]
 	switch n {
 	case 0:
 		// 000: get from STREAMINFO metadata block.
@@ -225,7 +228,7 @@ func NewHeader(r io.Reader) (h *Header, err error) {
 		///    - Should we try to read StreamInfo from here? We won't always have
 		///      access to it.
 		/// ### [/ todo ] ###
-		log.Println(fmt.Errorf("not yet implemented; sample size: %d", n))
+		log.Println(fmt.Errorf("not yet implemented; sample size spec: %d", n))
 	case 1:
 		// 001: 8 bits per sample.
 		h.SampleSize = 8
@@ -247,11 +250,12 @@ func NewHeader(r io.Reader) (h *Header, err error) {
 		h.SampleSize = 24
 	default:
 		// should be unreachable.
-		log.Fatalln(fmt.Errorf("frame.NewHeader: unhandled sample size bit pattern: %03b", n))
+		panic(fmt.Errorf("frame.NewHeader: unhandled sample size bit pattern: %03b", n))
 	}
 
 	// Reserved.
-	if bits&Reserved2Mask != 0 {
+	// field 7: reserved (1 bit)
+	if fields[7] != 0 {
 		return nil, errors.New("frame.NewHeader: all reserved bits must be 0")
 	}
 
@@ -281,7 +285,8 @@ func NewHeader(r io.Reader) (h *Header, err error) {
 	//    0111: get 16 bit (sampleCount-1) from end of header.
 	//    1000-1111: 256 * (2^(n-8)) samples, i.e. 256/512/1024/2048/4096/8192/
 	//               16384/32768.
-	n = bits & SampleCountSpecMask >> 12
+	// field 3: sample_count_spec (4 bits)
+	n = fields[3]
 	switch {
 	case n == 0:
 		// 0000: reserved.
@@ -314,7 +319,7 @@ func NewHeader(r io.Reader) (h *Header, err error) {
 		h.SampleCount = uint16(256 * math.Pow(2, float64(n-8)))
 	default:
 		// should be unreachable.
-		log.Fatalln(fmt.Errorf("frame.NewHeader: unhandled block size bit pattern: %04b", n))
+		panic(fmt.Errorf("frame.NewHeader: unhandled block size bit pattern: %04b", n))
 	}
 
 	// Sample rate:
@@ -334,7 +339,8 @@ func NewHeader(r io.Reader) (h *Header, err error) {
 	//    1101: get 16 bit sample rate (in Hz) from end of header.
 	//    1110: get 16 bit sample rate (in tens of Hz) from end of header.
 	//    1111: invalid, to prevent sync-fooling string of 1s.
-	n = bits & SampleRateSpecMask >> 8
+	// field 4: sample_rate_spec (4 bits)
+	n = fields[4]
 	switch n {
 	case 0:
 		// 0000: get from STREAMINFO metadata block.
@@ -404,7 +410,7 @@ func NewHeader(r io.Reader) (h *Header, err error) {
 		return nil, fmt.Errorf("frame.NewHeader: invalid sample rate bit pattern: %04b", n)
 	default:
 		// should be unreachable.
-		log.Fatalln(fmt.Errorf("frame.NewHeader: unhandled sample rate bit pattern: %04b", n))
+		panic(fmt.Errorf("frame.NewHeader: unhandled sample rate bit pattern: %04b", n))
 	}
 
 	// Verify the CRC-8.
@@ -412,13 +418,13 @@ func NewHeader(r io.Reader) (h *Header, err error) {
 	// Disable hashing on hr.
 	hr.Hash = nil
 
-	var crc uint8
-	err = binary.Read(hr, binary.BigEndian, &crc)
+	var want uint8
+	err = binary.Read(hr, binary.BigEndian, &want)
 	if err != nil {
 		return nil, err
 	}
-	if crc != got {
-		return nil, fmt.Errorf("frame.NewHeader: checksum mismatch; expected 0x%02X, got 0x%02X", crc, got)
+	if got != want {
+		return nil, fmt.Errorf("frame.NewHeader: checksum mismatch; expected 0x%02X, got 0x%02X", want, got)
 	}
 
 	return h, nil
