@@ -107,6 +107,7 @@ func (h *Header) NewSubHeader(br *bit.Reader) (sh *SubHeader, err error) {
 	}
 
 	// Padding.
+	// field 0: padding (1 bit)
 	if fields[0] != 0 {
 		return nil, errors.New("Header.NewSubHeader: invalid padding; must be 0")
 	}
@@ -120,6 +121,7 @@ func (h *Header) NewSubHeader(br *bit.Reader) (sh *SubHeader, err error) {
 	//    01xxxx: reserved
 	//    1xxxxx: SUBFRAME_LPC, xxxxx=order-1
 	sh = new(SubHeader)
+	// field 1: type (6 bits)
 	n := fields[1]
 	switch {
 	case n == 0:
@@ -150,7 +152,7 @@ func (h *Header) NewSubHeader(br *bit.Reader) (sh *SubHeader, err error) {
 		sh.PredMethod = PredLPC
 	default:
 		// should be unreachable.
-		return nil, fmt.Errorf("Header.NewSubHeader: unhandled subframe prediction method; bit pattern: %06b", n)
+		panic(fmt.Errorf("Header.NewSubHeader: unhandled subframe prediction method; bit pattern: %06b", n))
 	}
 
 	// Wasted bits-per-sample, 1+k bits.
