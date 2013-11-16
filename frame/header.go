@@ -8,8 +8,8 @@ import (
 	"io"
 	"log"
 	"math"
-	"os"
 
+	"github.com/mewkiz/pkg/hashutil"
 	"github.com/mewkiz/pkg/hashutil/crc8"
 )
 
@@ -124,13 +124,10 @@ func (order ChannelOrder) ChannelCount() int {
 //       }
 //       crc8                      uint8
 //    }
-func NewHeader(r io.ReadSeeker) (h *Header, err error) {
-	// Record start offset, which is used when verifying the CRC-8 of the frame
-	// header.
-	start, err := r.Seek(0, os.SEEK_CUR)
-	if err != nil {
-		return nil, err
-	}
+func NewHeader(r io.Reader) (h *Header, err error) {
+	// Create a new hash reader which adds the data from all read operations to a
+	// running hash.
+	hr := hashutil.NewHashReader(r, crc8.NewATM())
 
 	// Read 32 bits which are arranged according to the following masks.
 	const (
@@ -144,7 +141,7 @@ func NewHeader(r io.ReadSeeker) (h *Header, err error) {
 		Reserved2Mask         = 0x00000001 // 1 bit     shift right: 0
 	)
 	var bits uint32
-	err = binary.Read(r, binary.BigEndian, &bits)
+	err = binary.Read(hr, binary.BigEndian, &bits)
 	if err != nil {
 		return nil, err
 	}
@@ -261,14 +258,14 @@ func NewHeader(r io.ReadSeeker) (h *Header, err error) {
 	// "UTF-8" coded sample number or frame number.
 	if h.HasVariableSampleCount {
 		// Sample number.
-		h.SampleNum, err = decodeUTF8Int(r)
+		h.SampleNum, err = decodeUTF8Int(hr)
 		if err != nil {
 			return nil, err
 		}
 		dbg.Println("UTF-8 decoded sample number:", h.SampleNum)
 	} else {
 		// Frame number.
-		frameNum, err := decodeUTF8Int(r)
+		frameNum, err := decodeUTF8Int(hr)
 		if err != nil {
 			return nil, err
 		}
@@ -298,7 +295,7 @@ func NewHeader(r io.ReadSeeker) (h *Header, err error) {
 	case n == 6:
 		// 0110: get 8 bit (sampleCount-1) from end of header.
 		var x uint8
-		err = binary.Read(r, binary.BigEndian, &x)
+		err = binary.Read(hr, binary.BigEndian, &x)
 		if err != nil {
 			return nil, err
 		}
@@ -306,7 +303,7 @@ func NewHeader(r io.ReadSeeker) (h *Header, err error) {
 	case n == 7:
 		// 0111: get 16 bit (sampleCount-1) from end of header.
 		var x uint16
-		err = binary.Read(r, binary.BigEndian, &x)
+		err = binary.Read(hr, binary.BigEndian, &x)
 		if err != nil {
 			return nil, err
 		}
@@ -381,7 +378,7 @@ func NewHeader(r io.ReadSeeker) (h *Header, err error) {
 	case 12:
 		//1100: get 8 bit sample rate (in kHz) from end of header.
 		var sampleRate_kHz uint8
-		err = binary.Read(r, binary.BigEndian, &sampleRate_kHz)
+		err = binary.Read(hr, binary.BigEndian, &sampleRate_kHz)
 		if err != nil {
 			return nil, err
 		}
@@ -389,7 +386,7 @@ func NewHeader(r io.ReadSeeker) (h *Header, err error) {
 	case 13:
 		//1101: get 16 bit sample rate (in Hz) from end of header.
 		var sampleRate_Hz uint16
-		err = binary.Read(r, binary.BigEndian, &sampleRate_Hz)
+		err = binary.Read(hr, binary.BigEndian, &sampleRate_Hz)
 		if err != nil {
 			return nil, err
 		}
@@ -397,7 +394,7 @@ func NewHeader(r io.ReadSeeker) (h *Header, err error) {
 	case 14:
 		//1110: get 16 bit sample rate (in tens of Hz) from end of header.
 		var sampleRate_daHz uint16
-		err = binary.Read(r, binary.BigEndian, &sampleRate_daHz)
+		err = binary.Read(hr, binary.BigEndian, &sampleRate_daHz)
 		if err != nil {
 			return nil, err
 		}
@@ -410,28 +407,16 @@ func NewHeader(r io.ReadSeeker) (h *Header, err error) {
 		log.Fatalln(fmt.Errorf("frame.NewHeader: unhandled sample rate bit pattern: %04b", n))
 	}
 
-	// Read the frame header data and calculate the CRC-8.
-	end, err := r.Seek(0, os.SEEK_CUR)
-	if err != nil {
-		return nil, err
-	}
-	_, err = r.Seek(start, os.SEEK_SET)
-	if err != nil {
-		return nil, err
-	}
-	data := make([]byte, end-start)
-	_, err = io.ReadFull(r, data)
-	if err != nil {
-		return nil, err
-	}
-
 	// Verify the CRC-8.
+	got := hr.Sum8()
+	// Disable hashing on hr.
+	hr.Hash = nil
+
 	var crc uint8
-	err = binary.Read(r, binary.BigEndian, &crc)
+	err = binary.Read(hr, binary.BigEndian, &crc)
 	if err != nil {
 		return nil, err
 	}
-	got := crc8.ChecksumATM(data)
 	if crc != got {
 		return nil, fmt.Errorf("frame.NewHeader: checksum mismatch; expected 0x%02X, got 0x%02X", crc, got)
 	}

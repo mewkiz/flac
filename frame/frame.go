@@ -3,12 +3,11 @@ package frame
 
 import (
 	"encoding/binary"
-	"errors"
 	"fmt"
 	"io"
-	"os"
 
-	"github.com/mewkiz/pkg/bit"
+	"github.com/eaburns/bit"
+	"github.com/mewkiz/pkg/hashutil"
 	"github.com/mewkiz/pkg/hashutil/crc16"
 )
 
@@ -34,22 +33,20 @@ type Frame struct {
 //    }
 //
 // ref: http://flac.sourceforge.net/format.html#frame
-func NewFrame(r io.ReadSeeker) (frame *Frame, err error) {
-	// Record start offset, which is used when verifying the CRC-16 of the frame.
-	start, err := r.Seek(0, os.SEEK_CUR)
-	if err != nil {
-		return nil, err
-	}
+func NewFrame(r io.Reader) (frame *Frame, err error) {
+	// Create a new hash reader which adds the data from all read operations to a
+	// running hash.
+	hr := hashutil.NewHashReader(r, crc16.NewIBM())
 
 	// Frame header.
 	frame = new(Frame)
-	frame.Header, err = NewHeader(r)
+	frame.Header, err = NewHeader(hr)
 	if err != nil {
 		return nil, err
 	}
 
 	// Subframes.
-	br := bit.NewReader(r)
+	br := bit.NewReader(hr)
 	h := frame.Header
 	for i := 0; i < h.ChannelOrder.ChannelCount(); i++ {
 		subframe, err := h.NewSubFrame(br)
@@ -60,45 +57,38 @@ func NewFrame(r io.ReadSeeker) (frame *Frame, err error) {
 	}
 
 	// Padding.
-	bitOff, err := br.Seek(0, bit.SeekCur)
-	if err != nil {
-		return nil, err
-	}
-	padBitCount := bitOff % 8
-	if padBitCount != 0 {
-		pad, err := br.Read(int(padBitCount))
-		if err != nil {
-			return nil, err
-		}
-		if pad.Uint64() != 0 {
-			return nil, errors.New("frame.NewFrame: invalid padding; must be 0")
-		}
-	}
+	// ignore bits up to byte boundery.
+	br = bit.NewReader(hr)
+	/// ### [ TODO ] ###
+	///    - verify paddings
+	/// ### [/ TODO ] ###
+	///bitOff, err := br.Seek(0, bit.SeekCur)
+	///if err != nil {
+	///	return nil, err
+	///}
+	///padBitCount := bitOff % 8
+	///if padBitCount != 0 {
+	///	pad, err := br.Read(int(padBitCount))
+	///	if err != nil {
+	///		return nil, err
+	///	}
+	///	if pad.Uint64() != 0 {
+	///		return nil, errors.New("frame.NewFrame: invalid padding; must be 0")
+	///	}
+	///}
 
 	// Frame footer.
 
-	// Read the frame data and calculate the CRC-16.
-	end, err := r.Seek(0, os.SEEK_CUR)
-	if err != nil {
-		return nil, err
-	}
-	_, err = r.Seek(start, os.SEEK_SET)
-	if err != nil {
-		return nil, err
-	}
-	data := make([]byte, end-start)
-	_, err = io.ReadFull(r, data)
-	if err != nil {
-		return nil, err
-	}
-
 	// Verify the CRC-16.
+	got := hr.Sum16()
+	// Disable hashing on hr.
+	hr.Hash = nil
+
 	var crc uint16
-	err = binary.Read(r, binary.BigEndian, &crc)
+	err = binary.Read(hr, binary.BigEndian, &crc)
 	if err != nil {
 		return nil, err
 	}
-	got := crc16.ChecksumIBM(data)
 	if crc != got {
 		return nil, fmt.Errorf("frame.NewFrame: checksum mismatch; expected 0x%04X, got 0x%04X", crc, got)
 	}
