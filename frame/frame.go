@@ -57,25 +57,11 @@ func NewFrame(r io.Reader) (frame *Frame, err error) {
 	}
 
 	// Padding.
-	// ignore bits up to byte boundery.
-	br = bit.NewReader(hr)
 	/// ### [ TODO ] ###
 	///    - verify paddings
 	/// ### [/ TODO ] ###
-	///bitOff, err := br.Seek(0, bit.SeekCur)
-	///if err != nil {
-	///	return nil, err
-	///}
-	///padBitCount := bitOff % 8
-	///if padBitCount != 0 {
-	///	pad, err := br.Read(int(padBitCount))
-	///	if err != nil {
-	///		return nil, err
-	///	}
-	///	if pad.Uint64() != 0 {
-	///		return nil, errors.New("frame.NewFrame: invalid padding; must be 0")
-	///	}
-	///}
+	// ignore bits up to byte boundery.
+	br = bit.NewReader(hr)
 
 	// Frame footer.
 
