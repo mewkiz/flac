@@ -1,14 +1,3 @@
-/*
-Links:
-	http://code.google.com/p/goflac-meta/source/browse/flacmeta_test.go
-	http://flac.sourceforge.net/api/hierarchy.html
-	http://flac.sourceforge.net/documentation_format_overview.html
-	http://flac.sourceforge.net/format.html
-	http://jflac.sourceforge.net/
-	http://ffmpeg.org/doxygen/trunk/libavcodec_2flacdec_8c-source.html#l00485
-	http://mi.eng.cam.ac.uk/reports/svr-ftp/auto-pdf/robinson_tr156.pdf
-*/
-
 // Package flac provides access to FLAC [1] (Free Lossless Audio Codec) files.
 //
 // The basic structure of a FLAC bitstream is:
