@@ -7,6 +7,7 @@ import (
 	"math"
 
 	"github.com/eaburns/bit"
+	"github.com/mewkiz/pkg/bitutil"
 )
 
 // A SubFrame contains the decoded audio data of a channel.
@@ -18,7 +19,8 @@ type SubFrame struct {
 	Samples []Sample
 }
 
-// A Sample is an audio sample. The size of each sample is between 4 and 32 bits.
+// A Sample is an audio sample. The size of each sample is between 4 and 32
+// bits.
 type Sample uint32
 
 // NewSubFrame parses and returns a new subframe, which consists of a subframe
@@ -28,7 +30,8 @@ type Sample uint32
 //
 //    type SUBFRAME struct {
 //       header      SUBFRAME_HEADER
-//       enc_samples SUBFRAME_CONSTANT || SUBFRAME_FIXED || SUBFRAME_LPC || SUBFRAME_VERBATIM
+//       enc_samples SUBFRAME_CONSTANT || SUBFRAME_FIXED || SUBFRAME_LPC ||
+//                   SUBFRAME_VERBATIM
 //    }
 //
 // ref: http://flac.sourceforge.net/format.html#subframe
@@ -156,26 +159,22 @@ func (h *Header) NewSubHeader(br *bit.Reader) (sh *SubHeader, err error) {
 	}
 
 	// Wasted bits-per-sample, 1+k bits.
-	bits, err := br.Read(1)
+	hasWastedBits, err := br.Read(1)
 	if err != nil {
 		return nil, err
 	}
-	if bits != 0 {
+	if hasWastedBits != 0 {
 		// k wasted bits-per-sample in source subblock, k-1 follows, unary coded;
 		// e.g. k=3 => 001 follows, k=7 => 0000001 follows.
 		/// ### [ todo ] ###
 		///    - verify.
 		/// ### [/ todo ] ###
-		for {
-			sh.WastedBitCount++
-			bits, err = br.Read(1)
-			if err != nil {
-				return nil, err
-			}
-			if bits == 1 {
-				break
-			}
+		n, err := bitutil.DecodeUnary(br)
+		if err != nil {
+			return nil, err
 		}
+		sh.WastedBitCount = int8(n)
+		dbg.Println("wasted bits-per-sample:", sh.WastedBitCount)
 	}
 
 	return sh, nil
@@ -195,8 +194,9 @@ func (h *Header) DecodeConstant(br *bit.Reader) (samples []Sample, err error) {
 	dbg.Println("Constant sample:", sample)
 
 	// Duplicate the constant sample, sample count number of times.
-	for i := uint16(0); i < h.SampleCount; i++ {
-		samples = append(samples, sample)
+	samples = make([]Sample, h.SampleCount)
+	for i := range samples {
+		samples[i] = sample
 	}
 
 	return samples, nil
@@ -211,14 +211,15 @@ func (h *Header) DecodeConstant(br *bit.Reader) (samples []Sample, err error) {
 func (h *Header) DecodeFixed(br *bit.Reader, predOrder int) (samples []Sample, err error) {
 	// Unencoded warm-up samples:
 	//    n bits = frame's bits-per-sample * predictor order
-	for i := 0; i < predOrder; i++ {
+	samples = make([]Sample, predOrder)
+	for i := range samples {
 		bits, err := br.Read(uint(h.SampleSize))
 		if err != nil {
 			return nil, err
 		}
 		sample := Sample(bits)
 		dbg.Println("Fixed warm-up sample:", sample)
-		samples = append(samples, sample)
+		samples[i] = sample
 	}
 
 	residuals, err := h.DecodeResidual(br, predOrder)
@@ -241,14 +242,15 @@ func (h *Header) DecodeFixed(br *bit.Reader, predOrder int) (samples []Sample, e
 func (h *Header) DecodeLPC(br *bit.Reader, lpcOrder int) (samples []Sample, err error) {
 	// Unencoded warm-up samples:
 	//    n bits = frame's bits-per-sample * lpc order
-	for i := 0; i < lpcOrder; i++ {
+	samples = make([]Sample, lpcOrder)
+	for i := range samples {
 		bits, err := br.Read(uint(h.SampleSize))
 		if err != nil {
 			return nil, err
 		}
 		sample := Sample(bits)
 		dbg.Println("LPC warm-up sample:", sample)
-		samples = append(samples, sample)
+		samples[i] = sample
 	}
 
 	// (Quantized linear predictor coefficients' precision in bits) - 1.
@@ -270,18 +272,18 @@ func (h *Header) DecodeLPC(br *bit.Reader, lpcOrder int) (samples []Sample, err 
 	/// ### [ todo ] ###
 	///    - NOTE: this number is signed two's-complement.
 	///    - special case for negative numbers required?
-	///    - the same goes for qlpcPrec.
 	/// ### [/ todo ] ###
 	_ = qlpcShift
 
 	// Unencoded predictor coefficients.
-	for i := 0; i < lpcOrder; i++ {
+	pcs := make([]int, lpcOrder)
+	for i := range pcs {
 		pc, err := br.Read(uint(qlpcPrec))
 		if err != nil {
 			return nil, err
 		}
 		dbg.Println("pc:", pc)
-		_ = pc
+		pcs[i] = int(pc) /// ### todo ### is int the right type for pc?
 	}
 
 	residuals, err := h.DecodeResidual(br, lpcOrder)
@@ -301,14 +303,15 @@ func (h *Header) DecodeLPC(br *bit.Reader, lpcOrder int) (samples []Sample, err 
 // ref: http://flac.sourceforge.net/format.html#subframe_verbatim
 func (h *Header) DecodeVerbatim(br *bit.Reader) (samples []Sample, err error) {
 	// Read unencoded samples.
-	for i := uint16(0); i < h.SampleCount; i++ {
+	samples = make([]Sample, h.SampleCount)
+	for i := range samples {
 		bits, err := br.Read(uint(h.SampleSize))
 		if err != nil {
 			return nil, err
 		}
 		sample := Sample(bits)
 		dbg.Println("Verbatim sample:", sample)
-		samples = append(samples, sample)
+		samples[i] = sample
 	}
 
 	return samples, nil
@@ -356,24 +359,30 @@ func (h *Header) DecodeRice(br *bit.Reader, predOrder int) (residuals []int, err
 	partSampleCount := int(h.SampleCount) / partCount
 	for partNum := 0; partNum < partCount; partNum++ {
 		// Encoding parameter.
-		n, err := br.Read(4)
+		bits, err := br.Read(4)
 		if err != nil {
 			return nil, err
 		}
-		if n == 0x0F {
+		if bits == 0x0F {
 			// 1111: Escape code, meaning the partition is in unencoded binary form
 			// using n bits per sample; n follows as a 5-bit number.
 			/// ### [ todo ] ###
 			///    - not yet implemented.
 			/// ### [/ todo ] ###
-			return nil, errors.New("not yet implemented; rice encoding parameter escape code")
+			return nil, errors.New("Header.DecodeRice: not yet implemented; rice encoding parameter escape code")
 		}
-		riceParam := n
+		riceParam := bits
 		_ = riceParam
-
 		dbg.Println("riceParam:", riceParam)
 
 		// Encoded residual.
+		//    if the partition order is zero, n = frame's blocksize - predictor order
+		//    else if this is not the first partition of the subframe, n = (frame's blocksize / (2^partition order))
+		//    else n = (frame's blocksize / (2^partition order)) - predictor order
+		/// ### [ CONTINUE ] ###
+		///    - create a comment which maps blocksize to SampleCount? and so on.
+		///    - verify the above blue comment.
+		/// ### [/ CONTINUE ] ###
 		sampleCount := partSampleCount
 		if partNum == 0 {
 			sampleCount -= predOrder
@@ -385,7 +394,7 @@ func (h *Header) DecodeRice(br *bit.Reader, predOrder int) (residuals []int, err
 	/// ### [ todo ] ###
 	///    - not yet implemented.
 	/// ### [/ todo ] ###
-	return nil, errors.New("not yet implemented; rice coding method 0")
+	return nil, errors.New("Header.DecodeRice: not yet implemented; rice coding method 0")
 }
 
 // DecodeRice2 decodes and returns a slice of residuals. The residual coding
@@ -396,7 +405,7 @@ func (h *Header) DecodeRice2(br *bit.Reader, predOrder int) (residuals []int, er
 	/// ### [ todo ] ###
 	///    - not yet implemented.
 	/// ### [/ todo ] ###
-	return nil, errors.New("not yet implemented; rice coding method 1")
+	return nil, errors.New("Header.DecodeRice: not yet implemented; rice coding method 1")
 }
 
 /**

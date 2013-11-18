@@ -64,7 +64,6 @@ func NewFrame(r io.Reader) (frame *Frame, err error) {
 	br = bit.NewReader(hr)
 
 	// Frame footer.
-
 	// Verify the CRC-16.
 	got := h.Sum16()
 
