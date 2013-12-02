@@ -359,20 +359,22 @@ func (h *Header) DecodeRice(br *bit.Reader, predOrder int) (residuals []int, err
 	partSampleCount := int(h.SampleCount) / partCount
 	for partNum := 0; partNum < partCount; partNum++ {
 		// Encoding parameter.
-		bits, err := br.Read(4)
+		riceParam, err := br.Read(4)
 		if err != nil {
 			return nil, err
 		}
-		if bits == 0x0F {
+		if riceParam == 0x0F {
 			// 1111: Escape code, meaning the partition is in unencoded binary form
 			// using n bits per sample; n follows as a 5-bit number.
-			/// ### [ todo ] ###
-			///    - not yet implemented.
-			/// ### [/ todo ] ###
-			return nil, errors.New("Header.DecodeRice: not yet implemented; rice encoding parameter escape code")
+			n, err := br.Read(5)
+			if err != nil {
+				return nil, err
+			}
+			riceParam, err = br.Read(uint(n))
+			if err != nil {
+				return nil, err
+			}
 		}
-		riceParam := bits
-		_ = riceParam
 		dbg.Println("riceParam:", riceParam)
 
 		// Encoded residual.
@@ -384,7 +386,7 @@ func (h *Header) DecodeRice(br *bit.Reader, predOrder int) (residuals []int, err
 		///    - verify the above blue comment.
 		/// ### [/ CONTINUE ] ###
 		sampleCount := partSampleCount
-		if partNum == 0 {
+		if partOrder == 0 || partNum == 0 {
 			sampleCount -= predOrder
 		}
 
