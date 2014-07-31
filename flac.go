@@ -1,4 +1,4 @@
-// Package flac provides access to FLAC [1] (Free Lossless Audio Codec) files.
+// Package flac provides access to FLAC (Free Lossless Audio Codec) files. [1]
 //
 // The basic structure of a FLAC bitstream is:
 //    - The four byte string signature "fLaC".
@@ -77,14 +77,14 @@ func ParseStream(r io.ReadSeeker) (s *Stream, err error) {
 	return s, nil
 }
 
-// FlacSignature is present at the beginning of each FLAC file.
-const FlacSignature = "fLaC"
-
 // NewStream validates the FLAC signature of the provided io.ReadSeeker and
 // returns a handle to the FLAC bitstream. Call either Stream.Parse or
 // Stream.ParseBlocks and Stream.ParseFrames to parse the metadata blocks and
 // audio frames.
 func NewStream(r io.ReadSeeker) (s *Stream, err error) {
+	// signature is present at the beginning of each FLAC file.
+	const signature = "fLaC"
+
 	// Verify "fLaC" signature (size: 4 bytes).
 	buf := make([]byte, 4)
 	_, err = io.ReadFull(r, buf)
@@ -92,8 +92,8 @@ func NewStream(r io.ReadSeeker) (s *Stream, err error) {
 		return nil, err
 	}
 	sig := string(buf)
-	if sig != FlacSignature {
-		return nil, fmt.Errorf("flac.NewStream: invalid signature; expected %q, got %q", FlacSignature, sig)
+	if sig != signature {
+		return nil, fmt.Errorf("flac.NewStream: invalid signature; expected %q, got %q", signature, sig)
 	}
 
 	s = &Stream{r: r}
@@ -137,7 +137,7 @@ func (s *Stream) ParseBlocks(types meta.BlockType) (err error) {
 		// The first block type must be StreamInfo.
 		if isFirst {
 			if block.Header.BlockType != meta.TypeStreamInfo {
-				return fmt.Errorf("flac.NewStream: first block type is invalid; expected %d (StreamInfo), got %d", meta.TypeStreamInfo, block.Header.BlockType)
+				return fmt.Errorf("flac.Stream.ParseBlocks: first block type is invalid; expected %d (StreamInfo), got %d", meta.TypeStreamInfo, block.Header.BlockType)
 			}
 			isFirst = false
 		}
