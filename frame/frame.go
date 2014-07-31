@@ -57,9 +57,7 @@ func NewFrame(r io.Reader) (frame *Frame, err error) {
 	}
 
 	// Padding.
-	/// ### [ TODO ] ###
-	///    - verify paddings
-	/// ### [/ TODO ] ###
+	// TODO(u): Verify paddings.
 	// ignore bits up to byte boundery.
 	br = bit.NewReader(hr)
 

@@ -22,7 +22,7 @@ type Header struct {
 	HasVariableSampleCount bool
 	// Sample count is the number of samples in any of a block's subblocks.
 	SampleCount uint16
-	// Sample rate.
+	// Sample rate. Get from StreamInfo metadata block if set to 0.
 	SampleRate uint32
 	// Channel order specifies the order in which channels are stored in the
 	// frame.
@@ -68,23 +68,25 @@ const (
 	ChannelMidSide                        // mid/side stereo:   mid (average), side (difference)
 )
 
+// channelCount maps from a channel assignment to its number of channels.
+var channelCount = map[ChannelOrder]int{
+	ChannelMono:       1,
+	ChannelLR:         2,
+	ChannelLRC:        3,
+	ChannelLRLsRs:     4,
+	ChannelLRCLsRs:    5,
+	ChannelLRCLfeLsRs: 6,
+	Channel7:          7,
+	Channel8:          8,
+	ChannelLSide:      2,
+	ChannelSideR:      2,
+	ChannelMidSide:    2,
+}
+
 // ChannelCount returns the number of channels used by the provided channel
 // order.
 func (order ChannelOrder) ChannelCount() int {
-	var m = map[ChannelOrder]int{
-		ChannelMono:       1,
-		ChannelLR:         2,
-		ChannelLRC:        3,
-		ChannelLRLsRs:     4,
-		ChannelLRCLsRs:    5,
-		ChannelLRCLfeLsRs: 6,
-		Channel7:          7,
-		Channel8:          8,
-		ChannelLSide:      2,
-		ChannelSideR:      2,
-		ChannelMidSide:    2,
-	}
-	return m[order]
+	return channelCount[order]
 }
 
 // NewHeader parses and returns a new frame header.
@@ -224,10 +226,8 @@ func NewHeader(r io.Reader) (hdr *Header, err error) {
 	switch n {
 	case 0:
 		// 000: get from STREAMINFO metadata block.
-		/// ### [ todo ] ###
-		///    - Should we try to read StreamInfo from here? We won't always have
-		///      access to it.
-		/// ### [/ todo ] ###
+		// TODO(u): Should we try to read StreamInfo from here? We won't always
+		// have access to it.
 		log.Println(fmt.Errorf("not yet implemented; sample size spec: %d", n))
 	case 1:
 		// 001: 8 bits per sample.
@@ -344,9 +344,7 @@ func NewHeader(r io.Reader) (hdr *Header, err error) {
 	switch n {
 	case 0:
 		// 0000: get from STREAMINFO metadata block.
-		/// ### [ todo ] ###
-		///    - add flag to get from StreamInfo?
-		/// ### [/ todo ] ###
+		// TODO(u): Add flag to get from StreamInfo?
 		log.Println(fmt.Errorf("not yet implemented; sample rate: %d", n))
 	case 1:
 		//0001: 88.2kHz.

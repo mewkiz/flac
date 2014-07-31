@@ -55,7 +55,7 @@ func (h *Header) NewSubFrame(br *bit.Reader) (subframe *SubFrame, err error) {
 	case PredVerbatim:
 		subframe.Samples, err = h.DecodeVerbatim(br)
 	default:
-		return nil, fmt.Errorf("Header.NewSubFrame: unknown subframe prediction method: %d", sh.PredMethod)
+		return nil, fmt.Errorf("frame.Header.NewSubFrame: unknown subframe prediction method: %d", sh.PredMethod)
 	}
 	if err != nil {
 		return nil, err
@@ -112,7 +112,7 @@ func (h *Header) NewSubHeader(br *bit.Reader) (sh *SubHeader, err error) {
 	// Padding.
 	// field 0: padding (1 bit)
 	if fields[0] != 0 {
-		return nil, errors.New("Header.NewSubHeader: invalid padding; must be 0")
+		return nil, errors.New("frame.Header.NewSubHeader: invalid padding; must be 0")
 	}
 
 	// Subframe prediction method.
@@ -136,18 +136,18 @@ func (h *Header) NewSubHeader(br *bit.Reader) (sh *SubHeader, err error) {
 	case n < 8:
 		// 00001x: reserved
 		// 0001xx: reserved
-		return nil, fmt.Errorf("Header.NewSubHeader: invalid subframe prediction method; reserved bit pattern: %06b", n)
+		return nil, fmt.Errorf("frame.Header.NewSubHeader: invalid subframe prediction method; reserved bit pattern: %06b", n)
 	case n < 16:
 		// 001xxx: if(xxx <= 4) SUBFRAME_FIXED, xxx=order ; else reserved
 		const predOrderMask = 0x07
 		sh.PredOrder = int8(n) & predOrderMask
 		if sh.PredOrder > 4 {
-			return nil, fmt.Errorf("Header.NewSubHeader: invalid subframe prediction method; reserved bit pattern: %06b", n)
+			return nil, fmt.Errorf("frame.Header.NewSubHeader: invalid subframe prediction method; reserved bit pattern: %06b", n)
 		}
 		sh.PredMethod = PredFixed
 	case n < 32:
 		// 01xxxx: reserved
-		return nil, fmt.Errorf("Header.NewSubHeader: invalid subframe prediction method; reserved bit pattern: %06b", n)
+		return nil, fmt.Errorf("frame.Header.NewSubHeader: invalid subframe prediction method; reserved bit pattern: %06b", n)
 	case n < 64:
 		// 1xxxxx: SUBFRAME_LPC, xxxxx=order-1
 		const predOrderMask = 0x1F
@@ -155,7 +155,7 @@ func (h *Header) NewSubHeader(br *bit.Reader) (sh *SubHeader, err error) {
 		sh.PredMethod = PredLPC
 	default:
 		// should be unreachable.
-		panic(fmt.Errorf("Header.NewSubHeader: unhandled subframe prediction method; bit pattern: %06b", n))
+		panic(fmt.Errorf("frame.Header.NewSubHeader: unhandled subframe prediction method; bit pattern: %06b", n))
 	}
 
 	// Wasted bits-per-sample, 1+k bits.
@@ -166,9 +166,7 @@ func (h *Header) NewSubHeader(br *bit.Reader) (sh *SubHeader, err error) {
 	if hasWastedBits != 0 {
 		// k wasted bits-per-sample in source subblock, k-1 follows, unary coded;
 		// e.g. k=3 => 001 follows, k=7 => 0000001 follows.
-		/// ### [ todo ] ###
-		///    - verify.
-		/// ### [/ todo ] ###
+		// TODO(u): Verify that the unary decoding is correct.
 		n, err := bitutil.DecodeUnary(br)
 		if err != nil {
 			return nil, err
@@ -203,9 +201,8 @@ func (h *Header) DecodeConstant(br *bit.Reader) (samples []Sample, err error) {
 }
 
 // DecodeFixed decodes and returns a slice of samples.
-/// ### [ todo ] ###
-///    - add more details.
-/// ### [/ todo ] ###
+//
+// TODO(u): Add more detailed documentation.
 //
 // ref: http://flac.sourceforge.net/format.html#subframe_fixed
 func (h *Header) DecodeFixed(br *bit.Reader, predOrder int) (samples []Sample, err error) {
@@ -227,16 +224,13 @@ func (h *Header) DecodeFixed(br *bit.Reader, predOrder int) (samples []Sample, e
 		return nil, err
 	}
 	_ = residuals
-	/// ### [ todo ] ###
-	///    - not yet implemented.
-	/// ### [/ todo ] ###
+	// TODO(u): not yet implemented.
 	return nil, errors.New("not yet implemented; Fixed encoding")
 }
 
 // DecodeLPC decodes and returns a slice of samples.
-/// ### [ todo ] ###
-///    - add more details.
-/// ### [/ todo ] ###
+//
+// TODO(u): Add more detailed documentation.
 //
 // ref: http://flac.sourceforge.net/format.html#subframe_lpc
 func (h *Header) DecodeLPC(br *bit.Reader, lpcOrder int) (samples []Sample, err error) {
@@ -260,7 +254,7 @@ func (h *Header) DecodeLPC(br *bit.Reader, lpcOrder int) (samples []Sample, err 
 	}
 	if n == 0x0F {
 		// 1111: invalid.
-		return nil, errors.New("Header.DecodeLPC: invalid quantized lpc precision; reserved bit pattern: 1111")
+		return nil, errors.New("frame.Header.DecodeLPC: invalid quantized lpc precision; reserved bit pattern: 1111")
 	}
 	qlpcPrec := int(n) + 1
 
@@ -269,10 +263,8 @@ func (h *Header) DecodeLPC(br *bit.Reader, lpcOrder int) (samples []Sample, err 
 	if err != nil {
 		return nil, err
 	}
-	/// ### [ todo ] ###
-	///    - NOTE: this number is signed two's-complement.
-	///    - special case for negative numbers required?
-	/// ### [/ todo ] ###
+	// TODO(u): Check; special case for negative numbers required? This number is
+	// signed two's-complement.
 	_ = qlpcShift
 
 	// Unencoded predictor coefficients.
@@ -283,7 +275,7 @@ func (h *Header) DecodeLPC(br *bit.Reader, lpcOrder int) (samples []Sample, err 
 			return nil, err
 		}
 		dbg.Println("pc:", pc)
-		pcs[i] = int(pc) /// ### todo ### is int the right type for pc?
+		pcs[i] = int(pc) // TODO(u): Check; is int the right type for pc?
 	}
 
 	residuals, err := h.DecodeResidual(br, lpcOrder)
@@ -291,9 +283,7 @@ func (h *Header) DecodeLPC(br *bit.Reader, lpcOrder int) (samples []Sample, err 
 		return nil, err
 	}
 	_ = residuals
-	/// ### [ todo ] ###
-	///    - not yet implemented.
-	/// ### [/ todo ] ###
+	// TODO(u): not yet implemented.
 	return nil, errors.New("not yet implemented; LPC encoding")
 }
 
@@ -318,9 +308,8 @@ func (h *Header) DecodeVerbatim(br *bit.Reader) (samples []Sample, err error) {
 }
 
 // DecodeResidual decodes and returns a slice of residuals.
-/// ### [ todo ] ###
-///    - add more details.
-/// ### [/ todo ] ###
+//
+// TODO(u): Add more detailed documentation.
 //
 // ref: http://flac.sourceforge.net/format.html#residual
 func (h *Header) DecodeResidual(br *bit.Reader, predOrder int) (residuals []int, err error) {
@@ -340,7 +329,7 @@ func (h *Header) DecodeResidual(br *bit.Reader, predOrder int) (residuals []int,
 		return h.DecodeRice2(br, predOrder)
 	}
 	// 1x: reserved
-	return nil, fmt.Errorf("Header.DecodeResidual: invalid residual coding method; reserved bit pattern: %02b", method)
+	return nil, fmt.Errorf("frame.Header.DecodeResidual: invalid residual coding method; reserved bit pattern: %02b", method)
 }
 
 // DecodeRice decodes and returns a slice of residuals. The residual coding
@@ -381,10 +370,9 @@ func (h *Header) DecodeRice(br *bit.Reader, predOrder int) (residuals []int, err
 		//    if the partition order is zero, n = frame's blocksize - predictor order
 		//    else if this is not the first partition of the subframe, n = (frame's blocksize / (2^partition order))
 		//    else n = (frame's blocksize / (2^partition order)) - predictor order
-		/// ### [ CONTINUE ] ###
-		///    - create a comment which maps blocksize to SampleCount? and so on.
-		///    - verify the above blue comment.
-		/// ### [/ CONTINUE ] ###
+		// TODO(u): Continue here;
+		//    - verify the above comment.
+		//    - create a comment which maps blocksize to SampleCount? and so on.
 		sampleCount := partSampleCount
 		if partOrder == 0 || partNum == 0 {
 			sampleCount -= predOrder
@@ -393,10 +381,8 @@ func (h *Header) DecodeRice(br *bit.Reader, predOrder int) (residuals []int, err
 		dbg.Println("sampleCount:", sampleCount)
 	}
 
-	/// ### [ todo ] ###
-	///    - not yet implemented.
-	/// ### [/ todo ] ###
-	return nil, errors.New("Header.DecodeRice: not yet implemented; rice coding method 0")
+	// TODO(u): not yet implemented.
+	return nil, errors.New("frame.Header.DecodeRice: not yet implemented; rice coding method 0")
 }
 
 // DecodeRice2 decodes and returns a slice of residuals. The residual coding
@@ -404,30 +390,6 @@ func (h *Header) DecodeRice(br *bit.Reader, predOrder int) (residuals []int, err
 //
 // ref: http://flac.sourceforge.net/format.html#partitioned_rice2
 func (h *Header) DecodeRice2(br *bit.Reader, predOrder int) (residuals []int, err error) {
-	/// ### [ todo ] ###
-	///    - not yet implemented.
-	/// ### [/ todo ] ###
-	return nil, errors.New("Header.DecodeRice: not yet implemented; rice coding method 1")
+	// TODO(u): not yet implemented.
+	return nil, errors.New("frame.Header.DecodeRice: not yet implemented; rice coding method 1")
 }
-
-/**
-type SubFrameLpc struct {
-	Precision             uint8
-	ShiftNeeded           uint8
-	PredictorCoefficients []byte
-}
-
-type Rice struct {
-	Partitions     []RicePartition
-}
-
-type Rice2 struct {
-	Partitions     []Rice2Partition
-}
-
-type RicePartition struct {
-	EncodingParameter uint16
-}
-
-type Rice2Partition struct{}
-*/
