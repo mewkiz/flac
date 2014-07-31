@@ -211,6 +211,23 @@ func signExtend(x uint64, n uint) int32 {
 	return int32(x)
 }
 
+// fixedCoeffs maps from prediction order to the LPC coefficients used in fixed
+// encoding.
+//
+//    x_0[n] = 0
+//    x_1[n] = x[n-1]
+//    x_2[n] = 2*x[n-1] - x[n-2]
+//    x_3[n] = 3*x[n-1] - 3*x[n-2] + x[n-3]
+//
+// ref: Section 2.2 of http://www.hpl.hp.com/techreports/1999/HPL-1999-144.pdf
+var fixedCoeffs = [...][]int32{
+	1: {1},
+	2: {2, -1},
+	3: {3, -3, 1},
+	// TODO(u): Verify the definition of the coefficients for prediction order 4.
+	4: {4, -6, 4, -1},
+}
+
 // DecodeFixed decodes and returns a slice of samples.
 //
 // TODO(u): Add more detailed documentation.
@@ -219,15 +236,16 @@ func signExtend(x uint64, n uint) int32 {
 func (h *Header) DecodeFixed(br *bit.Reader, predOrder int) (samples []Sample, err error) {
 	// Unencoded warm-up samples:
 	//    n bits = frame's bits-per-sample * predictor order
-	samples = make([]Sample, predOrder)
-	for i := range samples {
+	warm := make([]Sample, predOrder)
+	dbg.Println("Fixed prediction order:", predOrder)
+	for i := range warm {
 		x, err := br.Read(uint(h.BitsPerSample))
 		if err != nil {
 			return nil, err
 		}
 		sample := Sample(signExtend(x, uint(h.BitsPerSample)))
 		dbg.Println("Fixed warm-up sample:", sample)
-		samples[i] = sample
+		warm[i] = sample
 	}
 
 	residuals, err := h.DecodeResidual(br, predOrder)
@@ -235,8 +253,24 @@ func (h *Header) DecodeFixed(br *bit.Reader, predOrder int) (samples []Sample, e
 		return nil, err
 	}
 	dbg.Println("residuals:", residuals)
-	// TODO(u): not yet implemented.
-	return nil, errors.New("not yet implemented; Fixed encoding")
+	return lpcDecode(fixedCoeffs[predOrder], warm, residuals), nil
+}
+
+// lpcDecode decodes a set of samples using LPC (Linear Predictive Coding) with
+// FIR (Finite Impulse Response) predictors.
+func lpcDecode(coeffs []int32, warm []Sample, residuals []int32) (samples []Sample) {
+	samples = make([]Sample, len(warm)+len(residuals))
+	copy(samples, warm)
+	// Note: The following code is borrowed from https://github.com/eaburns/flac/blob/master/decode.go#L751
+	for i := len(warm); i < len(samples); i++ {
+		var sum int32
+		for j, coeff := range coeffs {
+			sum += coeff * int32(samples[i-j-1])
+			samples[i] = Sample(residuals[i-len(warm)] + sum)
+		}
+	}
+	dbg.Println("samples:", samples)
+	return samples
 }
 
 // DecodeLPC decodes and returns a slice of samples.
