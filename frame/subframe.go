@@ -21,7 +21,7 @@ type SubFrame struct {
 
 // A Sample is an audio sample. The size of each sample is between 4 and 32
 // bits.
-type Sample uint32
+type Sample int32
 
 // NewSubFrame parses and returns a new subframe, which consists of a subframe
 // header and encoded audio samples.
@@ -184,11 +184,11 @@ func (h *Header) NewSubHeader(br *bit.Reader) (sh *SubHeader, err error) {
 // ref: http://flac.sourceforge.net/format.html#subframe_constant
 func (h *Header) DecodeConstant(br *bit.Reader) (samples []Sample, err error) {
 	// Read constant sample.
-	bits, err := br.Read(uint(h.SampleSize))
+	x, err := br.Read(uint(h.BitsPerSample))
 	if err != nil {
 		return nil, err
 	}
-	sample := Sample(bits)
+	sample := Sample(signExtend(x, uint(h.BitsPerSample)))
 	dbg.Println("Constant sample:", sample)
 
 	// Duplicate the constant sample, sample count number of times.
@@ -198,6 +198,17 @@ func (h *Header) DecodeConstant(br *bit.Reader) (samples []Sample, err error) {
 	}
 
 	return samples, nil
+}
+
+// signExtend interprets x as a signed n-bit integer value and sign extends it
+// to 32 bits.
+func signExtend(x uint64, n uint) int32 {
+	// x is signed if its most significant bit is set.
+	if x&(1<<(n-1)) != 0 {
+		// Sign extend x.
+		return int32(x | ^uint64(0)<<n)
+	}
+	return int32(x)
 }
 
 // DecodeFixed decodes and returns a slice of samples.
@@ -210,11 +221,11 @@ func (h *Header) DecodeFixed(br *bit.Reader, predOrder int) (samples []Sample, e
 	//    n bits = frame's bits-per-sample * predictor order
 	samples = make([]Sample, predOrder)
 	for i := range samples {
-		bits, err := br.Read(uint(h.SampleSize))
+		x, err := br.Read(uint(h.BitsPerSample))
 		if err != nil {
 			return nil, err
 		}
-		sample := Sample(bits)
+		sample := Sample(signExtend(x, uint(h.BitsPerSample)))
 		dbg.Println("Fixed warm-up sample:", sample)
 		samples[i] = sample
 	}
@@ -238,11 +249,11 @@ func (h *Header) DecodeLPC(br *bit.Reader, lpcOrder int) (samples []Sample, err 
 	//    n bits = frame's bits-per-sample * lpc order
 	samples = make([]Sample, lpcOrder)
 	for i := range samples {
-		bits, err := br.Read(uint(h.SampleSize))
+		x, err := br.Read(uint(h.BitsPerSample))
 		if err != nil {
 			return nil, err
 		}
-		sample := Sample(bits)
+		sample := Sample(signExtend(x, uint(h.BitsPerSample)))
 		dbg.Println("LPC warm-up sample:", sample)
 		samples[i] = sample
 	}
@@ -252,7 +263,7 @@ func (h *Header) DecodeLPC(br *bit.Reader, lpcOrder int) (samples []Sample, err 
 	if err != nil {
 		return nil, err
 	}
-	if n == 0x0F {
+	if n == 0xF {
 		// 1111: invalid.
 		return nil, errors.New("frame.Header.DecodeLPC: invalid quantized lpc precision; reserved bit pattern: 1111")
 	}
@@ -295,11 +306,11 @@ func (h *Header) DecodeVerbatim(br *bit.Reader) (samples []Sample, err error) {
 	// Read unencoded samples.
 	samples = make([]Sample, h.SampleCount)
 	for i := range samples {
-		bits, err := br.Read(uint(h.SampleSize))
+		x, err := br.Read(uint(h.BitsPerSample))
 		if err != nil {
 			return nil, err
 		}
-		sample := Sample(bits)
+		sample := Sample(signExtend(x, uint(h.BitsPerSample)))
 		dbg.Println("Verbatim sample:", sample)
 		samples[i] = sample
 	}
@@ -360,6 +371,8 @@ func (h *Header) DecodeRice(br *bit.Reader, predOrder int) (residuals []int32, e
 			if err != nil {
 				return nil, err
 			}
+			// TODO(u): Check; the loop below is a best effort attempt at
+			// understanding the spec, it may very well be inaccurate.
 			for i := 0; i < partSampleCount; i++ {
 				sample, err := br.Read(uint(n))
 				if err != nil {
@@ -397,23 +410,27 @@ func (h *Header) DecodeRice(br *bit.Reader, predOrder int) (residuals []int32, e
 
 // riceDecode decodes the residual signals of a partition encoded using Rice
 // coding.
+//
+// ref: Section 1.1.3 of http://www.hpl.hp.com/techreports/1999/HPL-1999-144.pdf
 func riceDecode(br *bit.Reader, m uint, n int) (residuals []int32, err error) {
 	residuals = make([]int32, n)
 	for i := 0; i < n; i++ {
-		q, err := bitutil.DecodeUnary(br)
+		sign, err := br.Read(1)
 		if err != nil {
 			return nil, err
 		}
-		u, err := br.Read(m)
+		low, err := br.Read(m)
 		if err != nil {
 			return nil, err
 		}
-		// TODO(u): Make use of bitutil to perform truncated binary decoding.
-		//    r, err := bitutil.DecodeTruncatedBinary(br, k, u)
-		// NOTE: The following piece of code is borrowed from:
-		//    https://github.com/eaburns/flac/blob/master/decode.go#L838
-		u |= (uint64(q) << uint64(m))
-		residual := int32(u>>1) ^ -int32(u&1)
+		high, err := bitutil.DecodeUnary(br)
+		if err != nil {
+			return nil, err
+		}
+		var residual int32 = int32(high<<m | uint(low))
+		if sign == 1 {
+			residual *= -1
+		}
 		residuals = append(residuals, residual)
 	}
 	return residuals, nil

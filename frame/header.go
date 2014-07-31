@@ -27,9 +27,9 @@ type Header struct {
 	// Channel order specifies the order in which channels are stored in the
 	// frame.
 	ChannelOrder ChannelOrder
-	// Sample size in bits, i.e. bits-per-sample. Get from StreamInfo metadata
-	// block if set to 0.
-	SampleSize uint8
+	// Sample size in bits-per-sample. Get from StreamInfo metadata block if set
+	// to 0.
+	BitsPerSample uint8
 	// Sample number is the frame's starting sample number, used by
 	// variable-sample count streams.
 	SampleNum uint64
@@ -231,23 +231,23 @@ func NewHeader(r io.Reader) (hdr *Header, err error) {
 		log.Println(fmt.Errorf("not yet implemented; sample size spec: %d", n))
 	case 1:
 		// 001: 8 bits per sample.
-		hdr.SampleSize = 8
+		hdr.BitsPerSample = 8
 	case 2:
 		// 010: 12 bits per sample.
-		hdr.SampleSize = 12
+		hdr.BitsPerSample = 12
 	case 3, 7:
 		// 011: reserved.
 		// 111: reserved.
 		return nil, fmt.Errorf("frame.NewHeader: invalid sample size; reserved bit pattern: %03b", n)
 	case 4:
 		// 100: 16 bits per sample.
-		hdr.SampleSize = 16
+		hdr.BitsPerSample = 16
 	case 5:
 		// 101: 20 bits per sample.
-		hdr.SampleSize = 20
+		hdr.BitsPerSample = 20
 	case 6:
 		// 110: 24 bits per sample.
-		hdr.SampleSize = 24
+		hdr.BitsPerSample = 24
 	default:
 		// should be unreachable.
 		panic(fmt.Errorf("frame.NewHeader: unhandled sample size bit pattern: %03b", n))
