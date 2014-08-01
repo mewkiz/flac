@@ -1,3 +1,5 @@
+// TODO(u): Get rid of all panics :)
+
 package frame
 
 import (
@@ -173,6 +175,7 @@ func (h *Header) NewSubHeader(br *bit.Reader) (sh *SubHeader, err error) {
 		}
 		sh.WastedBitCount = int8(n)
 		dbg.Println("wasted bits-per-sample:", sh.WastedBitCount)
+		panic("not yet implemented; wasted bits")
 	}
 
 	return sh, nil
@@ -254,12 +257,12 @@ func (h *Header) DecodeFixed(br *bit.Reader, predOrder int) (samples []Sample, e
 	}
 	dbg.Println("residuals:", residuals)
 	dbg.Println("coeff:", fixedCoeffs[predOrder])
-	return lpcDecode(fixedCoeffs[predOrder], warm, residuals), nil
+	return lpcDecode(fixedCoeffs[predOrder], warm, residuals, 0), nil
 }
 
 // lpcDecode decodes a set of samples using LPC (Linear Predictive Coding) with
 // FIR (Finite Impulse Response) predictors.
-func lpcDecode(coeffs []int32, warm []Sample, residuals []int32) (samples []Sample) {
+func lpcDecode(coeffs []int32, warm []Sample, residuals []int32, shift uint) (samples []Sample) {
 	samples = make([]Sample, len(warm)+len(residuals))
 	copy(samples, warm)
 	// Note: The following code is borrowed from https://github.com/eaburns/flac/blob/master/decode.go#L751
@@ -267,7 +270,7 @@ func lpcDecode(coeffs []int32, warm []Sample, residuals []int32) (samples []Samp
 		var sum int32
 		for j, coeff := range coeffs {
 			sum += coeff * int32(samples[i-j-1])
-			samples[i] = Sample(residuals[i-len(warm)] + sum)
+			samples[i] = Sample(residuals[i-len(warm)] + sum>>shift)
 		}
 	}
 	dbg.Println("samples:", samples)
@@ -280,18 +283,20 @@ func lpcDecode(coeffs []int32, warm []Sample, residuals []int32) (samples []Samp
 //
 // ref: http://flac.sourceforge.net/format.html#subframe_lpc
 func (h *Header) DecodeLPC(br *bit.Reader, lpcOrder int) (samples []Sample, err error) {
+	dbg.Println("lpcOrder:", lpcOrder)
 	// Unencoded warm-up samples:
 	//    n bits = frame's bits-per-sample * lpc order
-	samples = make([]Sample, lpcOrder)
-	for i := range samples {
+	warm := make([]Sample, lpcOrder)
+	for i := range warm {
 		x, err := br.Read(uint(h.BitsPerSample))
 		if err != nil {
 			return nil, err
 		}
 		sample := Sample(signExtend(x, uint(h.BitsPerSample)))
 		dbg.Println("LPC warm-up sample:", sample)
-		samples[i] = sample
+		warm[i] = sample
 	}
+	dbg.Println("warm:", warm)
 
 	// (Quantized linear predictor coefficients' precision in bits) - 1.
 	n, err := br.Read(4)
@@ -303,34 +308,40 @@ func (h *Header) DecodeLPC(br *bit.Reader, lpcOrder int) (samples []Sample, err 
 		return nil, errors.New("frame.Header.DecodeLPC: invalid quantized lpc precision; reserved bit pattern: 1111")
 	}
 	qlpcPrec := int(n) + 1
+	dbg.Println("qlpcPrec:", qlpcPrec)
 
 	// Quantized linear predictor coefficient shift needed in bits.
-	qlpcShift, err := br.Read(5)
+	x, err := br.Read(5)
 	if err != nil {
 		return nil, err
 	}
-	// TODO(u): Check; special case for negative numbers required? This number is
-	// signed two's-complement.
-	_ = qlpcShift
+	qlpcShift := signExtend(x, 5)
+	if qlpcShift < 0 {
+		panic("qlpcShift is negative")
+	}
+	dbg.Println("qlpcShift:", qlpcShift)
 
 	// Unencoded predictor coefficients.
-	pcs := make([]int, lpcOrder)
-	for i := range pcs {
-		pc, err := br.Read(uint(qlpcPrec))
+	coeffs := make([]int32, lpcOrder)
+	for i := range coeffs {
+		x, err := br.Read(uint(qlpcPrec))
 		if err != nil {
 			return nil, err
 		}
-		dbg.Println("pc:", pc)
-		pcs[i] = int(pc) // TODO(u): Check; is int the right type for pc?
+		coeff := int32(signExtend(x, uint(qlpcPrec)))
+		dbg.Println("coeff:", coeff)
+		coeffs[i] = coeff
 	}
+	dbg.Println("coeffs:", coeffs)
 
 	residuals, err := h.DecodeResidual(br, lpcOrder)
 	if err != nil {
 		return nil, err
 	}
 	_ = residuals
-	// TODO(u): not yet implemented.
-	return nil, errors.New("not yet implemented; LPC encoding")
+	dbg.Println("residuals:", residuals)
+
+	return lpcDecode(coeffs, warm, residuals, uint(qlpcShift)), nil
 }
 
 // DecodeVerbatim decodes and returns a slice of samples. The samples are stored
@@ -406,6 +417,7 @@ func (h *Header) DecodeRice(br *bit.Reader, predOrder int) (residuals []int32, e
 			if err != nil {
 				return nil, err
 			}
+			panic("not yet implemented: unencoded samples.")
 			// TODO(u): Check; the loop below is a best effort attempt at
 			// understanding the spec, it may very well be inaccurate.
 			for i := 0; i < partSampleCount; i++ {
@@ -416,7 +428,6 @@ func (h *Header) DecodeRice(br *bit.Reader, predOrder int) (residuals []int32, e
 				// TODO(u): Figure out if we should change to API to return the
 				// unencoded samples.
 				dbg.Println("sample:", sample)
-				panic("not yet implemented: unencoded samples.")
 			}
 		}
 		dbg.Println("riceParam:", riceParam)
@@ -429,7 +440,6 @@ func (h *Header) DecodeRice(br *bit.Reader, predOrder int) (residuals []int32, e
 		} else {
 			partSampleCount = int(h.SampleCount)/int(math.Pow(2, float64(partOrder))) - predOrder
 		}
-		// TODO(u): Continue here.
 		dbg.Println("partSampleCount:", partSampleCount)
 
 		// Decode rice partition residuals.
@@ -462,7 +472,7 @@ func riceDecode(br *bit.Reader, k uint, n int) (residuals []int32, err error) {
 		residual := int32(high<<k | low)
 
 		// ZigZag decode.
-		residual = residual>>1 ^ -(residual & 1)
+		residual = int32(bitutil.DecodeZigZag(int(residual)))
 
 		residuals[i] = residual
 	}
