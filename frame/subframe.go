@@ -445,15 +445,16 @@ func (h *Header) DecodeRice(br *bit.Reader, predOrder int) (residuals []int32, e
 
 // riceDecode decodes the residual signals of a partition encoded using Rice
 // coding.
-//
-// ref: Section 1.1.3 of http://www.hpl.hp.com/techreports/1999/HPL-1999-144.pdf
 func riceDecode(br *bit.Reader, k uint, n int) (residuals []int32, err error) {
 	residuals = make([]int32, n)
 	for i := 0; i < n; i++ {
+		// Read unary encoded most significant bits.
 		high, err := bitutil.DecodeUnary(br)
 		if err != nil {
 			return nil, err
 		}
+
+		// Read binary encoded least significant bits.
 		low, err := br.Read(k)
 		if err != nil {
 			return nil, err
