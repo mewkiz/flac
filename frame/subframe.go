@@ -253,6 +253,7 @@ func (h *Header) DecodeFixed(br *bit.Reader, predOrder int) (samples []Sample, e
 		return nil, err
 	}
 	dbg.Println("residuals:", residuals)
+	dbg.Println("coeff:", fixedCoeffs[predOrder])
 	return lpcDecode(fixedCoeffs[predOrder], warm, residuals), nil
 }
 
@@ -446,26 +447,23 @@ func (h *Header) DecodeRice(br *bit.Reader, predOrder int) (residuals []int32, e
 // coding.
 //
 // ref: Section 1.1.3 of http://www.hpl.hp.com/techreports/1999/HPL-1999-144.pdf
-func riceDecode(br *bit.Reader, m uint, n int) (residuals []int32, err error) {
+func riceDecode(br *bit.Reader, k uint, n int) (residuals []int32, err error) {
 	residuals = make([]int32, n)
 	for i := 0; i < n; i++ {
-		sign, err := br.Read(1)
-		if err != nil {
-			return nil, err
-		}
-		low, err := br.Read(m)
-		if err != nil {
-			return nil, err
-		}
 		high, err := bitutil.DecodeUnary(br)
 		if err != nil {
 			return nil, err
 		}
-		var residual int32 = int32(high<<m | uint(low))
-		if sign == 1 {
-			residual *= -1
+		low, err := br.Read(k)
+		if err != nil {
+			return nil, err
 		}
-		residuals = append(residuals, residual)
+		residual := int32(high<<k | low)
+
+		// ZigZag decode.
+		residual = residual>>1 ^ -(residual & 1)
+
+		residuals[i] = residual
 	}
 	return residuals, nil
 }
