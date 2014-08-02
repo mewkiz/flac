@@ -5,12 +5,16 @@ package frame
 import (
 	"errors"
 	"fmt"
-	dbg "fmt"
 	"math"
 
 	"github.com/eaburns/bit"
 	"github.com/mewkiz/pkg/bitutil"
+	"github.com/mewkiz/pkg/dbg"
 )
+
+func init() {
+	dbg.Debug = false
+}
 
 // A SubFrame contains the decoded audio data of a channel.
 type SubFrame struct {
@@ -286,7 +290,7 @@ func (h *Header) DecodeLPC(br *bit.Reader, lpcOrder int, bps uint) (samples []Sa
 	dbg.Println("lpcOrder:", lpcOrder)
 	// Unencoded warm-up samples:
 	//    n bits = frame's bits-per-sample * lpc order
-	fmt.Println("bps:", bps)
+	dbg.Println("bps:", bps)
 	warm := make([]Sample, lpcOrder)
 	for i := range warm {
 		x, err := br.Read(bps)

@@ -3,11 +3,24 @@ package main
 import (
 	"flag"
 	"log"
+	"os"
+	"runtime/pprof"
 
 	"github.com/mewkiz/flac"
 )
 
 func main() {
+	f, err := os.Create("flac-frame.pprof")
+	if err != nil {
+		log.Println(err)
+	}
+	defer f.Close()
+	err = pprof.StartCPUProfile(f)
+	if err != nil {
+		log.Println(err)
+	}
+	defer pprof.StopCPUProfile()
+
 	flag.Parse()
 	for _, filePath := range flag.Args() {
 		err := flacFrame(filePath)
@@ -18,9 +31,18 @@ func main() {
 }
 
 func flacFrame(filePath string) (err error) {
-	_, err = flac.Parse(filePath)
+	s, err := flac.Open(filePath)
 	if err != nil {
 		return err
 	}
+	err = s.ParseBlocks(0)
+	if err != nil {
+		return err
+	}
+	err = s.ParseFrames()
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
