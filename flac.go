@@ -25,7 +25,7 @@ type Stream struct {
 	// Audio frames.
 	Frames []*frame.Frame
 	// The underlying reader of the stream.
-	r io.ReadSeeker
+	r io.Reader
 }
 
 // Parse reads the provided file and returns a parsed FLAC bitstream. It parses
@@ -62,10 +62,10 @@ func (s *Stream) Close() error {
 	return nil
 }
 
-// ParseStream reads from the provided io.ReadSeeker and returns a parsed FLAC
+// ParseStream reads from the provided io.Reader and returns a parsed FLAC
 // bitstream. It parses all metadata blocks and all audio frames.  Use NewStream
 // instead for more granularity.
-func ParseStream(r io.ReadSeeker) (s *Stream, err error) {
+func ParseStream(r io.Reader) (s *Stream, err error) {
 	s, err = NewStream(r)
 	if err != nil {
 		return nil, err
@@ -77,11 +77,11 @@ func ParseStream(r io.ReadSeeker) (s *Stream, err error) {
 	return s, nil
 }
 
-// NewStream validates the FLAC signature of the provided io.ReadSeeker and
-// returns a handle to the FLAC bitstream. Call either Stream.Parse or
+// NewStream validates the FLAC signature of the provided io.Reader and returns
+// a handle to the FLAC bitstream. Call either Stream.Parse or
 // Stream.ParseBlocks and Stream.ParseFrames to parse the metadata blocks and
 // audio frames.
-func NewStream(r io.ReadSeeker) (s *Stream, err error) {
+func NewStream(r io.Reader) (s *Stream, err error) {
 	// signature is present at the beginning of each FLAC file.
 	const signature = "fLaC"
 

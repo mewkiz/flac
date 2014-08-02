@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"os"
 
 	"github.com/eaburns/bit"
@@ -13,17 +14,17 @@ import (
 // A Block is a metadata block, consisting of a block header and a block body.
 type Block struct {
 	// The underlying reader of the block.
-	r io.ReadSeeker
+	r io.Reader
 	// Metadata block header.
 	Header *BlockHeader
 	// Metadata block body: *StreamInfo, *Application, *SeekTable, etc.
 	Body interface{}
 }
 
-// ParseBlock reads from the provided io.ReadSeeker and returns a parsed
-// metadata block. It parses both the header and the body of the metadata block.
-// Use NewBlock instead for more granularity.
-func ParseBlock(r io.ReadSeeker) (block *Block, err error) {
+// ParseBlock reads from the provided io.Reader and returns a parsed metadata
+// block. It parses both the header and the body of the metadata block. Use
+// NewBlock instead for more granularity.
+func ParseBlock(r io.Reader) (block *Block, err error) {
 	block, err = NewBlock(r)
 	if err != nil {
 		return nil, err
@@ -37,10 +38,10 @@ func ParseBlock(r io.ReadSeeker) (block *Block, err error) {
 	return block, nil
 }
 
-// NewBlock reads and parses a metadata block header from the provided
-// io.ReadSeeker and returns a handle to the metadata block. Call Block.Parse to
-// parse the metadata block body and Block.Skip to ignore it.
-func NewBlock(r io.ReadSeeker) (block *Block, err error) {
+// NewBlock reads and parses a metadata block header from the provided io.Reader
+// and returns a handle to the metadata block. Call Block.Parse to parse the
+// metadata block body and Block.Skip to ignore it.
+func NewBlock(r io.Reader) (block *Block, err error) {
 	// Read metadata block header.
 	block = &Block{r: r}
 	block.Header, err = ParseBlockHeader(r)
@@ -82,9 +83,16 @@ func (block *Block) Parse() (err error) {
 
 // Skip ignores the contents of the metadata block body.
 func (block *Block) Skip() (err error) {
-	_, err = block.r.Seek(int64(block.Header.Length), os.SEEK_CUR)
-	if err != nil {
-		return err
+	if r, ok := block.r.(io.Seeker); ok {
+		_, err = r.Seek(int64(block.Header.Length), os.SEEK_CUR)
+		if err != nil {
+			return err
+		}
+	} else {
+		_, err = io.CopyN(ioutil.Discard, block.r, int64(block.Header.Length))
+		if err != nil {
+			return err
+		}
 	}
 	return nil
 }
