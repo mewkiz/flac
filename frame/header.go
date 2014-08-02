@@ -63,8 +63,8 @@ const (
 	ChannelLRCLfeLsRs                     // 6 channels: left, right, center, low-frequency effects, left surround, right surround
 	Channel7                              // 7 channels: not defined
 	Channel8                              // 8 channels: not defined
-	ChannelLSide                          // left/side stereo:  left, side (difference)
-	ChannelSideR                          // side/right stereo: side (difference), right
+	ChannelLeftSide                       // left/side stereo:  left, side (difference)
+	ChannelRightSide                      // side/right stereo: side (difference), right
 	ChannelMidSide                        // mid/side stereo:   mid (average), side (difference)
 )
 
@@ -78,8 +78,8 @@ var channelCount = map[ChannelOrder]int{
 	ChannelLRCLfeLsRs: 6,
 	Channel7:          7,
 	Channel8:          8,
-	ChannelLSide:      2,
-	ChannelSideR:      2,
+	ChannelLeftSide:   2,
+	ChannelRightSide:  2,
 	ChannelMidSide:    2,
 }
 

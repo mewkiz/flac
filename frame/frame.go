@@ -48,8 +48,19 @@ func NewFrame(r io.Reader) (frame *Frame, err error) {
 	// Subframes.
 	br := bit.NewReader(hr)
 	hdr := frame.Header
-	for i := 0; i < hdr.ChannelOrder.ChannelCount(); i++ {
-		subframe, err := hdr.NewSubFrame(br)
+	for subFrameNum := 0; subFrameNum < hdr.ChannelOrder.ChannelCount(); subFrameNum++ {
+		bps := uint(hdr.BitsPerSample)
+		switch hdr.ChannelOrder {
+		case ChannelLeftSide, ChannelMidSide:
+			if subFrameNum == 1 {
+				bps++
+			}
+		case ChannelRightSide:
+			if subFrameNum == 0 {
+				bps++
+			}
+		}
+		subframe, err := hdr.NewSubFrame(br, bps)
 		if err != nil {
 			return nil, err
 		}
@@ -73,6 +84,8 @@ func NewFrame(r io.Reader) (frame *Frame, err error) {
 	if got != want {
 		return nil, fmt.Errorf("frame.NewFrame: checksum mismatch; expected 0x%04X, got 0x%04X", want, got)
 	}
+
+	// TODO(u): Decorrelate channels. ref: https://www.xiph.org/flac/format.html#interchannel
 
 	return frame, nil
 }

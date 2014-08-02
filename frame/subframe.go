@@ -37,7 +37,7 @@ type Sample int32
 //    }
 //
 // ref: http://flac.sourceforge.net/format.html#subframe
-func (h *Header) NewSubFrame(br *bit.Reader) (subframe *SubFrame, err error) {
+func (h *Header) NewSubFrame(br *bit.Reader, bps uint) (subframe *SubFrame, err error) {
 	// Parse subframe header.
 	subframe = new(SubFrame)
 	subframe.Header, err = h.NewSubHeader(br)
@@ -49,13 +49,13 @@ func (h *Header) NewSubFrame(br *bit.Reader) (subframe *SubFrame, err error) {
 	sh := subframe.Header
 	switch sh.PredMethod {
 	case PredConstant:
-		subframe.Samples, err = h.DecodeConstant(br)
+		subframe.Samples, err = h.DecodeConstant(br, bps)
 	case PredFixed:
-		subframe.Samples, err = h.DecodeFixed(br, int(sh.PredOrder))
+		subframe.Samples, err = h.DecodeFixed(br, int(sh.PredOrder), bps)
 	case PredLPC:
-		subframe.Samples, err = h.DecodeLPC(br, int(sh.PredOrder))
+		subframe.Samples, err = h.DecodeLPC(br, int(sh.PredOrder), bps)
 	case PredVerbatim:
-		subframe.Samples, err = h.DecodeVerbatim(br)
+		subframe.Samples, err = h.DecodeVerbatim(br, bps)
 	default:
 		return nil, fmt.Errorf("frame.Header.NewSubFrame: unknown subframe prediction method: %d", sh.PredMethod)
 	}
@@ -173,7 +173,7 @@ func (h *Header) NewSubHeader(br *bit.Reader) (sh *SubHeader, err error) {
 		if err != nil {
 			return nil, err
 		}
-		sh.WastedBitCount = int8(n)
+		sh.WastedBitCount = int8(n) + 1
 		dbg.Println("wasted bits-per-sample:", sh.WastedBitCount)
 		panic("not yet implemented; wasted bits")
 	}
@@ -185,13 +185,13 @@ func (h *Header) NewSubHeader(br *bit.Reader) (sh *SubHeader, err error) {
 // constant throughout the entire subframe.
 //
 // ref: http://flac.sourceforge.net/format.html#subframe_constant
-func (h *Header) DecodeConstant(br *bit.Reader) (samples []Sample, err error) {
+func (h *Header) DecodeConstant(br *bit.Reader, bps uint) (samples []Sample, err error) {
 	// Read constant sample.
-	x, err := br.Read(uint(h.BitsPerSample))
+	x, err := br.Read(bps)
 	if err != nil {
 		return nil, err
 	}
-	sample := Sample(signExtend(x, uint(h.BitsPerSample)))
+	sample := Sample(signExtend(x, bps))
 	dbg.Println("Constant sample:", sample)
 
 	// Duplicate the constant sample, sample count number of times.
@@ -236,17 +236,17 @@ var fixedCoeffs = [...][]int32{
 // TODO(u): Add more detailed documentation.
 //
 // ref: http://flac.sourceforge.net/format.html#subframe_fixed
-func (h *Header) DecodeFixed(br *bit.Reader, predOrder int) (samples []Sample, err error) {
+func (h *Header) DecodeFixed(br *bit.Reader, predOrder int, bps uint) (samples []Sample, err error) {
 	// Unencoded warm-up samples:
 	//    n bits = frame's bits-per-sample * predictor order
 	warm := make([]Sample, predOrder)
 	dbg.Println("Fixed prediction order:", predOrder)
 	for i := range warm {
-		x, err := br.Read(uint(h.BitsPerSample))
+		x, err := br.Read(bps)
 		if err != nil {
 			return nil, err
 		}
-		sample := Sample(signExtend(x, uint(h.BitsPerSample)))
+		sample := Sample(signExtend(x, bps))
 		dbg.Println("Fixed warm-up sample:", sample)
 		warm[i] = sample
 	}
@@ -282,36 +282,37 @@ func lpcDecode(coeffs []int32, warm []Sample, residuals []int32, shift uint) (sa
 // TODO(u): Add more detailed documentation.
 //
 // ref: http://flac.sourceforge.net/format.html#subframe_lpc
-func (h *Header) DecodeLPC(br *bit.Reader, lpcOrder int) (samples []Sample, err error) {
+func (h *Header) DecodeLPC(br *bit.Reader, lpcOrder int, bps uint) (samples []Sample, err error) {
 	dbg.Println("lpcOrder:", lpcOrder)
 	// Unencoded warm-up samples:
 	//    n bits = frame's bits-per-sample * lpc order
+	fmt.Println("bps:", bps)
 	warm := make([]Sample, lpcOrder)
 	for i := range warm {
-		x, err := br.Read(uint(h.BitsPerSample))
+		x, err := br.Read(bps)
 		if err != nil {
 			return nil, err
 		}
-		sample := Sample(signExtend(x, uint(h.BitsPerSample)))
+		sample := Sample(signExtend(x, bps))
 		dbg.Println("LPC warm-up sample:", sample)
 		warm[i] = sample
 	}
 	dbg.Println("warm:", warm)
 
 	// (Quantized linear predictor coefficients' precision in bits) - 1.
-	n, err := br.Read(4)
+	x, err := br.Read(4)
 	if err != nil {
 		return nil, err
 	}
-	if n == 0xF {
+	if x == 0xF {
 		// 1111: invalid.
 		return nil, errors.New("frame.Header.DecodeLPC: invalid quantized lpc precision; reserved bit pattern: 1111")
 	}
-	qlpcPrec := int(n) + 1
+	qlpcPrec := int(x) + 1
 	dbg.Println("qlpcPrec:", qlpcPrec)
 
 	// Quantized linear predictor coefficient shift needed in bits.
-	x, err := br.Read(5)
+	x, err = br.Read(5)
 	if err != nil {
 		return nil, err
 	}
@@ -348,15 +349,15 @@ func (h *Header) DecodeLPC(br *bit.Reader, lpcOrder int) (samples []Sample, err 
 // unencoded.
 //
 // ref: http://flac.sourceforge.net/format.html#subframe_verbatim
-func (h *Header) DecodeVerbatim(br *bit.Reader) (samples []Sample, err error) {
+func (h *Header) DecodeVerbatim(br *bit.Reader, bps uint) (samples []Sample, err error) {
 	// Read unencoded samples.
 	samples = make([]Sample, h.SampleCount)
 	for i := range samples {
-		x, err := br.Read(uint(h.BitsPerSample))
+		x, err := br.Read(bps)
 		if err != nil {
 			return nil, err
 		}
-		sample := Sample(signExtend(x, uint(h.BitsPerSample)))
+		sample := Sample(signExtend(x, bps))
 		dbg.Println("Verbatim sample:", sample)
 		samples[i] = sample
 	}
