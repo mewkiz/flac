@@ -49,6 +49,7 @@ func NewFrame(r io.Reader) (frame *Frame, err error) {
 	br := bit.NewReader(hr)
 	hdr := frame.Header
 	for subFrameNum := 0; subFrameNum < hdr.ChannelOrder.ChannelCount(); subFrameNum++ {
+		// NOTE: This piece of code is based on https://github.com/eaburns/flac/blob/master/decode.go#L437
 		bps := uint(hdr.BitsPerSample)
 		switch hdr.ChannelOrder {
 		case ChannelLeftSide, ChannelMidSide:
@@ -60,6 +61,7 @@ func NewFrame(r io.Reader) (frame *Frame, err error) {
 				bps++
 			}
 		}
+
 		subframe, err := hdr.NewSubFrame(br, bps)
 		if err != nil {
 			return nil, err
@@ -85,7 +87,40 @@ func NewFrame(r io.Reader) (frame *Frame, err error) {
 		return nil, fmt.Errorf("frame.NewFrame: checksum mismatch; expected 0x%04X, got 0x%04X", want, got)
 	}
 
-	// TODO(u): Decorrelate channels. ref: https://www.xiph.org/flac/format.html#interchannel
+	// Decorrelate the left and right channels from each other.
+	decorrelate(frame)
 
 	return frame, nil
+}
+
+// decorrelate decorrelates the left and right channels from each other.
+//
+// ref: https://www.xiph.org/flac/format.html#interchannel
+func decorrelate(frame *Frame) {
+	// NOTE: This piece of code is based on https://github.com/eaburns/flac/blob/master/decode.go#L341
+	// TODO(u): Verify that the channel mapping is correct (left, right, mid, leftSample, ...)
+	switch frame.Header.ChannelOrder {
+	case ChannelLeftSide:
+		left := frame.SubFrames[0].Samples
+		right := frame.SubFrames[1].Samples
+		for i, leftSample := range left {
+			right[i] = leftSample - right[i]
+		}
+	case ChannelRightSide:
+		right := frame.SubFrames[0].Samples
+		left := frame.SubFrames[1].Samples
+		for i, leftSample := range left {
+			right[i] += leftSample
+		}
+	case ChannelMidSide:
+		mid := frame.SubFrames[0].Samples
+		side := frame.SubFrames[1].Samples
+		for i, midSample := range mid {
+			sideSample := side[i]
+			midSample *= 2
+			midSample |= (sideSample & 1) // if side is odd
+			mid[i] = (midSample + sideSample) / 2
+			side[i] = (midSample - sideSample) / 2
+		}
+	}
 }
