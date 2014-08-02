@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bufio"
 	"flag"
 	"log"
 	"os"
@@ -31,7 +32,14 @@ func main() {
 }
 
 func flacFrame(filePath string) (err error) {
-	s, err := flac.Open(filePath)
+	f, err := os.Open(filePath)
+	if err != nil {
+		log.Println(err)
+	}
+	defer f.Close()
+	br := bufio.NewReader(f)
+
+	s, err := flac.NewStream(br)
 	if err != nil {
 		return err
 	}

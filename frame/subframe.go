@@ -25,6 +25,8 @@ type SubFrame struct {
 	Samples []Sample
 }
 
+// TODO(u): Remove Sample type.
+
 // A Sample is an audio sample. The size of each sample is between 4 and 32
 // bits.
 type Sample int32
@@ -407,6 +409,9 @@ func (h *Header) DecodeRice(br *bit.Reader, predOrder int) (residuals []int32, e
 
 	// Rice partitions.
 	partCount := int(math.Pow(2, float64(partOrder)))
+	residuals = make([]int32, 0, h.SampleCount)
+	guess := int(h.SampleCount)
+	var total int
 	for partNum := 0; partNum < partCount; partNum++ {
 		partSampleCount := int(h.SampleCount) / partCount
 
@@ -445,6 +450,7 @@ func (h *Header) DecodeRice(br *bit.Reader, predOrder int) (residuals []int32, e
 		} else {
 			partSampleCount = int(h.SampleCount)/int(math.Pow(2, float64(partOrder))) - predOrder
 		}
+		total += partSampleCount
 		dbg.Println("partSampleCount:", partSampleCount)
 
 		// Decode rice partition residuals.
@@ -453,6 +459,9 @@ func (h *Header) DecodeRice(br *bit.Reader, predOrder int) (residuals []int32, e
 			return nil, err
 		}
 		residuals = append(residuals, partResiduals...)
+	}
+	if guess < total {
+		panic(fmt.Sprintf("guess (%d) < total (%d)", guess, total))
 	}
 
 	return residuals, nil
