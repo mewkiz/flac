@@ -8,7 +8,7 @@ import (
 	"log"
 	"math"
 
-	"github.com/eaburns/bit"
+	"github.com/mewkiz/pkg/bit"
 	"github.com/mewkiz/pkg/dbg"
 	"github.com/mewkiz/pkg/hashutil/crc8"
 )

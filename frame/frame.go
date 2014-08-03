@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/eaburns/bit"
+	"github.com/mewkiz/pkg/bit"
 	"github.com/mewkiz/pkg/hashutil/crc16"
 )
 

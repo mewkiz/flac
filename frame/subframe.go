@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"math"
 
-	"github.com/eaburns/bit"
+	"github.com/mewkiz/pkg/bit"
 	"github.com/mewkiz/pkg/bitutil"
 	"github.com/mewkiz/pkg/dbg"
 )
