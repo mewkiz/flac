@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"log"
 	"math"
 
 	"github.com/mewkiz/pkg/bit"
@@ -229,7 +228,6 @@ func NewHeader(r io.Reader) (hdr *Header, err error) {
 		// TODO(u): Should we try to read StreamInfo from here? We won't always
 		// have access to it.
 		panic("not yet implemented; bits-per-sample 0")
-		log.Println(fmt.Errorf("not yet implemented; sample size spec: %d", n))
 	case 1:
 		// 001: 8 bits per sample.
 		hdr.BitsPerSample = 8
@@ -347,7 +345,6 @@ func NewHeader(r io.Reader) (hdr *Header, err error) {
 		// 0000: get from STREAMINFO metadata block.
 		// TODO(u): Add flag to get from StreamInfo?
 		panic("not yet implemented; sample rate 0")
-		log.Println(fmt.Errorf("not yet implemented; sample rate: %d", n))
 	case 1:
 		//0001: 88.2kHz.
 		hdr.SampleRate = 88200

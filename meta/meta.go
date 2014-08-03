@@ -72,7 +72,7 @@ func (block *Block) Parse() (err error) {
 	case TypePicture:
 		block.Body, err = ParsePicture(lr)
 	default:
-		return fmt.Errorf("Block.ParseBlock: block type '%d' not yet supported", block.Header.BlockType)
+		return fmt.Errorf("meta.Block.ParseBlock: block type '%d' not yet supported", block.Header.BlockType)
 	}
 	if err != nil {
 		return err

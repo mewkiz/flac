@@ -104,15 +104,15 @@ func decorrelate(frame *Frame) {
 	switch frame.Header.ChannelOrder {
 	case ChannelLeftSide:
 		left := frame.SubFrames[0].Samples
-		right := frame.SubFrames[1].Samples
+		side := frame.SubFrames[1].Samples
 		for i, leftSample := range left {
-			right[i] = leftSample - right[i]
+			side[i] = leftSample - side[i]
 		}
 	case ChannelRightSide:
-		right := frame.SubFrames[0].Samples
-		left := frame.SubFrames[1].Samples
-		for i, leftSample := range left {
-			right[i] += leftSample
+		side := frame.SubFrames[0].Samples
+		right := frame.SubFrames[1].Samples
+		for i, rightSample := range right {
+			side[i] += rightSample
 		}
 	case ChannelMidSide:
 		mid := frame.SubFrames[0].Samples

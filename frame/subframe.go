@@ -402,6 +402,23 @@ func (h *Header) DecodeResidual(br *bit.Reader, predOrder int) (residuals []int3
 //
 // ref: http://flac.sourceforge.net/format.html#partitioned_rice
 func (h *Header) DecodeRice(br *bit.Reader, predOrder int) (residuals []int32, err error) {
+	return h.decodeRice(br, predOrder, 4)
+}
+
+// DecodeRice2 decodes and returns a slice of residuals. The residual coding
+// method used is partitioned Rice coding with a 5-bit Rice parameter.
+//
+// ref: http://flac.sourceforge.net/format.html#partitioned_rice2
+func (h *Header) DecodeRice2(br *bit.Reader, predOrder int) (residuals []int32, err error) {
+	return h.decodeRice(br, predOrder, 5)
+}
+
+// decodeRice decodes and returns a slice of residuals. The residual coding
+// method used is partitioned Rice coding with a n-bit Rice parameter, as
+// specified by paramSize.
+//
+// ref: http://flac.sourceforge.net/format.html#partitioned_rice2
+func (h *Header) decodeRice(br *bit.Reader, predOrder int, paramSize uint) (residuals []int32, err error) {
 	// Partition order.
 	partOrder, err := br.Read(4)
 	if err != nil {
@@ -417,29 +434,19 @@ func (h *Header) DecodeRice(br *bit.Reader, predOrder int) (residuals []int32, e
 		partSampleCount := int(h.SampleCount) / partCount
 
 		// Encoding parameter.
-		riceParam, err := br.Read(4)
+		riceParam, err := br.Read(paramSize)
 		if err != nil {
 			return nil, err
 		}
-		if riceParam == 0xF {
-			// 1111: Escape code, meaning the partition is in unencoded binary form
-			// using n bits per sample; n follows as a 5-bit number.
+		if paramSize == 4 && riceParam == 0xF || paramSize == 5 && riceParam == 0x1F {
+			// 1111 or 11111: Escape code, meaning the partition is in unencoded
+			// binary form using n bits per sample; n follows as a 5-bit number.
 			n, err := br.Read(5)
 			if err != nil {
 				return nil, err
 			}
+			_ = n
 			panic("not yet implemented: unencoded samples.")
-			// TODO(u): Check; the loop below is a best effort attempt at
-			// understanding the spec, it may very well be inaccurate.
-			for i := 0; i < partSampleCount; i++ {
-				sample, err := br.Read(uint(n))
-				if err != nil {
-					return nil, err
-				}
-				// TODO(u): Figure out if we should change to API to return the
-				// unencoded samples.
-				dbg.Println("sample:", sample)
-			}
 		}
 		dbg.Println("riceParam:", riceParam)
 
@@ -455,7 +462,7 @@ func (h *Header) DecodeRice(br *bit.Reader, predOrder int) (residuals []int32, e
 		dbg.Println("partSampleCount:", partSampleCount)
 
 		// Decode rice partition residuals.
-		partResiduals, err := riceDecode(br, uint(riceParam), partSampleCount)
+		partResiduals, err := decodeRiceResidual(br, uint(riceParam), partSampleCount)
 		if err != nil {
 			return nil, err
 		}
@@ -468,9 +475,9 @@ func (h *Header) DecodeRice(br *bit.Reader, predOrder int) (residuals []int32, e
 	return residuals, nil
 }
 
-// riceDecode decodes the residual signals of a partition encoded using Rice
-// coding.
-func riceDecode(br *bit.Reader, k uint, n int) (residuals []int32, err error) {
+// decodeRiceResidual decodes the residual signals of a partition encoded using
+// Rice coding.
+func decodeRiceResidual(br *bit.Reader, k uint, n int) (residuals []int32, err error) {
 	residuals = make([]int32, n)
 	for i := 0; i < n; i++ {
 		// Read unary encoded most significant bits.
@@ -492,13 +499,4 @@ func riceDecode(br *bit.Reader, k uint, n int) (residuals []int32, err error) {
 		residuals[i] = residual
 	}
 	return residuals, nil
-}
-
-// DecodeRice2 decodes and returns a slice of residuals. The residual coding
-// method used is partitioned Rice coding with a 5-bit Rice parameter.
-//
-// ref: http://flac.sourceforge.net/format.html#partitioned_rice2
-func (h *Header) DecodeRice2(br *bit.Reader, predOrder int) (residuals []int32, err error) {
-	// TODO(u): not yet implemented.
-	return nil, errors.New("frame.Header.DecodeRice: not yet implemented; rice coding method 1")
 }
