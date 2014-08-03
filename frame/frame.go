@@ -50,6 +50,7 @@ func NewFrame(r io.Reader) (frame *Frame, err error) {
 	hdr := frame.Header
 	for subFrameNum := 0; subFrameNum < hdr.ChannelOrder.ChannelCount(); subFrameNum++ {
 		// NOTE: This piece of code is based on https://github.com/eaburns/flac/blob/master/decode.go#L437
+		// It is governed by a MIT license: https://github.com/eaburns/flac/blob/master/LICENSE
 		bps := uint(hdr.BitsPerSample)
 		switch hdr.ChannelOrder {
 		case ChannelLeftSide, ChannelMidSide:
@@ -98,6 +99,7 @@ func NewFrame(r io.Reader) (frame *Frame, err error) {
 // ref: https://www.xiph.org/flac/format.html#interchannel
 func decorrelate(frame *Frame) {
 	// NOTE: This piece of code is based on https://github.com/eaburns/flac/blob/master/decode.go#L341
+	// It is governed by a MIT license: https://github.com/eaburns/flac/blob/master/LICENSE
 	// TODO(u): Verify that the channel mapping is correct (left, right, mid, leftSample, ...)
 	switch frame.Header.ChannelOrder {
 	case ChannelLeftSide:

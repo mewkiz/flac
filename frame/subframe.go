@@ -272,6 +272,7 @@ func lpcDecode(coeffs []int32, warm []Sample, residuals []int32, shift uint) (sa
 	samples = make([]Sample, len(warm)+len(residuals))
 	copy(samples, warm)
 	// Note: The following code is borrowed from https://github.com/eaburns/flac/blob/master/decode.go#L751
+	// It is governed by a MIT license: https://github.com/eaburns/flac/blob/master/LICENSE
 	for i := len(warm); i < len(samples); i++ {
 		var sum int32
 		for j, coeff := range coeffs {
