@@ -2,9 +2,9 @@ package meta
 
 import "crypto/md5"
 
-// StreamInfo contains information about the FLAC audio stream, such as its
-// sample rate and channel count. It must be  present as the first metadata
-// block of a FLAC stream.
+// StreamInfo contains the basic properties of a FLAC audio stream, such as its
+// sample rate and channel count. It is the only mandatory metadata block and
+// must be present as the first metadata block of a FLAC stream.
 //
 // ref: https://www.xiph.org/flac/format.html#metadata_block_streaminfo
 type StreamInfo struct {
