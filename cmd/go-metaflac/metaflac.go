@@ -77,6 +77,10 @@ func list(filePath string) (err error) {
 	if err != nil {
 		return err
 	}
+	err = s.ParseBlocks(meta.TypeAll)
+	if err != nil {
+		return err
+	}
 
 	if blockNums != nil {
 		// Only list blocks specified in the "--block-number" command line flag.
