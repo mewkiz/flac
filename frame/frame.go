@@ -4,6 +4,7 @@ package frame
 import (
 	"encoding/binary"
 	"fmt"
+	"hash"
 	"io"
 
 	"github.com/mewkiz/pkg/bit"
@@ -32,11 +33,11 @@ type Frame struct {
 //    }
 //
 // ref: http://flac.sourceforge.net/format.html#frame
-func NewFrame(r io.Reader) (frame *Frame, err error) {
+func NewFrame(r io.Reader, md5sum hash.Hash) (frame *Frame, err error) {
 	// Create a new hash reader which adds the data from all read operations to a
 	// running hash.
-	h := crc16.NewIBM()
-	hr := io.TeeReader(r, h)
+	crc := crc16.NewIBM()
+	hr := io.TeeReader(r, crc)
 
 	// Frame header.
 	frame = new(Frame)
@@ -77,7 +78,7 @@ func NewFrame(r io.Reader) (frame *Frame, err error) {
 
 	// Frame footer.
 	// Verify the CRC-16.
-	got := h.Sum16()
+	got := crc.Sum16()
 
 	var want uint16
 	err = binary.Read(r, binary.BigEndian, &want)
@@ -90,6 +91,37 @@ func NewFrame(r io.Reader) (frame *Frame, err error) {
 
 	// Decorrelate the left and right channels from each other.
 	decorrelate(frame)
+
+	// Write decoded samples to a running md5 hash.
+	var buf [3]byte
+	for i := 0; i < len(frame.SubFrames[0].Samples); i++ {
+		for _, subframe := range frame.SubFrames {
+			sample := subframe.Samples[i]
+			switch hdr.BitsPerSample {
+			case 8:
+				buf[0] = uint8(sample)
+				_, err = md5sum.Write(buf[:1])
+				if err != nil {
+					return nil, err
+				}
+			case 16:
+				buf[0] = uint8(sample & 0xFF)      // TODO(u): check; uint8 always truncates, so skip 0xFF mask?
+				buf[1] = uint8(sample >> 8 & 0xFF) // TODO(u): skip 0xFF mask?
+				_, err = md5sum.Write(buf[:2])
+				if err != nil {
+					return nil, err
+				}
+			case 24:
+				buf[0] = uint8(sample & 0xFF) // TODO(u): check; uint8 always truncates, so skip 0xFF mask?
+				buf[1] = uint8(sample >> 8 & 0xFF)
+				buf[2] = uint8(sample >> 16 & 0xFF) // TODO(u): skip 0xFF mask?
+				_, err = md5sum.Write(buf[:])
+				if err != nil {
+					return nil, err
+				}
+			}
+		}
+	}
 
 	return frame, nil
 }

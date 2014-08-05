@@ -10,6 +10,8 @@
 package flac
 
 import (
+	"bytes"
+	"crypto/md5"
 	"fmt"
 	"io"
 	"os"
@@ -173,14 +175,20 @@ func (s *Stream) ParseFrames() (err error) {
 	// Read audio frames.
 	// uint64 won't overflow since the max value of SampleCount is
 	// 0x0000000FFFFFFFFF.
+	md5sum := md5.New()
 	var i uint64
 	for i < si.SampleCount {
-		f, err := frame.NewFrame(s.r)
+		f, err := frame.NewFrame(s.r, md5sum)
 		if err != nil {
 			return err
 		}
 		s.Frames = append(s.Frames, f)
 		i += uint64(len(f.SubFrames[0].Samples))
+	}
+	got := md5sum.Sum(nil)
+	want := si.MD5sum[:]
+	if !bytes.Equal(got, want) {
+		return fmt.Errorf("flac.Stream.ParseFrames: md5 mismatch; got %32x, want %32x", got, want)
 	}
 
 	return nil
