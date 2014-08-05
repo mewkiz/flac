@@ -200,7 +200,11 @@ func listApplication(app *meta.Application) {
 func listSeekTable(st *meta.SeekTable) {
 	fmt.Printf("  seek points: %d\n", len(st.Points))
 	for pointNum, point := range st.Points {
-		fmt.Printf("    point %d: sample_number=%d, stream_offset=%d, frame_samples=%d\n", pointNum, point.SampleNum, point.Offset, point.SampleCount)
+		if point.SampleNum == meta.PlaceholderPoint {
+			fmt.Printf("    point %d: PLACEHOLDER\n", pointNum)
+		} else {
+			fmt.Printf("    point %d: sample_number=%d, stream_offset=%d, frame_samples=%d\n", pointNum, point.SampleNum, point.Offset, point.SampleCount)
+		}
 	}
 }
 
@@ -314,14 +318,14 @@ func listPicture(pic *meta.Picture) {
 		20: "Publisher/Studio logotype",
 	}
 	fmt.Printf("  type: %d (%s)\n", pic.Type, typeName[pic.Type])
-	fmt.Printf("  MIME type: %s", pic.MIME)
+	fmt.Printf("  MIME type: %s\n", pic.MIME)
 	fmt.Printf("  description: %s\n", pic.Desc)
 	fmt.Printf("  width: %d\n", pic.Width)
 	fmt.Printf("  height: %d\n", pic.Height)
 	fmt.Printf("  depth: %d\n", pic.ColorDepth)
 	fmt.Printf("  colors: %d", pic.ColorCount)
 	if pic.ColorCount == 0 {
-		fmt.Print("(unindexed)")
+		fmt.Print(" (unindexed)")
 	}
 	fmt.Println()
 	fmt.Printf("  data length: %d\n", len(pic.Data))
