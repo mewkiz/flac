@@ -68,7 +68,7 @@ func (block *Block) parseHeader() error {
 	panic("not yet implemented.")
 }
 
-// Type represent the type of a metadata block body.
+// Type represents the type of a metadata block body.
 type Type uint8
 
 // Metadata block body types.
