@@ -1,6 +1,8 @@
 package meta_test
 
 import (
+	"bytes"
+	"io/ioutil"
 	"reflect"
 	"testing"
 
@@ -248,19 +250,48 @@ func TestParseBlocks(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		if len(g.blocks) != len(s.MetaBlocks) {
+		if len(s.MetaBlocks) != len(g.blocks) {
 			t.Errorf("i=%d: invalid number of metadata blocks; expected %d, got %d.", i, len(g.blocks), len(s.MetaBlocks))
 			continue
 		}
 
 		for j, got := range s.MetaBlocks {
 			want := g.blocks[j]
-			if !reflect.DeepEqual(want.Header, got.Header) {
+			if !reflect.DeepEqual(got.Header, want.Header) {
 				t.Errorf("i=%d, j=%d: metadata block headers differ; expected %#v, got %#v.", i, j, want.Header, got.Header)
 			}
-			if !reflect.DeepEqual(want.Body, got.Body) {
+			if !reflect.DeepEqual(got.Body, want.Body) {
 				t.Errorf("i=%d, j=%d: metadata block bodies differ; expected %#v, got %#v.", i, j, want.Body, got.Body)
 			}
+		}
+	}
+}
+
+func TestParsePicture(t *testing.T) {
+	s, err := flac.Open("testdata/silence.flac")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+
+	err = s.ParseBlocks(meta.TypePicture)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	want, err := ioutil.ReadFile("testdata/silence.jpg")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	for _, block := range s.MetaBlocks {
+		if block.Header.BlockType == meta.TypePicture {
+			pic := block.Body.(*meta.Picture)
+			got := pic.Data
+			if !bytes.Equal(got, want) {
+				t.Errorf("picture data differ; expected %v, got %v", want, got)
+			}
+			break
 		}
 	}
 }
