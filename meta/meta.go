@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"log"
 	"os"
 
 	"github.com/eaburns/bit"
@@ -71,6 +72,8 @@ func (block *Block) Parse() (err error) {
 		block.Body, err = ParseCueSheet(lr)
 	case TypePicture:
 		block.Body, err = ParsePicture(lr)
+	case TypeReserved:
+		block.Body, err = ioutil.ReadAll(lr)
 	default:
 		return fmt.Errorf("meta.Block.ParseBlock: block type '%d' not yet supported", block.Header.BlockType)
 	}
@@ -109,10 +112,11 @@ const (
 	TypeVorbisComment
 	TypeCueSheet
 	TypePicture
+	TypeReserved
 
 	// TypeAll is a bitmask of all block types, except padding.
-	TypeAll = TypeStreamInfo | TypeApplication | TypeSeekTable | TypeVorbisComment | TypeCueSheet | TypePicture
-	// TypeAllStrict is a bitmask of all block types, including padding.
+	TypeAll = TypeStreamInfo | TypeApplication | TypeSeekTable | TypeVorbisComment | TypeCueSheet | TypePicture | TypeReserved
+	// TypeAllStrict is a bitmask of all block types, including padding but excluding reserved.
 	TypeAllStrict = TypeStreamInfo | TypePadding | TypeApplication | TypeSeekTable | TypeVorbisComment | TypeCueSheet | TypePicture
 )
 
@@ -128,7 +132,10 @@ var blockTypeName = map[BlockType]string{
 }
 
 func (t BlockType) String() string {
-	return blockTypeName[t]
+	if s, ok := blockTypeName[t]; ok {
+		return s
+	}
+	return fmt.Sprintf("unknown block type %d", uint8(t))
 }
 
 // A BlockHeader contains type and length information about a metadata block.
@@ -198,8 +205,9 @@ func ParseBlockHeader(r io.Reader) (h *BlockHeader, err error) {
 	default:
 		if blockType >= 7 && blockType <= 126 {
 			// block type 7-126: reserved.
-			return nil, errors.New("meta.ParseBlockHeader: reserved block type")
-		} else if blockType == 127 {
+			log.Printf("meta.ParseBlockHeader: reserved block type %d.\n", uint8(blockType))
+			h.BlockType = TypeReserved
+		} else {
 			// block type 127: invalid.
 			return nil, errors.New("meta.ParseBlockHeader: invalid block type")
 		}

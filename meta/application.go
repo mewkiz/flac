@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"log"
 )
 
 // registeredApplications maps from a registered application ID to a
@@ -77,17 +78,15 @@ func ParseApplication(r io.Reader) (app *Application, err error) {
 		return nil, err
 	}
 	app = &Application{ID: ID(buf)}
-	_, ok := registeredApplications[app.ID]
-	if !ok {
-		return nil, fmt.Errorf("meta.ParseApplication: unregistered application ID %q", string(app.ID))
+	if _, ok := registeredApplications[app.ID]; !ok {
+		log.Printf("meta.ParseApplication: unregistered application ID %q.\n", string(app.ID))
 	}
 
 	// Data.
-	buf, err = ioutil.ReadAll(r)
+	app.Data, err = ioutil.ReadAll(r)
 	if err != nil {
 		return nil, err
 	}
-	app.Data = buf
 
 	return app, nil
 }

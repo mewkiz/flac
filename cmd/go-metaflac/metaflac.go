@@ -1,3 +1,19 @@
+// TODO(u): Prefix lines with file name if flag.NArg() > 1. Example:
+//    tone24bit.flac:METADATA block #2
+//    tone24bit.flac:  type: 4 (VORBIS_COMMENT)
+//    tone24bit.flac:  is last: false
+//    tone24bit.flac:  length: 40
+//    tone24bit.flac:  vendor string: reference libFLAC 1.1.4 20070213
+//    tone24bit.flac:  comments: 0
+//    tone24bit.flac:METADATA block #3
+//    tone24bit.flac:  type: 1 (PADDING)
+//    tone24bit.flac:  is last: true
+//    tone24bit.flac:  length: 8192
+//    zonophone-x28010-10407u.flac:METADATA block #0
+//    zonophone-x28010-10407u.flac:  type: 0 (STREAMINFO)
+//    zonophone-x28010-10407u.flac:  is last: false
+//    zonophone-x28010-10407u.flac:  length: 34
+
 package main
 
 import (
@@ -132,8 +148,12 @@ func listHeader(header *meta.BlockHeader, blockNum int) {
 		meta.TypeCueSheet:      "CUESHEET",
 		meta.TypePicture:       "PICTURE",
 	}
+	name, ok := blockTypeName[header.BlockType]
+	if !ok {
+		name = "UNKNOWN"
+	}
 	fmt.Printf("METADATA block #%d\n", blockNum)
-	fmt.Printf("  type: %d (%s)\n", header.BlockType, blockTypeName[header.BlockType])
+	fmt.Printf("  type: %d (%s)\n", header.BlockType, name)
 	fmt.Printf("  is last: %t\n", header.IsLast)
 	fmt.Printf("  length: %d\n", header.Length)
 }
@@ -165,9 +185,11 @@ func listStreamInfo(si *meta.StreamInfo) {
 //      data contents:
 //    Medieval CUE Splitter (www.medieval.it)
 func listApplication(app *meta.Application) {
-	fmt.Printf("  application ID: %x\n", app.ID)
+	fmt.Printf("  application ID: %x\n", string(app.ID))
 	fmt.Println("  data contents:")
-	fmt.Println(string(app.Data))
+	if len(app.Data) > 0 {
+		fmt.Println(string(app.Data))
+	}
 }
 
 // Example:
