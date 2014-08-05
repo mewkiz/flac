@@ -153,6 +153,9 @@ func listHeader(header *meta.BlockHeader, blockNum int) {
 		name = "UNKNOWN"
 	}
 	fmt.Printf("METADATA block #%d\n", blockNum)
+	// TODO(u): Figure out how to solve the inconsistency of BlockType between
+	// the Go and C version of metaflac. BlockType is a bitfield in the Go
+	// version and a sequential integer in the C version.
 	fmt.Printf("  type: %d (%s)\n", header.BlockType, name)
 	fmt.Printf("  is last: %t\n", header.IsLast)
 	fmt.Printf("  length: %d\n", header.Length)
