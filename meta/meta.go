@@ -30,7 +30,7 @@ func New(r io.Reader) (block *Block, err error) {
 	block = new(Block)
 	err = block.parseHeader(r)
 	if err != nil {
-		return nil, err
+		return block, err
 	}
 	block.lr = io.LimitReader(r, block.Length)
 	return block, nil
@@ -41,11 +41,11 @@ func New(r io.Reader) (block *Block, err error) {
 func Parse(r io.Reader) (block *Block, err error) {
 	block, err = New(r)
 	if err != nil {
-		return nil, err
+		return block, err
 	}
 	err = block.Parse()
 	if err != nil {
-		return nil, err
+		return block, err
 	}
 	return block, nil
 }
