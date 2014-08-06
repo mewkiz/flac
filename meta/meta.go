@@ -4,6 +4,8 @@ package meta
 import (
 	"errors"
 	"io"
+	"io/ioutil"
+	"os"
 
 	"github.com/mewkiz/pkg/bit"
 )
@@ -17,19 +19,20 @@ type Block struct {
 	// Metadata block body of type *StreamInfo, *Application, ... etc. Body is
 	// initially nil, and gets populated by a call to Block.Parse.
 	Body interface{}
-	// Underlying io.Reader.
-	r io.Reader
+	// Underlying io.Reader; limited by the length of the block body.
+	lr io.Reader
 }
 
 // New creates a new Block for accessing the metadata of r. It reads and parses
 // a metadata block header. Call Block.Parse to parse the metadata block body,
 // and call Block.Skip to ignore it.
 func New(r io.Reader) (block *Block, err error) {
-	block = &Block{r: r}
-	err = block.parseHeader()
+	block = new(Block)
+	err = block.parseHeader(r)
 	if err != nil {
 		return nil, err
 	}
+	block.lr = io.LimitReader(r, block.Length)
 	return block, nil
 }
 
@@ -79,7 +82,12 @@ func (block *Block) Parse() error {
 
 // Skip ignores the contents of the metadata block body.
 func (block *Block) Skip() error {
-	panic("not yet implemented.")
+	if sr, ok := block.lr.(io.Seeker); ok {
+		_, err := sr.Seek(block.Length, os.SEEK_CUR)
+		return err
+	}
+	_, err := io.Copy(ioutil.Discard, block.lr)
+	return err
 }
 
 // A Header contains information about the type and length of a metadata block.
@@ -95,9 +103,9 @@ type Header struct {
 }
 
 // parseHeader reads and parses the header of a metadata block.
-func (block *Block) parseHeader() error {
+func (block *Block) parseHeader(r io.Reader) error {
 	// 1 bit: IsLast.
-	br := bit.NewReader(block.r)
+	br := bit.NewReader(r)
 	x, err := br.Read(1)
 	if err != nil {
 		return err
