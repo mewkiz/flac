@@ -1,6 +1,6 @@
 package meta
 
-// A CueSheet describes how tracks are layed out within a FLAC stream.
+// A CueSheet describes how tracks are laid out within a FLAC stream.
 //
 // ref: https://www.xiph.org/flac/format.html#metadata_block_cuesheet
 type CueSheet struct {
