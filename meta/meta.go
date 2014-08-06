@@ -1,3 +1,6 @@
+// TODO(u): Check that all block.parseXXX functions stores the decoded content
+// in block.Body.
+
 // Package meta implements access to FLAC metadata.
 package meta
 
