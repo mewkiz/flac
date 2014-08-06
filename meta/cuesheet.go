@@ -1,12 +1,10 @@
-// TODO(u): Implement error handling for CueSheet parsing.
-// TODO(u): Check handling of padding during the parsing of CueSheet.
-
 package meta
 
 import (
 	"bytes"
 	"encoding/binary"
 	"errors"
+	"fmt"
 	"io"
 	"io/ioutil"
 )
@@ -78,7 +76,13 @@ func (block *Block) parseCueSheet() error {
 	if x < 1 {
 		return errors.New("meta.Block.parseCueSheet: at least one track required")
 	}
+	if cs.IsCompactDisc && x > 100 {
+		return fmt.Errorf("meta.Block.parseCueSheet: number of CD-DA tracks (%d) exceeds 100", x)
+	}
 	cs.Tracks = make([]CueSheetTrack, x)
+	// Each track number within a cue sheet must be unique; use uniq to keep
+	// track.
+	uniq := make(map[uint8]struct{})
 	for i := range cs.Tracks {
 		// 64 bits: Offset.
 		track := &cs.Tracks[i]
@@ -86,11 +90,37 @@ func (block *Block) parseCueSheet() error {
 		if err != nil {
 			return err
 		}
+		if cs.IsCompactDisc && track.Offset%588 != 0 {
+			return fmt.Errorf("meta.Block.parseCueSheet: CD-DA track offset (%d) must be evenly divisible by 588", track.Offset)
+		}
 
 		// 8 bits: Num.
 		err = binary.Read(block.lr, binary.BigEndian, &track.Num)
 		if err != nil {
 			return err
+		}
+		if _, ok := uniq[track.Num]; ok {
+			return fmt.Errorf("meta.Block.parseCueSheet: duplicated track number %d", track.Num)
+		}
+		uniq[track.Num] = struct{}{}
+		if track.Num == 0 {
+			return errors.New("meta.Block.parseCueSheet: invalid track number (0)")
+		}
+		isLeadOut := i == len(cs.Tracks)-1
+		if cs.IsCompactDisc {
+			if !isLeadOut {
+				if track.Num >= 100 {
+					return fmt.Errorf("meta.Block.parseCueSheet: CD-DA track number (%d) exceeds 99", track.Num)
+				}
+			} else {
+				if track.Num != 170 {
+					return fmt.Errorf("meta.Block.parseCueSheet: invalid lead-out CD-DA track number; expected 170, got %d", track.Num)
+				}
+			}
+		} else {
+			if isLeadOut && track.Num != 255 {
+				return fmt.Errorf("meta.Block.parseCueSheet: invalid lead-out track number; expected 255, got %d", track.Num)
+			}
 		}
 
 		// 12 bytes: ISRC.
@@ -106,7 +136,7 @@ func (block *Block) parseCueSheet() error {
 			return err
 		}
 		// mask = 10000000
-		if x&0x80 != 0 {
+		if x&0x80 == 0 {
 			track.IsAudio = true
 		}
 
@@ -133,6 +163,12 @@ func (block *Block) parseCueSheet() error {
 		err = binary.Read(block.lr, binary.BigEndian, &x)
 		if err != nil {
 			return err
+		}
+		if x < 1 {
+			if !isLeadOut {
+				return errors.New("meta.Block.parseCueSheet: at least one track index required")
+			}
+			continue
 		}
 		track.Indicies = make([]CueSheetTrackIndex, x)
 		for i := range track.Indicies {
