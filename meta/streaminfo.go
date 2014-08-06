@@ -105,11 +105,10 @@ func (block *Block) parseStreamInfo() error {
 	si.BitsPerSample = uint8(x + 1)
 
 	// 36 bits: NSamples.
-	x, err = br.Read(36)
+	si.NSamples, err = br.Read(36)
 	if err != nil {
 		return err
 	}
-	si.NSamples = x
 
 	// 16 bytes: MD5sum.
 	_, err = io.ReadFull(block.lr, si.MD5sum[:])
