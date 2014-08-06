@@ -1,10 +1,9 @@
 package meta
 
 import (
+	"encoding/binary"
 	"fmt"
 	"strings"
-
-	"github.com/mewkiz/pkg/bit"
 )
 
 // VorbisComment contains a list of name-value pairs.
@@ -21,8 +20,8 @@ type VorbisComment struct {
 // block.
 func (block *Block) parseVorbisComment() error {
 	// 32 bits: vendor length.
-	br := bit.NewReader(block.lr)
-	x, err := br.Read(32)
+	var x uint32
+	err := binary.Read(block.lr, binary.LittleEndian, &x)
 	if err != nil {
 		return err
 	}
@@ -37,7 +36,7 @@ func (block *Block) parseVorbisComment() error {
 	comment.Vendor = string(buf)
 
 	// 32 bits: number of tags.
-	x, err = br.Read(32)
+	err = binary.Read(block.lr, binary.LittleEndian, &x)
 	if err != nil {
 		return err
 	}
@@ -45,13 +44,13 @@ func (block *Block) parseVorbisComment() error {
 
 	for i := range comment.Tags {
 		// 32 bits: vector length
-		x, err = br.Read(32)
+		err = binary.Read(block.lr, binary.LittleEndian, &x)
 		if err != nil {
 			return err
 		}
 
 		// (vector length): vector.
-		buf, err := readBytes(block.lr, int(x))
+		buf, err = readBytes(block.lr, int(x))
 		if err != nil {
 			return err
 		}
