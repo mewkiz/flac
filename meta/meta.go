@@ -1,6 +1,3 @@
-// TODO(u): Check that all block.parseXXX functions stores the decoded content
-// in block.Body.
-
 // Package meta implements access to FLAC metadata.
 package meta
 
@@ -118,14 +115,14 @@ func (block *Block) parseHeader(r io.Reader) error {
 	}
 
 	// 7 bits: Type.
-	x, err = br.Read(1)
+	x, err = br.Read(7)
 	if err != nil {
 		return err
 	}
 	block.Type = Type(x)
 
 	// 24 bits: Length.
-	x, err = br.Read(1)
+	x, err = br.Read(24)
 	if err != nil {
 		return err
 	}

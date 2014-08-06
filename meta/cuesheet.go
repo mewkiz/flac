@@ -1,4 +1,5 @@
 // TODO(u): Implement error handling for CueSheet parsing.
+// TODO(u): Check handling of padding during the parsing of CueSheet.
 
 package meta
 
