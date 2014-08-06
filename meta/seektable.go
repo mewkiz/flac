@@ -8,6 +8,11 @@ type SeekTable struct {
 	Points []SeekPoint
 }
 
+// parseSeekTable reads and parses the body of an SeekTable metadata block.
+func (block *Block) parseSeekTable() error {
+	panic("not yet implemented.")
+}
+
 // A SeekPoint specifies the byte offset and initial sample number of a given
 // target frame.
 //

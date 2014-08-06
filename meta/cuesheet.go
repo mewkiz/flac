@@ -17,6 +17,11 @@ type CueSheet struct {
 	Tracks []CueSheetTrack
 }
 
+// parseCueSheet reads and parses the body of an CueSheet metadata block.
+func (block *Block) parseCueSheet() error {
+	panic("not yet implemented.")
+}
+
 // CueSheetTrack contains the start offset of a track and other track specific
 // metadata.
 type CueSheetTrack struct {

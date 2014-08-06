@@ -11,3 +11,8 @@ type Application struct {
 	// Application data.
 	Data []byte
 }
+
+// parseApplication reads and parses the body of an Application metadata block.
+func (block *Block) parseApplication() error {
+	panic("not yet implemented.")
+}

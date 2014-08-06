@@ -1,7 +1,12 @@
 // Package meta implements access to FLAC metadata.
 package meta
 
-import "io"
+import (
+	"errors"
+	"io"
+
+	"github.com/mewkiz/pkg/bit"
+)
 
 // A Block contains the header and body of a metadata block.
 //
@@ -25,7 +30,7 @@ func New(r io.Reader) (block *Block, err error) {
 	if err != nil {
 		return nil, err
 	}
-	panic("not yet implemented.")
+	return block, nil
 }
 
 // Parse reads and parses the header and body of a metadata block. Use New for
@@ -42,9 +47,34 @@ func Parse(r io.Reader) (block *Block, err error) {
 	return block, nil
 }
 
+// Errors returned by Parse.
+var (
+	ErrReserved = errors.New("meta.Block.Parse: reserved block type")
+	ErrInvalid  = errors.New("meta.Block.Parse: invalid block type")
+)
+
 // Parse reads and parses the metadata block body.
 func (block *Block) Parse() error {
-	panic("not yet implemented.")
+	switch block.Type {
+	case TypeStreamInfo:
+		return block.parseStreamInfo()
+	case TypePadding:
+		return block.verifyPadding()
+	case TypeApplication:
+		return block.parseApplication()
+	case TypeSeekTable:
+		return block.parseSeekTable()
+	case TypeVorbisComment:
+		return block.parseVorbisComment()
+	case TypeCueSheet:
+		return block.parseCueSheet()
+	case TypePicture:
+		return block.parsePicture()
+	}
+	if block.Type >= 7 && block.Type <= 126 {
+		return ErrReserved
+	}
+	return ErrInvalid
 }
 
 // Skip ignores the contents of the metadata block body.
@@ -66,7 +96,31 @@ type Header struct {
 
 // parseHeader reads and parses the header of a metadata block.
 func (block *Block) parseHeader() error {
-	panic("not yet implemented.")
+	// 1 bit: IsLast.
+	br := bit.NewReader(block.r)
+	x, err := br.Read(1)
+	if err != nil {
+		return err
+	}
+	if x != 0 {
+		block.IsLast = true
+	}
+
+	// 7 bits: Type.
+	x, err = br.Read(1)
+	if err != nil {
+		return err
+	}
+	block.Type = Type(x)
+
+	// 24 bits: Length.
+	x, err = br.Read(1)
+	if err != nil {
+		return err
+	}
+	block.Length = int64(x)
+
+	return nil
 }
 
 // Type represents the type of a metadata block body.

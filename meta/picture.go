@@ -44,3 +44,8 @@ type Picture struct {
 	// Image data.
 	Data []byte
 }
+
+// parsePicture reads and parses the body of an Picture metadata block.
+func (block *Block) parsePicture() error {
+	panic("not yet implemented.")
+}

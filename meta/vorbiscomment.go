@@ -9,3 +9,8 @@ type VorbisComment struct {
 	// A list of tags, each represented by a name-value pair.
 	Tags [][2]string
 }
+
+// parseVorbisComment reads and parses the body of an VorbisComment metadata block.
+func (block *Block) parseVorbisComment() error {
+	panic("not yet implemented.")
+}

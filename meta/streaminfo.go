@@ -29,3 +29,8 @@ type StreamInfo struct {
 	// MD5 checksum of the unencoded audio data.
 	MD5sum [md5.BlockSize]uint8
 }
+
+// parseStreamInfo reads and parses the body of an StreamInfo metadata block.
+func (block *Block) parseStreamInfo() error {
+	panic("not yet implemented.")
+}
