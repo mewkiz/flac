@@ -52,13 +52,14 @@ func (block *Block) parseCueSheet() error {
 	if err != nil {
 		return err
 	}
-	if x&1 != 0 {
+	// mask = 10000000
+	if x&0x80 != 0 {
 		cs.IsCompactDisc = true
 	}
 
 	// 7 bits and 258 bytes: reserved.
-	// mask = 11111110
-	if x&0xFE != 0 {
+	// mask = 01111111
+	if x&0x7F != 0 {
 		return ErrInvalidPadding
 	}
 	lr := io.LimitReader(block.lr, 258)
@@ -104,18 +105,20 @@ func (block *Block) parseCueSheet() error {
 		if err != nil {
 			return err
 		}
-		if x&1 == 0 {
+		// mask = 10000000
+		if x&0x80 != 0 {
 			track.IsAudio = true
 		}
 
 		// 1 bit: HasPreEmphasis.
-		if x&2 == 0 {
+		// mask = 01000000
+		if x&0x40 != 0 {
 			track.HasPreEmphasis = true
 		}
 
 		// 6 bits and 13 bytes: reserved.
-		// mask = 11111110
-		if x&0xFC != 0 {
+		// mask = 00111111
+		if x&0x3F != 0 {
 			return ErrInvalidPadding
 		}
 		lr = io.LimitReader(block.lr, 13)
