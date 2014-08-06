@@ -1,0 +1,22 @@
+package frame
+
+import "io"
+
+// A Subframe contains the encoded audio samples from one channel of an audio
+// block (a part of the audio stream).
+//
+// ref: https://www.xiph.org/flac/format.html#subframe
+type Subframe struct {
+	// Subframe header.
+	SubHeader
+	// Unencoded audio samples. Samples is initially nil, and gets populated by a
+	// call to Frame.Parse.
+	Samples []int32
+	// Underlying io.Reader.
+	r io.Reader
+}
+
+// A SubHeader specifies the prediction method and order of a subframe.
+//
+// ref: https://www.xiph.org/flac/format.html#subframe_header
+type SubHeader struct{}
