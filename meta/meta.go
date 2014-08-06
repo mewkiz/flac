@@ -55,8 +55,8 @@ func Parse(r io.Reader) (block *Block, err error) {
 
 // Errors returned by Parse.
 var (
-	ErrReserved = errors.New("meta.Block.Parse: reserved block type")
-	ErrInvalid  = errors.New("meta.Block.Parse: invalid block type")
+	ErrReservedType = errors.New("meta.Block.Parse: reserved block type")
+	ErrInvalidType  = errors.New("meta.Block.Parse: invalid block type")
 )
 
 // Parse reads and parses the metadata block body.
@@ -78,9 +78,9 @@ func (block *Block) Parse() error {
 		return block.parsePicture()
 	}
 	if block.Type >= 7 && block.Type <= 126 {
-		return ErrReserved
+		return ErrReservedType
 	}
-	return ErrInvalid
+	return ErrInvalidType
 }
 
 // Skip ignores the contents of the metadata block body.

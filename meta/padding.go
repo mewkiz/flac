@@ -6,11 +6,6 @@ import (
 	"io/ioutil"
 )
 
-// Errors returned by verifyPadding.
-var (
-	ErrInvalidPadding = errors.New("meta.Block.verifyPadding: invalid padding")
-)
-
 // verifyPadding verifies the body of a Padding metadata block. It should only
 // contain zero-padding.
 //
@@ -20,6 +15,11 @@ func (block *Block) verifyPadding() error {
 	_, err := io.Copy(ioutil.Discard, zr)
 	return err
 }
+
+// Errors returned by zeros.Read.
+var (
+	ErrInvalidPadding = errors.New("invalid padding")
+)
 
 // zeros implements an io.Reader, with a Read method which returns an error if
 // any byte read isn't zero.
