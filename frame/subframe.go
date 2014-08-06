@@ -16,6 +16,14 @@ type Subframe struct {
 	r io.Reader
 }
 
+func (frame *Frame) parseSubframe() (subframe *Subframe, err error) {
+	err = subframe.parseHeader()
+	if err != nil {
+		return subframe, err
+	}
+	panic("not yet implemented.")
+}
+
 // A SubHeader specifies the prediction method and order of a subframe.
 //
 // ref: https://www.xiph.org/flac/format.html#subframe_header
@@ -23,6 +31,10 @@ type SubHeader struct {
 	// Specifies the prediction method used to encode the audio sample of the
 	// subframe.
 	Pred Pred
+}
+
+func (subframe *Subframe) parseHeader() error {
+	panic("not yet implemented.")
 }
 
 // Pred specifies the prediction method used to encode the audio samples of a

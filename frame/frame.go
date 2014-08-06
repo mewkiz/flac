@@ -8,6 +8,8 @@ import (
 	"io"
 
 	"github.com/mewkiz/pkg/bit"
+	"github.com/mewkiz/pkg/hashutil"
+	"github.com/mewkiz/pkg/hashutil/crc16"
 	"github.com/mewkiz/pkg/hashutil/crc8"
 )
 
@@ -21,6 +23,10 @@ type Frame struct {
 	Header
 	// One subframe per channel, containing encoded audio samples.
 	Subframes []*Subframe
+	// CRC-16 hash sum, calculated by read operations on hr.
+	crc hashutil.Hash16
+	// A CRC-16 hash reader, wrapping read operations to r.
+	hr io.Reader
 	// Underlying io.Reader.
 	r io.Reader
 }
@@ -29,18 +35,32 @@ type Frame struct {
 // parses an audio frame header. Call Frame.Parse to parse the audio samples of
 // its subframes, and Frame.Next to gain access to the next audio frame.
 func New(r io.Reader) (frame *Frame, err error) {
-	frame = &Frame{r: r}
+	// Create a new CRC-16 hash reader which adds the data from all read
+	// operations to a running hash.
+	crc := crc16.NewIBM()
+	hr := io.TeeReader(r, crc)
+
+	// Parse frame header.
+	frame = &Frame{crc: crc, hr: hr, r: r}
 	err = frame.parseHeader()
-	if err != nil {
-		return nil, err
-	}
-	panic("not yet implemented.")
+	return frame, err
 }
 
-// Next returns access to the next audio frame. It reads and parses an audio
-// frame header. Call Frame.Parse to parse the audio samples of its subframes.
-func (frame *Frame) Next() (next *Frame, err error) {
-	panic("not yet implemented.")
+// Parse reads and parses the header, and the audio samples from each subframe
+// of a frame. If the samples are interchannel correlated between the subframes,
+// it decorrelates them.
+//
+// ref: https://www.xiph.org/flac/format.html#interchannel
+func Parse(r io.Reader) (frame *Frame, err error) {
+	// Parse frame header.
+	frame, err = New(r)
+	if err != nil {
+		return frame, err
+	}
+
+	// Parse subframes.
+	err = frame.Parse()
+	return frame, err
 }
 
 // Parse reads and parses the audio samples from each subframe of the frame. If
@@ -49,7 +69,30 @@ func (frame *Frame) Next() (next *Frame, err error) {
 //
 // ref: https://www.xiph.org/flac/format.html#interchannel
 func (frame *Frame) Parse() error {
-	panic("not yet implemented.")
+	// Parse subframes.
+	frame.Subframes = make([]*Subframe, frame.Channels.Count())
+	var err error
+	for i := range frame.Subframes {
+		frame.Subframes[i], err = frame.parseSubframe()
+		if err != nil {
+			return err
+		}
+	}
+
+	// Decorrelate subframe samples.
+
+	// 2 bytes: CRC-16 checksum.
+	var want uint16
+	err = binary.Read(frame.r, binary.BigEndian, &want)
+	if err != nil {
+		return err
+	}
+	got := frame.crc.Sum16()
+	if got != want {
+		return fmt.Errorf("frame.Frame.Parse: CRC-16 checksum mismatch; expected %v, got %v", want, got)
+	}
+
+	return nil
 }
 
 // A Header contains the basic properties of an audio frame, such as its sample
@@ -87,10 +130,10 @@ var (
 
 // parseHeader reads and parses the header of an audio frame.
 func (frame *Frame) parseHeader() error {
-	// Create a new hash reader which adds the data from all read operations to a
-	// running hash.
+	// Create a new CRC-8 hash reader which adds the data from all read
+	// operations to a running hash.
 	h := crc8.NewATM()
-	hr := io.TeeReader(frame.r, h)
+	hr := io.TeeReader(frame.hr, h)
 
 	// 14 bits: sync-code (11111111111110)
 	br := bit.NewReader(hr)
@@ -339,7 +382,7 @@ func (frame *Frame) parseHeader() error {
 
 	// 1 byte: CRC-8 checksum.
 	var want uint8
-	err = binary.Read(frame.r, binary.BigEndian, &want)
+	err = binary.Read(frame.hr, binary.BigEndian, &want)
 	if err != nil {
 		return err
 	}
