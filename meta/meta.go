@@ -20,6 +20,7 @@ type Block struct {
 // a metadata block header. Call Block.Parse to parse the metadata block body,
 // and call Block.Skip to ignore it.
 func New(r io.Reader) (block *Block, err error) {
+	block = &Block{r: r}
 	err = block.parseHeader()
 	if err != nil {
 		return nil, err
