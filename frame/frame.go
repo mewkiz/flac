@@ -122,3 +122,9 @@ var nChannels = [...]int{
 	ChannelsSideRight:      2,
 	ChannelsMidSide:        2,
 }
+
+// Count returns the number of channels (subframes) used by the provided channel
+// assignment.
+func (channels Channels) Count() int {
+	return nChannels[channels]
+}
