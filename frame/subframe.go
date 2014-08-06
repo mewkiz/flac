@@ -6,7 +6,7 @@ import (
 	"io"
 
 	"github.com/mewkiz/pkg/bit"
-	"github.com/mewkiz/pkg/bitutil"
+	"github.com/mewkiz/pkg/bits"
 )
 
 // A Subframe contains the encoded audio samples from one channel of an audio
@@ -133,7 +133,7 @@ func (subframe *Subframe) parseHeader() error {
 	}
 	if x != 0 {
 		// The number of wasted bits-per-sample is unary coded.
-		_, err = bitutil.DecodeUnary(br)
+		_, err = bits.Unary(br)
 		if err != nil {
 			return err
 		}
@@ -333,5 +333,23 @@ func (subframe *Subframe) decodeRicePart(paramSize uint) error {
 
 // decodeRice decodes a Rice encoded residual (error signal).
 func (subframe *Subframe) decodeRice(k uint) error {
-	panic("not yet implemented.")
+	// Read unary encoded most significant bits.
+	br := subframe.br
+	high, err := bits.Unary(br)
+	if err != nil {
+		return err
+	}
+
+	// Read binary encoded least significant bits.
+	low, err := br.Read(k)
+	if err != nil {
+		return err
+	}
+	residual := int32(high<<k | low)
+
+	// ZigZag decode.
+	residual = bits.ZigZag(residual)
+	subframe.Samples = append(subframe.Samples, residual)
+
+	return nil
 }
