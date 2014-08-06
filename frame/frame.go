@@ -12,7 +12,7 @@ type Frame struct {
 	// Audio frame header.
 	Header
 	// One subframe per channel, containing encoded audio samples.
-	Subframes []Subframe
+	Subframes []*Subframe
 	// Underlying io.Reader.
 	r io.Reader
 }
