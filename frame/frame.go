@@ -47,8 +47,8 @@ func New(r io.Reader) (frame *Frame, err error) {
 }
 
 // Parse reads and parses the header, and the audio samples from each subframe
-// of a frame. If the samples are interchannel correlated between the subframes,
-// it decorrelates them.
+// of a frame. If the samples are inter-channel decorrelated between the
+// subframes, it correlates them.
 //
 // ref: https://www.xiph.org/flac/format.html#interchannel
 func Parse(r io.Reader) (frame *Frame, err error) {
@@ -64,23 +64,40 @@ func Parse(r io.Reader) (frame *Frame, err error) {
 }
 
 // Parse reads and parses the audio samples from each subframe of the frame. If
-// the samples are interchannel correlated between the subframes, it
-// decorrelates them.
+// the samples are inter-channel decorrelated between the subframes, it
+// correlates them.
 //
 // ref: https://www.xiph.org/flac/format.html#interchannel
 func (frame *Frame) Parse() error {
 	// Parse subframes.
 	frame.Subframes = make([]*Subframe, frame.Channels.Count())
 	var err error
-	for i := range frame.Subframes {
-		frame.Subframes[i], err = frame.parseSubframe()
+	for channel := range frame.Subframes {
+		// The side channel requires an extra bit per sample when using
+		// inter-channel decorrelation.
+		bps := uint(frame.BitsPerSample)
+		switch frame.Channels {
+		case ChannelsSideRight:
+			// channel 0 is the side channel.
+			if channel == 0 {
+				bps++
+			}
+		case ChannelsLeftSide, ChannelsMidSide:
+			// channel 1 is the side channel.
+			if channel == 1 {
+				bps++
+			}
+		}
+
+		// Parse subframe.
+		frame.Subframes[channel], err = frame.parseSubframe(bps)
 		if err != nil {
 			return err
 		}
 	}
 
-	// Decorrelate subframe samples.
-	// TODO(u): Implement interchannel decorrelation of samples.
+	// Inter-channel correlation of subframe samples.
+	frame.correlate()
 
 	// 2 bytes: CRC-16 checksum.
 	var want uint16
@@ -112,7 +129,7 @@ type Header struct {
 	// StreamInfo.
 	SampleRate uint32
 	// Specifies the number of channels (subframes) that exist in the frame,
-	// their order and possible interchannel correlation.
+	// their order and possible inter-channel decorrelation.
 	Channels Channels
 	// Sample size in bits-per-sample; a 0 value implies unknown, get sample size
 	// from StreamInfo.
@@ -181,17 +198,17 @@ func (frame *Frame) parseHeader() error {
 	// 4 bits: Channels.
 	//
 	// The 4 bits are used to specify the channels as follows:
-	//    0000: (1 channel) mono
-	//    0001: (2 channels) left, right
-	//    0010: (3 channels) left, right, center
-	//    0011: (4 channels) left, right, left surround, right surround
-	//    0100: (5 channels) left, right, center, left surround, right surround
-	//    0101: (6 channels) left, right, center, LFE, left surround, right surround
-	//    0110: (7 channels) left, right, center, LFE, center surround, side left, side right
-	//    0111: (8 channels) left, right, center, LFE, left surround, right surround, side left, side right
-	//    1000: (2 channels) left, side; using interchannel correlation
-	//    1001: (2 channels) side, right; using interchannel correlation
-	//    1010: (2 channels) mid, side; using interchannel correlation
+	//    0000: (1 channel) mono.
+	//    0001: (2 channels) left, right.
+	//    0010: (3 channels) left, right, center.
+	//    0011: (4 channels) left, right, left surround, right surround.
+	//    0100: (5 channels) left, right, center, left surround, right surround.
+	//    0101: (6 channels) left, right, center, LFE, left surround, right surround.
+	//    0110: (7 channels) left, right, center, LFE, center surround, side left, side right.
+	//    0111: (8 channels) left, right, center, LFE, left surround, right surround, side left, side right.
+	//    1000: (2 channels) left, side; using inter-channel decorrelation.
+	//    1001: (2 channels) side, right; using inter-channel decorrelation.
+	//    1010: (2 channels) mid, side; using inter-channel decorrelation.
 	//    1011: reserved.
 	//    1100: reserved.
 	//    1101: reserved.
@@ -396,7 +413,7 @@ func (frame *Frame) parseHeader() error {
 }
 
 // Channels specifies the number of channels (subframes) that exist in a frame,
-// their order and possible interchannel correlation.
+// their order and possible inter-channel decorrelation.
 type Channels uint8
 
 // Channel assignments. The following abbreviations are used:
@@ -413,17 +430,17 @@ type Channels uint8
 // The first 6 channel constants follow the SMPTE/ITU-R channel order:
 //    L R C Lfe Ls Rs
 const (
-	ChannelsMono           Channels = iota // 1 channel: mono
-	ChannelsLR                             // 2 channels: left, right
-	ChannelsLRC                            // 3 channels: left, right, center
-	ChannelsLRLsRs                         // 4 channels: left, right, left surround, right surround
-	ChannelsLRCLsRs                        // 5 channels: left, right, center, left surround, right surround
-	ChannelsLRCLfeLsRs                     // 6 channels: left, right, center, LFE, left surround, right surround
-	ChannelsLRCLfeCsSlSr                   // 7 channels: left, right, center, LFE, center surround, side left, side right
-	ChannelsLRCLfeLsRsSlSr                 // 8 channels: left, right, center, LFE, left surround, right surround, side left, side right
-	ChannelsLeftSide                       // 2 channels: left, side; using interchannel correlation
-	ChannelsSideRight                      // 2 channels: side, right; using interchannel correlation
-	ChannelsMidSide                        // 2 channels: mid, side; using interchannel correlation
+	ChannelsMono           Channels = iota // 1 channel: mono.
+	ChannelsLR                             // 2 channels: left, right.
+	ChannelsLRC                            // 3 channels: left, right, center.
+	ChannelsLRLsRs                         // 4 channels: left, right, left surround, right surround.
+	ChannelsLRCLsRs                        // 5 channels: left, right, center, left surround, right surround.
+	ChannelsLRCLfeLsRs                     // 6 channels: left, right, center, LFE, left surround, right surround.
+	ChannelsLRCLfeCsSlSr                   // 7 channels: left, right, center, LFE, center surround, side left, side right.
+	ChannelsLRCLfeLsRsSlSr                 // 8 channels: left, right, center, LFE, left surround, right surround, side left, side right.
+	ChannelsLeftSide                       // 2 channels: left, side; using inter-channel decorrelation.
+	ChannelsSideRight                      // 2 channels: side, right; using inter-channel decorrelation.
+	ChannelsMidSide                        // 2 channels: mid, side; using inter-channel decorrelation.
 )
 
 // nChannels specifies the number of channels used by each channel assignment.
@@ -445,4 +462,50 @@ var nChannels = [...]int{
 // assignment.
 func (channels Channels) Count() int {
 	return nChannels[channels]
+}
+
+// correlate reverts any inter-channel decorrelation between the samples of the
+// subframes.
+//
+// An encoder decorrelates audio samples as follows:
+//    mid = (left + right)/2
+//    side = left - right
+func (frame *Frame) correlate() {
+	switch frame.Channels {
+	case ChannelsLeftSide:
+		// 2 channels: left, side; using inter-channel decorrelation.
+		left := frame.Subframes[0].Samples
+		side := frame.Subframes[1].Samples
+		for i := range side {
+			// right = left - side
+			side[i] = left[i] - side[i]
+		}
+	case ChannelsSideRight:
+		// 2 channels: side, right; using inter-channel decorrelation.
+		side := frame.Subframes[0].Samples
+		right := frame.Subframes[1].Samples
+		// left = right + side
+		for i := range side {
+			side[i] += right[i]
+		}
+	case ChannelsMidSide:
+		// 2 channels: mid, side; using inter-channel decorrelation.
+		mid := frame.Subframes[0].Samples
+		side := frame.Subframes[1].Samples
+		for i := range side {
+			// left = (2*mid + side)/2
+			// right = (2*mid - side)/2
+			m := mid[i]
+			s := side[i]
+			m *= 2
+			// Notice that the integer division in mid = (left + right)/2 discards
+			// the least significant bit. It can be reconstructed however, since a
+			// sum A+B and a differance A-B has the same least significant bit.
+			//
+			// ref: Data Compression: The Complete Reference (ch. 7, Decorrelation)
+			m |= s & 1
+			mid[i] = (m + s) / 2
+			side[i] = (m - s) / 2
+		}
+	}
 }

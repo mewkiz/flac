@@ -25,13 +25,27 @@ type Subframe struct {
 
 // parseSubframe reads and parses the header, and the audio samples of a
 // subframe.
-func (frame *Frame) parseSubframe() (subframe *Subframe, err error) {
+func (frame *Frame) parseSubframe(bps uint) (subframe *Subframe, err error) {
+	// Parse subframe header.
 	subframe = &Subframe{r: frame.hr}
 	err = subframe.parseHeader()
 	if err != nil {
 		return subframe, err
 	}
-	panic("not yet implemented.")
+
+	// Decode subframe audio samples.
+	subframe.Samples = make([]int32, frame.BlockSize)
+	switch subframe.Pred {
+	case PredConstant:
+		err = subframe.decodeConstant(bps)
+	case PredVerbatim:
+		err = subframe.decodeVerbatim(bps)
+	case PredFixed:
+		err = subframe.decodeFixed()
+	case PredLPC:
+		err = subframe.decodeLPC()
+	}
+	return subframe, err
 }
 
 // A SubHeader specifies the prediction method and order of a subframe.
@@ -134,3 +148,70 @@ const (
 	PredFixed
 	PredLPC
 )
+
+// signExtend interprets x as a signed n-bit integer value and sign extends it
+// to 32 bits.
+func signExtend(x uint64, n uint) int32 {
+	// x is signed if its most significant bit is set.
+	if x&(1<<(n-1)) != 0 {
+		// Sign extend x.
+		return int32(x | ^uint64(0)<<n)
+	}
+	return int32(x)
+}
+
+// decodeConstant reads an unencoded audio sample of the subframe. Each sample
+// of the subframe has this constant value. The constant encoding can be thought
+// of as run-length encoding.
+//
+// ref: https://www.xiph.org/flac/format.html#subframe_constant
+func (subframe *Subframe) decodeConstant(bps uint) error {
+	// (bits-per-sample) bits: Unencoded constant value of the subblock.
+	br := bit.NewReader(subframe.r)
+	x, err := br.Read(bps)
+	if err != nil {
+		return err
+	}
+
+	// Each sample of the subframe has the same constant value.
+	sample := signExtend(x, bps)
+	for i := range subframe.Samples {
+		subframe.Samples[i] = sample
+	}
+
+	return nil
+}
+
+// decodeVerbatim reads the unencoded audio samples of the subframe.
+//
+// ref: https://www.xiph.org/flac/format.html#subframe_verbatim
+func (subframe *Subframe) decodeVerbatim(bps uint) error {
+	// Parse the unencoded audio samples of the subframe.
+	br := bit.NewReader(subframe.r)
+	for i := range subframe.Samples {
+		// (bits-per-sample) bits: Unencoded constant value of the subblock.
+		x, err := br.Read(bps)
+		if err != nil {
+			return err
+		}
+		sample := signExtend(x, bps)
+		subframe.Samples[i] = sample
+	}
+	return nil
+}
+
+// decodeFixed decodes the linear prediction coded samples of the subframe,
+// using a fixed set of predefined polynomial coefficients.
+//
+// ref: https://www.xiph.org/flac/format.html#subframe_fixed
+func (subframe *Subframe) decodeFixed() error {
+	panic("not yet implemented.")
+}
+
+// decodeLPC decodes the linear prediction coded samples of the subframe, using
+// polynomial coefficients stored in the stream.
+//
+// ref: https://www.xiph.org/flac/format.html#subframe_lpc
+func (subframe *Subframe) decodeLPC() error {
+	panic("not yet implemented.")
+}
