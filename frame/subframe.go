@@ -19,4 +19,20 @@ type Subframe struct {
 // A SubHeader specifies the prediction method and order of a subframe.
 //
 // ref: https://www.xiph.org/flac/format.html#subframe_header
-type SubHeader struct{}
+type SubHeader struct {
+	// Specifies the prediction method used to encode the audio sample of the
+	// subframe.
+	Pred Pred
+}
+
+// Pred specifies the prediction method used to encode the audio samples of a
+// subframe.
+type Pred uint8
+
+// Prediction methods.
+const (
+	PredConstant Pred = iota
+	PredVerbatim
+	PredFixed
+	PredLPC
+)
