@@ -1,5 +1,10 @@
 package meta
 
+import (
+	"encoding/binary"
+	"io"
+)
+
 // Picture contains the image data of an embedded picture.
 //
 // ref: https://www.xiph.org/flac/format.html#metadata_block_picture
@@ -47,5 +52,73 @@ type Picture struct {
 
 // parsePicture reads and parses the body of an Picture metadata block.
 func (block *Block) parsePicture() error {
-	panic("not yet implemented.")
+	// 32 bits: Type.
+	pic := new(Picture)
+	block.Body = pic
+	err := binary.Read(block.lr, binary.BigEndian, &pic.Type)
+	if err != nil {
+		return err
+	}
+
+	// 32 bits: (MIME type length).
+	var x uint32
+	err = binary.Read(block.lr, binary.BigEndian, &x)
+	if err != nil {
+		return err
+	}
+
+	// (MIME type length) bytes: MIMEType.
+	buf, err := readBytes(block.lr, int(x))
+	if err != nil {
+		return err
+	}
+	pic.MIMEType = string(buf)
+
+	// 32 bits: (description length).
+	err = binary.Read(block.lr, binary.BigEndian, &x)
+	if err != nil {
+		return err
+	}
+
+	// (description length) bytes: Desc.
+	buf, err = readBytes(block.lr, int(x))
+	if err != nil {
+		return err
+	}
+	pic.Desc = string(buf)
+
+	// 32 bits: Width.
+	err = binary.Read(block.lr, binary.BigEndian, &pic.Width)
+	if err != nil {
+		return err
+	}
+
+	// 32 bits: Height.
+	err = binary.Read(block.lr, binary.BigEndian, &pic.Height)
+	if err != nil {
+		return err
+	}
+
+	// 32 bits: Depth.
+	err = binary.Read(block.lr, binary.BigEndian, &pic.Depth)
+	if err != nil {
+		return err
+	}
+
+	// 32 bits: NPalColors.
+	err = binary.Read(block.lr, binary.BigEndian, &pic.NPalColors)
+	if err != nil {
+		return err
+	}
+
+	// 32 bits: (data length).
+	err = binary.Read(block.lr, binary.BigEndian, &x)
+	if err != nil {
+		return err
+	}
+
+	// (data length) bytes: Data.
+	pic.Data = make([]byte, x)
+	_, err = io.ReadFull(block.lr, pic.Data)
+	return err
 }

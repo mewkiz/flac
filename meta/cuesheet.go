@@ -1,3 +1,5 @@
+// TODO(u): Implement error handling for CueSheet parsing.
+
 package meta
 
 import (
