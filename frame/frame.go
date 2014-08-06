@@ -33,7 +33,7 @@ type Frame struct {
 
 // New creates a new Frame for accessing the audio samples of r. It reads and
 // parses an audio frame header. Call Frame.Parse to parse the audio samples of
-// its subframes, and Frame.Next to gain access to the next audio frame.
+// its subframes.
 func New(r io.Reader) (frame *Frame, err error) {
 	// Create a new CRC-16 hash reader which adds the data from all read
 	// operations to a running hash.
@@ -80,6 +80,7 @@ func (frame *Frame) Parse() error {
 	}
 
 	// Decorrelate subframe samples.
+	// TODO(u): Implement interchannel decorrelation of samples.
 
 	// 2 bytes: CRC-16 checksum.
 	var want uint16
