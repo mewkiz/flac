@@ -35,13 +35,16 @@ func (block *Block) parseVorbisComment() error {
 	block.Body = comment
 	comment.Vendor = string(buf)
 
+	// Parse tags.
 	// 32 bits: number of tags.
 	err = binary.Read(block.lr, binary.LittleEndian, &x)
 	if err != nil {
 		return err
 	}
+	if x < 1 {
+		return nil
+	}
 	comment.Tags = make([][2]string, x)
-
 	for i := range comment.Tags {
 		// 32 bits: vector length
 		err = binary.Read(block.lr, binary.LittleEndian, &x)
