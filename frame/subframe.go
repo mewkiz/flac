@@ -19,6 +19,10 @@ type Subframe struct {
 	// Unencoded audio samples. Samples is initially nil, and gets populated by a
 	// call to Frame.Parse.
 	Samples []int32
+	// Number of audio samples in the subframe.
+	NSamples int
+	// A bit reader, wrapping read operations to r.
+	br *bit.Reader
 	// Underlying io.Reader.
 	r io.Reader
 }
@@ -27,21 +31,23 @@ type Subframe struct {
 // subframe.
 func (frame *Frame) parseSubframe(bps uint) (subframe *Subframe, err error) {
 	// Parse subframe header.
-	subframe = &Subframe{r: frame.hr}
+	br := subframe.br
+	subframe = &Subframe{br: br, r: frame.hr}
 	err = subframe.parseHeader()
 	if err != nil {
 		return subframe, err
 	}
 
 	// Decode subframe audio samples.
-	subframe.Samples = make([]int32, frame.BlockSize)
+	subframe.NSamples = int(frame.BlockSize)
+	subframe.Samples = make([]int32, 0, subframe.NSamples)
 	switch subframe.Pred {
 	case PredConstant:
 		err = subframe.decodeConstant(bps)
 	case PredVerbatim:
 		err = subframe.decodeVerbatim(bps)
 	case PredFixed:
-		err = subframe.decodeFixed()
+		err = subframe.decodeFixed(bps)
 	case PredLPC:
 		err = subframe.decodeLPC()
 	}
@@ -56,13 +62,13 @@ type SubHeader struct {
 	// subframe.
 	Pred Pred
 	// Prediction order used by fixed and LPC decoding.
-	Order uint8
+	Order int
 }
 
 // parseHeader reads and parses the header of a subframe.
 func (subframe *Subframe) parseHeader() error {
 	// 1 bit: zero-padding.
-	br := bit.NewReader(subframe.r)
+	br := subframe.br
 	x, err := br.Read(1)
 	if err != nil {
 		return err
@@ -105,7 +111,7 @@ func (subframe *Subframe) parseHeader() error {
 		//       Fixed prediction method; xxx=order
 		//    else
 		//       reserved.
-		order := uint8(x & 0x07)
+		order := int(x & 0x07)
 		if order > 4 {
 			return fmt.Errorf("frame.Subframe.parseHeader: reserved prediction method bit pattern (%06b)", x)
 		}
@@ -117,7 +123,7 @@ func (subframe *Subframe) parseHeader() error {
 	default:
 		// 1xxxxx: LPC prediction method; xxxxx=order-1
 		subframe.Pred = PredLPC
-		subframe.Order = uint8(x&0x1F) + 1
+		subframe.Order = int(x&0x1F) + 1
 	}
 
 	// 1 bit: hasWastedBits.
@@ -167,7 +173,7 @@ func signExtend(x uint64, n uint) int32 {
 // ref: https://www.xiph.org/flac/format.html#subframe_constant
 func (subframe *Subframe) decodeConstant(bps uint) error {
 	// (bits-per-sample) bits: Unencoded constant value of the subblock.
-	br := bit.NewReader(subframe.r)
+	br := subframe.br
 	x, err := br.Read(bps)
 	if err != nil {
 		return err
@@ -175,8 +181,8 @@ func (subframe *Subframe) decodeConstant(bps uint) error {
 
 	// Each sample of the subframe has the same constant value.
 	sample := signExtend(x, bps)
-	for i := range subframe.Samples {
-		subframe.Samples[i] = sample
+	for i := 0; i < subframe.NSamples; i++ {
+		subframe.Samples = append(subframe.Samples, sample)
 	}
 
 	return nil
@@ -187,25 +193,54 @@ func (subframe *Subframe) decodeConstant(bps uint) error {
 // ref: https://www.xiph.org/flac/format.html#subframe_verbatim
 func (subframe *Subframe) decodeVerbatim(bps uint) error {
 	// Parse the unencoded audio samples of the subframe.
-	br := bit.NewReader(subframe.r)
-	for i := range subframe.Samples {
+	br := subframe.br
+	for i := 0; i < subframe.NSamples; i++ {
 		// (bits-per-sample) bits: Unencoded constant value of the subblock.
 		x, err := br.Read(bps)
 		if err != nil {
 			return err
 		}
 		sample := signExtend(x, bps)
-		subframe.Samples[i] = sample
+		subframe.Samples = append(subframe.Samples, sample)
 	}
 	return nil
+}
+
+// fixedCoeffs maps from prediction order to the LPC coefficients used in fixed
+// encoding.
+//
+//    x_0[n] = 0
+//    x_1[n] = x[n-1]
+//    x_2[n] = 2*x[n-1] - x[n-2]
+//    x_3[n] = 3*x[n-1] - 3*x[n-2] + x[n-3]
+//    x_4[n] = 4*x[n-1] - 6*x[n-2] + 4*x[n-3] - x[n-4]
+var fixedCoeffs = [...][]int32{
+	// ref: Section 2.2 of http://www.hpl.hp.com/techreports/1999/HPL-1999-144.pdf
+	1: {1},
+	2: {2, -1},
+	3: {3, -3, 1},
+	// ref: Data Compression: The Complete Reference (7.10.1)
+	4: {4, -6, 4, -1},
 }
 
 // decodeFixed decodes the linear prediction coded samples of the subframe,
 // using a fixed set of predefined polynomial coefficients.
 //
 // ref: https://www.xiph.org/flac/format.html#subframe_fixed
-func (subframe *Subframe) decodeFixed() error {
-	panic("not yet implemented.")
+func (subframe *Subframe) decodeFixed(bps uint) error {
+	// Parse unencoded warmup samples.
+	br := subframe.br
+	for i := 0; i < subframe.Order; i++ {
+		// (bits-per-sample) bits: Unencoded warmup sample.
+		x, err := br.Read(bps)
+		if err != nil {
+			return err
+		}
+		sample := signExtend(x, bps)
+		subframe.Samples = append(subframe.Samples, sample)
+	}
+
+	return subframe.decodeResidual()
 }
 
 // decodeLPC decodes the linear prediction coded samples of the subframe, using
@@ -213,5 +248,90 @@ func (subframe *Subframe) decodeFixed() error {
 //
 // ref: https://www.xiph.org/flac/format.html#subframe_lpc
 func (subframe *Subframe) decodeLPC() error {
+	panic("not yet implemented.")
+}
+
+// decodeResidual decodes the encoded residuals (prediction method error
+// signals) of the subframe.
+//
+// ref: https://www.xiph.org/flac/format.html#residual
+func (subframe *Subframe) decodeResidual() error {
+	// 2 bits: Residual coding method.
+	br := subframe.br
+	x, err := br.Read(2)
+	if err != nil {
+		return err
+	}
+	// The 2 bits are used to specify the residual coding method as follows:
+	//    00: Rice coding with a 4-bit Rice parameter.
+	//    01: Rice coding with a 5-bit Rice parameter.
+	//    10: reserved.
+	//    11: reserved.
+	switch x {
+	case 0x0:
+		return subframe.decodeRicePart(4)
+	case 0x1:
+		return subframe.decodeRicePart(5)
+	default:
+		return fmt.Errorf("frame.Subframe.decodeResidual: reserved residual coding method bit pattern (%02b)", x)
+	}
+}
+
+// decodeRicePart decodes a Rice partition of encoded residuals from the
+// subframe, using a Rice parameter of the specified size in bits.
+//
+// ref: https://www.xiph.org/flac/format.html#partitioned_rice
+// ref: https://www.xiph.org/flac/format.html#partitioned_rice2
+func (subframe *Subframe) decodeRicePart(paramSize uint) error {
+	// 4 bits: Partition order.
+	br := subframe.br
+	x, err := br.Read(4)
+	if err != nil {
+		return err
+	}
+	partOrder := x
+
+	// Parse Rice partitions; in total 2^partOrder partitions.
+	//
+	// ref: https://www.xiph.org/flac/format.html#rice_partition
+	// ref: https://www.xiph.org/flac/format.html#rice2_partition
+	nparts := 1 << partOrder
+	for i := 0; i < nparts; i++ {
+		// (4 or 5) bits: Rice parameter.
+		x, err = br.Read(paramSize)
+		if err != nil {
+			return err
+		}
+		if paramSize == 4 && x == 0xF || paramSize == 4 && x == 0x1F {
+			// 1111 or 11111: Escape code, meaning the partition is in unencoded
+			// binary form using n bits per sample; n follows as a 5-bit number.
+			panic("not yet implemented; Rice parameter escape code.")
+		}
+		param := uint(x)
+
+		// Determine the number of Rice encoded samples in the partition.
+		var nsamples int
+		if partOrder == 0 {
+			nsamples = subframe.NSamples - subframe.Order
+		} else if i != 0 {
+			nsamples = subframe.NSamples / nparts
+		} else {
+			nsamples = subframe.NSamples/nparts - subframe.Order
+		}
+
+		// Decode the Rice encoded residuals of the partition.
+		for j := 0; j < nsamples; j++ {
+			err = subframe.decodeRice(param)
+			if err != nil {
+				return err
+			}
+		}
+	}
+
+	return nil
+}
+
+// decodeRice decodes a Rice encoded residual (error signal).
+func (subframe *Subframe) decodeRice(k uint) error {
 	panic("not yet implemented.")
 }
