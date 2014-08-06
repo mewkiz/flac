@@ -1,6 +1,13 @@
 package meta
 
-import "crypto/md5"
+import (
+	"crypto/md5"
+	"errors"
+	"fmt"
+	"io"
+
+	"github.com/mewkiz/pkg/bit"
+)
 
 // StreamInfo contains the basic properties of a FLAC audio stream, such as its
 // sample rate and channel count. It is the only mandatory metadata block and
@@ -8,9 +15,11 @@ import "crypto/md5"
 //
 // ref: https://www.xiph.org/flac/format.html#metadata_block_streaminfo
 type StreamInfo struct {
-	// Minimum block size (in samples) used in the stream.
+	// Minimum block size (in samples) used in the stream; between 16 and 65535
+	// samples.
 	BlockSizeMin uint16
-	// Maximum block size (in samples) used in the stream.
+	// Maximum block size (in samples) used in the stream; between 16 and 65535
+	// samples.
 	BlockSizeMax uint16
 	// Minimum frame size in bytes; a 0 value implies unknown.
 	FrameSizeMin uint32
@@ -27,10 +36,82 @@ type StreamInfo struct {
 	// 0 value implies unknown.
 	NSamples uint64
 	// MD5 checksum of the unencoded audio data.
-	MD5sum [md5.BlockSize]uint8
+	MD5sum [md5.Size]uint8
 }
 
 // parseStreamInfo reads and parses the body of an StreamInfo metadata block.
 func (block *Block) parseStreamInfo() error {
-	panic("not yet implemented.")
+	// 16 bits: BlockSizeMin.
+	br := bit.NewReader(block.lr)
+	x, err := br.Read(16)
+	if err != nil {
+		return err
+	}
+	if x < 16 {
+		return fmt.Errorf("meta.Block.parseStreamInfo: invalid minimum block size (%d); expected >= 16", x)
+	}
+	si := new(StreamInfo)
+	block.Body = si
+	si.BlockSizeMin = uint16(x)
+
+	// 16 bits: BlockSizeMax.
+	x, err = br.Read(16)
+	if err != nil {
+		return err
+	}
+	if x < 16 {
+		return fmt.Errorf("meta.Block.parseStreamInfo: invalid maximum block size (%d); expected >= 16", x)
+	}
+	si.BlockSizeMax = uint16(x)
+
+	// 24 bits: FrameSizeMin.
+	x, err = br.Read(24)
+	if err != nil {
+		return err
+	}
+	si.FrameSizeMin = uint32(x)
+
+	// 24 bits: FrameSizeMax.
+	x, err = br.Read(24)
+	if err != nil {
+		return err
+	}
+	si.FrameSizeMax = uint32(x)
+
+	// 20 bits: SampleRate.
+	x, err = br.Read(20)
+	if err != nil {
+		return err
+	}
+	if x == 0 {
+		return errors.New("meta.Block.parseStreamInfo: invalid sample rate (0)")
+	}
+	si.SampleRate = uint32(x)
+
+	// 3 bits: NChannels.
+	x, err = br.Read(3)
+	if err != nil {
+		return err
+	}
+	// x contains: (number of channels) - 1
+	si.NChannels = uint8(x + 1)
+
+	// 5 bits: BitsPerSample.
+	x, err = br.Read(5)
+	if err != nil {
+		return err
+	}
+	// x contains: (bits-per-sample) - 1
+	si.BitsPerSample = uint8(x + 1)
+
+	// 36 bits: NSamples.
+	x, err = br.Read(36)
+	if err != nil {
+		return err
+	}
+	si.NSamples = x
+
+	// 16 bytes: MD5sum.
+	_, err = io.ReadFull(block.lr, si.MD5sum[:])
+	return err
 }

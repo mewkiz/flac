@@ -20,6 +20,7 @@ type Application struct {
 // parseApplication reads and parses the body of an Application metadata block.
 func (block *Block) parseApplication() error {
 	app := new(Application)
+	block.Body = app
 	err := binary.Read(block.lr, binary.BigEndian, &app.ID)
 	if err != nil {
 		return err
