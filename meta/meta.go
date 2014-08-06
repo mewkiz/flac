@@ -9,8 +9,8 @@ import "io"
 type Block struct {
 	// Metadata block header.
 	Header
-	// Metadata block body of type *StreamInfo, *Application, ... etc. It is
-	// initially nil, and gets populated by a call to Parse.
+	// Metadata block body of type *StreamInfo, *Application, ... etc. Body is
+	// initially nil, and gets populated by a call to Block.Parse.
 	Body interface{}
 	// Underlying io.Reader.
 	r io.Reader
