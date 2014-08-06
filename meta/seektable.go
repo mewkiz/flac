@@ -3,6 +3,7 @@ package meta
 import (
 	"encoding/binary"
 	"errors"
+	"fmt"
 )
 
 // SeekTable contains one or more pre-calculated audio frame seek points.
@@ -23,10 +24,24 @@ func (block *Block) parseSeekTable() error {
 	}
 	table := &SeekTable{Points: make([]SeekPoint, n)}
 	block.Body = table
+	var prev uint64
 	for i := range table.Points {
-		err := binary.Read(block.lr, binary.LittleEndian, &table.Points[i])
+		point := &table.Points[i]
+		err := binary.Read(block.lr, binary.LittleEndian, point)
 		if err != nil {
 			return err
+		}
+		// Seek points within a table must be sorted in ascending order by sample
+		// number. Each seek point must have a unique sample number, except for
+		// placeholder points.
+		sampleNum := point.SampleNum
+		if i != 0 && sampleNum != PlaceholderPoint {
+			switch {
+			case sampleNum < prev:
+				return fmt.Errorf("meta.Block.parseSeekTable: invalid seek point order; sample number (%d) < prev (%d)", sampleNum, prev)
+			case sampleNum == prev:
+				return fmt.Errorf("meta.Block.parseSeekTable: duplicate seek point with sample number (%d)", sampleNum)
+			}
 		}
 	}
 	return nil
@@ -46,3 +61,7 @@ type SeekPoint struct {
 	// Number of samples in the target frame.
 	NSamples uint16
 }
+
+// PlaceholderPoint represent the sample number used to specify placeholder seek
+// points.
+const PlaceholderPoint = 0xFFFFFFFFFFFFFFFF
