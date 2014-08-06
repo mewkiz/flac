@@ -27,7 +27,7 @@ func (block *Block) parseSeekTable() error {
 	var prev uint64
 	for i := range table.Points {
 		point := &table.Points[i]
-		err := binary.Read(block.lr, binary.LittleEndian, point)
+		err := binary.Read(block.lr, binary.BigEndian, point)
 		if err != nil {
 			return err
 		}
