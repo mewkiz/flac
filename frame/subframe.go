@@ -49,7 +49,7 @@ func (frame *Frame) parseSubframe(bps uint) (subframe *Subframe, err error) {
 	case PredFixed:
 		err = subframe.decodeFixed(bps)
 	case PredFIR:
-		err = subframe.decodeFIR()
+		err = subframe.decodeFIR(bps)
 	}
 	return subframe, err
 }
@@ -249,15 +249,64 @@ func (subframe *Subframe) decodeFixed(bps uint) error {
 	// Predict the audio samples of the subframe using a polynomial with
 	// predefined coefficients of a given order. Correct signal errors using the
 	// decoded residuals.
-	return subframe.decodeLPC(fixedCoeffs[subframe.Order])
+	return subframe.decodeLPC(fixedCoeffs[subframe.Order], 0)
 }
 
 // decodeFIR decodes the linear prediction coded samples of the subframe, using
 // polynomial coefficients stored in the stream.
 //
 // ref: https://www.xiph.org/flac/format.html#subframe_lpc
-func (subframe *Subframe) decodeFIR() error {
-	panic("not yet implemented.")
+func (subframe *Subframe) decodeFIR(bps uint) error {
+	// Parse unencoded warm-up samples.
+	br := subframe.br
+	for i := 0; i < subframe.Order; i++ {
+		// (bits-per-sample) bits: Unencoded warm-up sample.
+		x, err := br.Read(bps)
+		if err != nil {
+			return err
+		}
+		sample := signExtend(x, bps)
+		subframe.Samples = append(subframe.Samples, sample)
+	}
+
+	// 4 bits: (coefficients' precision in bits) - 1.
+	x, err := br.Read(4)
+	if err != nil {
+		return err
+	}
+	if x == 0xF {
+		return errors.New("frame.Subframe.decodeFIR: invalid coefficient precision bit pattern (1111)")
+	}
+	prec := uint(x) + 1
+
+	// 5 bits: predictor coefficient shift needed in bits.
+	x, err = br.Read(5)
+	if err != nil {
+		return err
+	}
+	shift := signExtend(x, 5)
+
+	// Parse coefficients.
+	coeffs := make([]int32, subframe.Order)
+	for i := range coeffs {
+		// (prec) bits: Predictor coefficient.
+		x, err = br.Read(prec)
+		if err != nil {
+			return err
+		}
+		coeffs[i] = signExtend(x, prec)
+	}
+
+	// Decode subframe residuals.
+	err = subframe.decodeResidual()
+	if err != nil {
+		return err
+	}
+
+	// Predict the audio samples of the subframe using a polynomial with
+	// predefined coefficients of a given order. Correct signal errors using the
+	// decoded residuals.
+	return subframe.decodeLPC(coeffs, shift)
 }
 
 // decodeResidual decodes the encoded residuals (prediction method error
@@ -366,16 +415,19 @@ func (subframe *Subframe) decodeRiceResidual(k uint) error {
 // decodeLPC decodes linear prediction coded audio samples, using the
 // coefficients of a given polynomial, a couple of unencoded warm-up samples,
 // and the signal errors of the prediction as specified by the residuals.
-func (subframe *Subframe) decodeLPC(coeffs []int32) error {
+func (subframe *Subframe) decodeLPC(coeffs []int32, shift int32) error {
 	if len(coeffs) != subframe.Order {
 		return fmt.Errorf("frame.Subframe.decodeLPC: prediction order (%d) differs from number of coefficients (%d)", subframe.Order, len(coeffs))
+	}
+	if shift < 0 {
+		panic("not yet implemented; negative shift.")
 	}
 	for i := subframe.Order; i < subframe.NSamples; i++ {
 		var sample int32
 		for j, c := range coeffs {
 			sample += c * subframe.Samples[i-j-1]
 		}
-		subframe.Samples[i] += sample
+		subframe.Samples[i] += sample >> uint(shift)
 	}
 	return nil
 }
