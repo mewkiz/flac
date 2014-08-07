@@ -1,3 +1,5 @@
+// TODO(u): Verify the decoded audio samples using StreamInfo.MD5sum.
+
 // Package frame implements access to FLAC audio frames.
 package frame
 
