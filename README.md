@@ -7,7 +7,7 @@ subject to change. The documentation can be inaccurate.
 flac
 ====
 
-This project provides access to [FLAC][1] (Free Lossless Audio Codec) streams.
+This package provides access to [FLAC][1] (Free Lossless Audio Codec) streams.
 
 [1]: http://flac.sourceforge.net/format.html
 
@@ -16,7 +16,7 @@ Documentation
 
 Documentation provided by GoDoc.
 
-- [flac][]: implements access to FLAC (Free Lossless Audio Codec) streams.
+- [flac][]: provides access to FLAC (Free Lossless Audio Codec) streams.
 	- [frame][]: implements access to FLAC audio frames.
 	- [meta][]: implements access to FLAC metadata.
 
