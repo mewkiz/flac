@@ -17,12 +17,12 @@ Documentation
 Documentation provided by GoDoc.
 
 - [flac][]: provides access to FLAC (Free Lossless Audio Codec) streams.
-	- [frame][]: implements access to FLAC audio frames.
-	- [meta][]: implements access to FLAC metadata.
+	- [frame][flac/frame]: implements access to FLAC audio frames.
+	- [meta][flac/meta]: implements access to FLAC metadata.
 
 [flac]: http://godoc.org/github.com/mewkiz/flac
-[frame]: http://godoc.org/github.com/mewkiz/flac/frame
-[meta]: http://godoc.org/github.com/mewkiz/flac/meta
+[flac/frame]: http://godoc.org/github.com/mewkiz/flac/frame
+[flac/meta]: http://godoc.org/github.com/mewkiz/flac/meta
 
 public domain
 -------------
