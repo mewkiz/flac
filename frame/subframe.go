@@ -149,9 +149,33 @@ type Pred uint8
 
 // Prediction methods.
 const (
+	// PredConstant specifies that the subframe contains a constant sound. The
+	// audio samples are encoded using run-length encoding. Since every audio
+	// sample has the same constant value, a single unencoded audio sample is
+	// stored in practice. It is replicated a number of times, as specified by
+	// BlockSize in the frame header.
 	PredConstant Pred = iota
+	// PredVerbatim specifies that the subframe contains unencoded audio samples.
+	// Random sound is often stored verbatim, since no prediction method can
+	// compress it sufficiently.
 	PredVerbatim
+	// PredFixed specifies that the subframe contains linear prediction coded
+	// audio samples. The coefficients of the prediction polynomial are selected
+	// from a fixed set, and can represent 0th through fourth-order polynomials.
+	// The prediction order (0 through 4) is stored within the subframe along
+	// with the same number of unencoded warm-up samples, which are used to kick
+	// start the prediction polynomial. The remainder of the subframe stores
+	// encoded residuals (signal errors) which specify the difference between the
+	// predicted and the original audio samples.
 	PredFixed
+	// PredFIR specifies that the subframe contains linear prediction coded audio
+	// samples. The coefficients of the prediction polynomial are stored in the
+	// subframe, and can represent 0th through 32nd-order polynomials. The
+	// prediction order (0 through 32) is stored within the subframe along with
+	// the same number of unencoded warm-up samples, which are used to kick start
+	// the prediction polynomial. The remainder of the subframe stores encoded
+	// residuals (signal errors) which specify the difference between the
+	// predicted and the original audio samples.
 	PredFIR
 )
 
