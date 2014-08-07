@@ -8,7 +8,7 @@ import (
 	"math"
 
 	"github.com/mewkiz/pkg/bit"
-	"github.com/mewkiz/pkg/bitutil"
+	"github.com/mewkiz/pkg/bits"
 	"github.com/mewkiz/pkg/dbg"
 )
 
@@ -175,7 +175,7 @@ func (h *Header) NewSubHeader(br *bit.Reader) (sh *SubHeader, err error) {
 		// k wasted bits-per-sample in source subblock, k-1 follows, unary coded;
 		// e.g. k=3 => 001 follows, k=7 => 0000001 follows.
 		// TODO(u): Verify that the unary decoding is correct.
-		n, err := bitutil.DecodeUnary(br)
+		n, err := bits.Unary(br)
 		if err != nil {
 			return nil, err
 		}
@@ -481,7 +481,7 @@ func decodeRiceResidual(br *bit.Reader, k uint, n int) (residuals []int32, err e
 	residuals = make([]int32, n)
 	for i := 0; i < n; i++ {
 		// Read unary encoded most significant bits.
-		high, err := bitutil.DecodeUnary(br)
+		high, err := bits.Unary(br)
 		if err != nil {
 			return nil, err
 		}
@@ -494,7 +494,7 @@ func decodeRiceResidual(br *bit.Reader, k uint, n int) (residuals []int32, err e
 		residual := int32(high<<k | low)
 
 		// ZigZag decode.
-		residual = int32(bitutil.DecodeZigZag(int(residual)))
+		residual = int32(bits.ZigZag(residual))
 
 		residuals[i] = residual
 	}
