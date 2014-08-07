@@ -27,6 +27,8 @@ type Frame struct {
 	Subframes []*Subframe
 	// CRC-16 hash sum, calculated by read operations on hr.
 	crc hashutil.Hash16
+	// A bit reader, wrapping read operations to hr.
+	br *bit.Reader
 	// A CRC-16 hash reader, wrapping read operations to r.
 	hr io.Reader
 	// Underlying io.Reader.
@@ -157,6 +159,7 @@ func (frame *Frame) parseHeader() error {
 
 	// 14 bits: sync-code (11111111111110)
 	br := bit.NewReader(hr)
+	frame.br = br
 	x, err := br.Read(14)
 	if err != nil {
 		return err

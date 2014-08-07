@@ -32,7 +32,7 @@ type Subframe struct {
 // subframe.
 func (frame *Frame) parseSubframe(bps uint) (subframe *Subframe, err error) {
 	// Parse subframe header.
-	subframe = &Subframe{br: bit.NewReader(frame.hr)}
+	subframe = &Subframe{br: frame.br}
 	err = subframe.parseHeader()
 	if err != nil {
 		return subframe, err
