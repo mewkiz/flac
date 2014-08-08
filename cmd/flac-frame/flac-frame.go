@@ -38,6 +38,7 @@ func flacFrame(path string) error {
 	if err != nil {
 		return err
 	}
+	defer stream.Close()
 
 	md5sum := md5.New()
 	for {
