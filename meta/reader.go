@@ -7,7 +7,10 @@ var readBuf = make([]byte, 4096)
 
 // readBytes reads and returns exactly n bytes from the provided io.Reader. The
 // local buffer is reused in between calls to reduce garbage generation. It is
-// the callers responsibility to make a copy of the returned data.
+// the callers responsibility to make a copy of the returned data. The error is
+// io.EOF only if no bytes were read. If an io.EOF happens after reading some
+// but not all the bytes, ReadFull returns io.ErrUnexpectedEOF. On return, n ==
+// len(buf) if and only if err == nil.
 //
 // The local buffer is initially 4096 bytes and will grow automatically if so
 // required.

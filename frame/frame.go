@@ -189,8 +189,8 @@ func (frame *Frame) parseHeader() error {
 	frame.br = br
 	x, err := br.Read(14)
 	if err != nil {
-		// This should be the only place for a frame to return io.EOF, which
-		// signals a graceful end of FLAC stream.
+		// This is the only place an audio frame may return io.EOF, which signals
+		// a graceful end of a FLAC stream.
 		return err
 	}
 	if x != 0x3FFE {

@@ -24,7 +24,7 @@ func (block *Block) parseApplication() error {
 	block.Body = app
 	err := binary.Read(block.lr, binary.BigEndian, &app.ID)
 	if err != nil {
-		return err
+		return unexpected(err)
 	}
 
 	// Check if the Application block only contains an ID.
@@ -34,5 +34,5 @@ func (block *Block) parseApplication() error {
 
 	// (block length)-4 bytes: Data.
 	app.Data, err = ioutil.ReadAll(block.lr)
-	return err
+	return unexpected(err)
 }

@@ -32,7 +32,7 @@ func (block *Block) parseCueSheet() error {
 	// 128 bytes: MCN.
 	buf, err := readBytes(block.lr, 128)
 	if err != nil {
-		return err
+		return unexpected(err)
 	}
 	cs := new(CueSheet)
 	block.Body = cs
@@ -41,14 +41,14 @@ func (block *Block) parseCueSheet() error {
 	// 64 bits: NLeadInSamples.
 	err = binary.Read(block.lr, binary.BigEndian, &cs.NLeadInSamples)
 	if err != nil {
-		return err
+		return unexpected(err)
 	}
 
 	// 1 bit: IsCompactDisc.
 	var x uint8
 	err = binary.Read(block.lr, binary.BigEndian, &x)
 	if err != nil {
-		return err
+		return unexpected(err)
 	}
 	// mask = 10000000
 	if x&0x80 != 0 {
@@ -71,7 +71,7 @@ func (block *Block) parseCueSheet() error {
 	// 8 bits: (number of tracks)
 	err = binary.Read(block.lr, binary.BigEndian, &x)
 	if err != nil {
-		return err
+		return unexpected(err)
 	}
 	if x < 1 {
 		return errors.New("meta.Block.parseCueSheet: at least one track required")
@@ -88,7 +88,7 @@ func (block *Block) parseCueSheet() error {
 		track := &cs.Tracks[i]
 		err = binary.Read(block.lr, binary.BigEndian, &track.Offset)
 		if err != nil {
-			return err
+			return unexpected(err)
 		}
 		if cs.IsCompactDisc && track.Offset%588 != 0 {
 			return fmt.Errorf("meta.Block.parseCueSheet: CD-DA track offset (%d) must be evenly divisible by 588", track.Offset)
@@ -97,7 +97,7 @@ func (block *Block) parseCueSheet() error {
 		// 8 bits: Num.
 		err = binary.Read(block.lr, binary.BigEndian, &track.Num)
 		if err != nil {
-			return err
+			return unexpected(err)
 		}
 		if _, ok := uniq[track.Num]; ok {
 			return fmt.Errorf("meta.Block.parseCueSheet: duplicated track number %d", track.Num)
@@ -126,14 +126,14 @@ func (block *Block) parseCueSheet() error {
 		// 12 bytes: ISRC.
 		buf, err = readBytes(block.lr, 12)
 		if err != nil {
-			return err
+			return unexpected(err)
 		}
 		track.ISRC = stringFromSZ(buf)
 
 		// 1 bit: IsAudio.
 		err = binary.Read(block.lr, binary.BigEndian, &x)
 		if err != nil {
-			return err
+			return unexpected(err)
 		}
 		// mask = 10000000
 		if x&0x80 == 0 {
@@ -162,7 +162,7 @@ func (block *Block) parseCueSheet() error {
 		// 8 bits: (number of indicies)
 		err = binary.Read(block.lr, binary.BigEndian, &x)
 		if err != nil {
-			return err
+			return unexpected(err)
 		}
 		if x < 1 {
 			if !isLeadOut {
@@ -176,13 +176,13 @@ func (block *Block) parseCueSheet() error {
 			// 64 bits: Offset.
 			err = binary.Read(block.lr, binary.BigEndian, &index.Offset)
 			if err != nil {
-				return err
+				return unexpected(err)
 			}
 
 			// 8 bits: Num.
 			err = binary.Read(block.lr, binary.BigEndian, &index.Num)
 			if err != nil {
-				return err
+				return unexpected(err)
 			}
 
 			// 3 bytes: reserved.

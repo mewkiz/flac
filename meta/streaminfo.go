@@ -45,7 +45,7 @@ func (block *Block) parseStreamInfo() error {
 	br := bit.NewReader(block.lr)
 	x, err := br.Read(16)
 	if err != nil {
-		return err
+		return unexpected(err)
 	}
 	if x < 16 {
 		return fmt.Errorf("meta.Block.parseStreamInfo: invalid minimum block size (%d); expected >= 16", x)
@@ -57,7 +57,7 @@ func (block *Block) parseStreamInfo() error {
 	// 16 bits: BlockSizeMax.
 	x, err = br.Read(16)
 	if err != nil {
-		return err
+		return unexpected(err)
 	}
 	if x < 16 {
 		return fmt.Errorf("meta.Block.parseStreamInfo: invalid maximum block size (%d); expected >= 16", x)
@@ -67,21 +67,21 @@ func (block *Block) parseStreamInfo() error {
 	// 24 bits: FrameSizeMin.
 	x, err = br.Read(24)
 	if err != nil {
-		return err
+		return unexpected(err)
 	}
 	si.FrameSizeMin = uint32(x)
 
 	// 24 bits: FrameSizeMax.
 	x, err = br.Read(24)
 	if err != nil {
-		return err
+		return unexpected(err)
 	}
 	si.FrameSizeMax = uint32(x)
 
 	// 20 bits: SampleRate.
 	x, err = br.Read(20)
 	if err != nil {
-		return err
+		return unexpected(err)
 	}
 	if x == 0 {
 		return errors.New("meta.Block.parseStreamInfo: invalid sample rate (0)")
@@ -91,7 +91,7 @@ func (block *Block) parseStreamInfo() error {
 	// 3 bits: NChannels.
 	x, err = br.Read(3)
 	if err != nil {
-		return err
+		return unexpected(err)
 	}
 	// x contains: (number of channels) - 1
 	si.NChannels = uint8(x + 1)
@@ -99,7 +99,7 @@ func (block *Block) parseStreamInfo() error {
 	// 5 bits: BitsPerSample.
 	x, err = br.Read(5)
 	if err != nil {
-		return err
+		return unexpected(err)
 	}
 	// x contains: (bits-per-sample) - 1
 	si.BitsPerSample = uint8(x + 1)
@@ -107,10 +107,10 @@ func (block *Block) parseStreamInfo() error {
 	// 36 bits: NSamples.
 	si.NSamples, err = br.Read(36)
 	if err != nil {
-		return err
+		return unexpected(err)
 	}
 
 	// 16 bytes: MD5sum.
 	_, err = io.ReadFull(block.lr, si.MD5sum[:])
-	return err
+	return unexpected(err)
 }

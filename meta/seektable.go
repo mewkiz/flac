@@ -29,7 +29,7 @@ func (block *Block) parseSeekTable() error {
 		point := &table.Points[i]
 		err := binary.Read(block.lr, binary.BigEndian, point)
 		if err != nil {
-			return err
+			return unexpected(err)
 		}
 		// Seek points within a table must be sorted in ascending order by sample
 		// number. Each seek point must have a unique sample number, except for

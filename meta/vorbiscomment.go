@@ -23,13 +23,13 @@ func (block *Block) parseVorbisComment() error {
 	var x uint32
 	err := binary.Read(block.lr, binary.LittleEndian, &x)
 	if err != nil {
-		return err
+		return unexpected(err)
 	}
 
 	// (vendor length) bits: Vendor.
 	buf, err := readBytes(block.lr, int(x))
 	if err != nil {
-		return err
+		return unexpected(err)
 	}
 	comment := new(VorbisComment)
 	block.Body = comment
@@ -39,7 +39,7 @@ func (block *Block) parseVorbisComment() error {
 	// 32 bits: number of tags.
 	err = binary.Read(block.lr, binary.LittleEndian, &x)
 	if err != nil {
-		return err
+		return unexpected(err)
 	}
 	if x < 1 {
 		return nil
@@ -49,13 +49,13 @@ func (block *Block) parseVorbisComment() error {
 		// 32 bits: vector length
 		err = binary.Read(block.lr, binary.LittleEndian, &x)
 		if err != nil {
-			return err
+			return unexpected(err)
 		}
 
 		// (vector length): vector.
 		buf, err = readBytes(block.lr, int(x))
 		if err != nil {
-			return err
+			return unexpected(err)
 		}
 		vector := string(buf)
 
