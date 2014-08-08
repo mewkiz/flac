@@ -1,8 +1,10 @@
 package main
 
 import (
-	"bufio"
+	"crypto/md5"
 	"flag"
+	"fmt"
+	"io"
 	"log"
 	"os"
 	"runtime/pprof"
@@ -23,34 +25,33 @@ func main() {
 	defer pprof.StopCPUProfile()
 
 	flag.Parse()
-	for _, filePath := range flag.Args() {
-		err := flacFrame(filePath)
+	for _, path := range flag.Args() {
+		err := flacFrame(path)
 		if err != nil {
 			log.Println(err)
 		}
 	}
 }
 
-func flacFrame(filePath string) (err error) {
-	f, err := os.Open(filePath)
+func flacFrame(path string) error {
+	stream, err := flac.ParseFile(path)
 	if err != nil {
-		log.Println(err)
+		return err
 	}
-	defer f.Close()
-	br := bufio.NewReader(f)
 
-	s, err := flac.NewStream(br)
-	if err != nil {
-		return err
+	md5sum := md5.New()
+	for {
+		frame, err := stream.ParseNext()
+		if err != nil {
+			if err == io.EOF {
+				break
+			}
+			return err
+		}
+		frame.Hash(md5sum)
 	}
-	err = s.ParseBlocks(0)
-	if err != nil {
-		return err
-	}
-	err = s.ParseFrames()
-	if err != nil {
-		return err
-	}
+	fmt.Printf("original MD5: %032x\n", stream.Info.MD5sum[:])
+	fmt.Printf("decoded MD5:  %032x\n", md5sum.Sum(nil))
 
 	return nil
 }
