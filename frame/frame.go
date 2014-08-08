@@ -18,11 +18,11 @@
 // frames and subframes contain encoded audio samples. A FLAC stream contains
 // one or more audio frames.
 //
-// [1]: https://www.xiph.org/flac/format.html#architecture
-// [2]: https://www.xiph.org/flac/format.html#blocking
-// [3]: https://www.xiph.org/flac/format.html#interchannel
-// [4]: https://www.xiph.org/flac/format.html#prediction
-// [5]: https://godoc.org/github.com/mewkiz/flac/frame#Pred
+//    [1]: https://www.xiph.org/flac/format.html#architecture
+//    [2]: https://www.xiph.org/flac/format.html#blocking
+//    [3]: https://www.xiph.org/flac/format.html#interchannel
+//    [4]: https://www.xiph.org/flac/format.html#prediction
+//    [5]: https://godoc.org/github.com/mewkiz/flac/frame#Pred
 package frame
 
 import (
