@@ -44,6 +44,9 @@ type Stream struct {
 	Blocks []*meta.Block
 	// Underlying io.Reader.
 	r io.Reader
+	// Underlying io.Closer of file if opened with Open and ParseFile, and nil
+	// otherwise.
+	c io.Closer
 }
 
 // New creates a new Stream for accessing the audio samples of r. It reads and
@@ -54,7 +57,8 @@ type Stream struct {
 // Stream.ParseNext to parse the entire next frame including audio samples.
 func New(r io.Reader) (stream *Stream, err error) {
 	// Verify FLAC signature and parse the StreamInfo metadata block.
-	stream = &Stream{r: bufio.NewReader(r)}
+	br := bufio.NewReader(r)
+	stream = &Stream{r: br}
 	isLast, err := stream.parseStreamInfo()
 	if err != nil {
 		return nil, err
@@ -62,7 +66,7 @@ func New(r io.Reader) (stream *Stream, err error) {
 
 	// Skip the remaining metadata blocks.
 	for !isLast {
-		block, err := meta.New(r)
+		block, err := meta.New(br)
 		if err != nil && err != meta.ErrReservedType {
 			return stream, err
 		}
@@ -115,7 +119,8 @@ func (stream *Stream) parseStreamInfo() (isLast bool, err error) {
 // Stream.ParseNext to parse the entire next frame including audio samples.
 func Parse(r io.Reader) (stream *Stream, err error) {
 	// Verify FLAC signature and parse the StreamInfo metadata block.
-	stream = &Stream{r: r}
+	br := bufio.NewReader(r)
+	stream = &Stream{r: br}
 	isLast, err := stream.parseStreamInfo()
 	if err != nil {
 		return nil, err
@@ -123,7 +128,7 @@ func Parse(r io.Reader) (stream *Stream, err error) {
 
 	// Parse the remaining metadata blocks.
 	for !isLast {
-		block, err := meta.Parse(r)
+		block, err := meta.Parse(br)
 		if err != nil {
 			if err != meta.ErrReservedType {
 				return stream, err
@@ -157,7 +162,9 @@ func Open(path string) (stream *Stream, err error) {
 	if err != nil {
 		return nil, err
 	}
-	return New(f)
+	stream, err = New(f)
+	stream.c = f
+	return stream, err
 }
 
 // ParseFile creates a new Stream for accessing the metadata blocks and audio
@@ -173,7 +180,9 @@ func ParseFile(path string) (stream *Stream, err error) {
 	if err != nil {
 		return nil, err
 	}
-	return Parse(f)
+	stream, err = Parse(f)
+	stream.c = f
+	return stream, err
 }
 
 // Close closes the stream if opened through a call to Open or ParseFile, and
