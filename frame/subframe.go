@@ -71,7 +71,7 @@ func (subframe *Subframe) parseHeader() error {
 	br := subframe.br
 	x, err := br.Read(1)
 	if err != nil {
-		return err
+		return unexpected(err)
 	}
 	if x != 0 {
 		return errors.New("frame.Subframe.parseHeader: non-zero padding")
@@ -80,7 +80,7 @@ func (subframe *Subframe) parseHeader() error {
 	// 6 bits: Pred.
 	x, err = br.Read(6)
 	if err != nil {
-		return err
+		return unexpected(err)
 	}
 	// The 6 bits are used to specify the prediction method and order as follows:
 	//    000000: Constant prediction method.
@@ -129,13 +129,13 @@ func (subframe *Subframe) parseHeader() error {
 	// 1 bit: hasWastedBits.
 	x, err = br.Read(1)
 	if err != nil {
-		return err
+		return unexpected(err)
 	}
 	if x != 0 {
 		// The number of wasted bits-per-sample is unary coded.
 		_, err = bits.Unary(br)
 		if err != nil {
-			return err
+			return unexpected(err)
 		}
 		panic("Never seen a FLAC file contain wasted-bits-per-sample before. Not really a reason to panic, but I want to dissect one of those files. Please send it to me :)")
 	}
@@ -200,7 +200,7 @@ func (subframe *Subframe) decodeConstant(bps uint) error {
 	br := subframe.br
 	x, err := br.Read(bps)
 	if err != nil {
-		return err
+		return unexpected(err)
 	}
 
 	// Each sample of the subframe has the same constant value.
@@ -222,7 +222,7 @@ func (subframe *Subframe) decodeVerbatim(bps uint) error {
 		// (bits-per-sample) bits: Unencoded constant value of the subblock.
 		x, err := br.Read(bps)
 		if err != nil {
-			return err
+			return unexpected(err)
 		}
 		sample := signExtend(x, bps)
 		subframe.Samples = append(subframe.Samples, sample)
@@ -258,7 +258,7 @@ func (subframe *Subframe) decodeFixed(bps uint) error {
 		// (bits-per-sample) bits: Unencoded warm-up sample.
 		x, err := br.Read(bps)
 		if err != nil {
-			return err
+			return unexpected(err)
 		}
 		sample := signExtend(x, bps)
 		subframe.Samples = append(subframe.Samples, sample)
@@ -287,7 +287,7 @@ func (subframe *Subframe) decodeFIR(bps uint) error {
 		// (bits-per-sample) bits: Unencoded warm-up sample.
 		x, err := br.Read(bps)
 		if err != nil {
-			return err
+			return unexpected(err)
 		}
 		sample := signExtend(x, bps)
 		subframe.Samples = append(subframe.Samples, sample)
@@ -296,7 +296,7 @@ func (subframe *Subframe) decodeFIR(bps uint) error {
 	// 4 bits: (coefficients' precision in bits) - 1.
 	x, err := br.Read(4)
 	if err != nil {
-		return err
+		return unexpected(err)
 	}
 	if x == 0xF {
 		return errors.New("frame.Subframe.decodeFIR: invalid coefficient precision bit pattern (1111)")
@@ -306,7 +306,7 @@ func (subframe *Subframe) decodeFIR(bps uint) error {
 	// 5 bits: predictor coefficient shift needed in bits.
 	x, err = br.Read(5)
 	if err != nil {
-		return err
+		return unexpected(err)
 	}
 	shift := signExtend(x, 5)
 
@@ -316,7 +316,7 @@ func (subframe *Subframe) decodeFIR(bps uint) error {
 		// (prec) bits: Predictor coefficient.
 		x, err = br.Read(prec)
 		if err != nil {
-			return err
+			return unexpected(err)
 		}
 		coeffs[i] = signExtend(x, prec)
 	}
@@ -342,7 +342,7 @@ func (subframe *Subframe) decodeResidual() error {
 	br := subframe.br
 	x, err := br.Read(2)
 	if err != nil {
-		return err
+		return unexpected(err)
 	}
 	// The 2 bits are used to specify the residual coding method as follows:
 	//    00: Rice coding with a 4-bit Rice parameter.
@@ -369,7 +369,7 @@ func (subframe *Subframe) decodeRicePart(paramSize uint) error {
 	br := subframe.br
 	x, err := br.Read(4)
 	if err != nil {
-		return err
+		return unexpected(err)
 	}
 	partOrder := x
 
@@ -382,7 +382,7 @@ func (subframe *Subframe) decodeRicePart(paramSize uint) error {
 		// (4 or 5) bits: Rice parameter.
 		x, err = br.Read(paramSize)
 		if err != nil {
-			return err
+			return unexpected(err)
 		}
 		if paramSize == 4 && x == 0xF || paramSize == 4 && x == 0x1F {
 			// 1111 or 11111: Escape code, meaning the partition is in unencoded
@@ -419,13 +419,13 @@ func (subframe *Subframe) decodeRiceResidual(k uint) error {
 	br := subframe.br
 	high, err := bits.Unary(br)
 	if err != nil {
-		return err
+		return unexpected(err)
 	}
 
 	// Read binary encoded least significant bits.
 	low, err := br.Read(k)
 	if err != nil {
-		return err
+		return unexpected(err)
 	}
 	residual := int32(high<<k | low)
 

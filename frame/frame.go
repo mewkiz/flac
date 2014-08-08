@@ -60,8 +60,10 @@ type Frame struct {
 }
 
 // New creates a new Frame for accessing the audio samples of r. It reads and
-// parses an audio frame header. Call Frame.Parse to parse the audio samples of
-// its subframes.
+// parses an audio frame header. It returns io.EOF to signal a graceful end of
+// FLAC stream.
+//
+// Call Frame.Parse to parse the audio samples of its subframes.
 func New(r io.Reader) (frame *Frame, err error) {
 	// Create a new CRC-16 hash reader which adds the data from all read
 	// operations to a running hash.
@@ -76,7 +78,8 @@ func New(r io.Reader) (frame *Frame, err error) {
 
 // Parse reads and parses the header, and the audio samples from each subframe
 // of a frame. If the samples are inter-channel decorrelated between the
-// subframes, it correlates them.
+// subframes, it correlates them. It returns io.EOF to signal a graceful end of
+// FLAC stream.
 //
 // ref: https://www.xiph.org/flac/format.html#interchannel
 func Parse(r io.Reader) (frame *Frame, err error) {
@@ -131,7 +134,7 @@ func (frame *Frame) Parse() error {
 	var want uint16
 	err = binary.Read(frame.r, binary.BigEndian, &want)
 	if err != nil {
-		return err
+		return unexpected(err)
 	}
 	got := frame.crc.Sum16()
 	if got != want {
@@ -186,6 +189,8 @@ func (frame *Frame) parseHeader() error {
 	frame.br = br
 	x, err := br.Read(14)
 	if err != nil {
+		// This should be the only place for a frame to return io.EOF, which
+		// signals a graceful end of FLAC stream.
 		return err
 	}
 	if x != 0x3FFE {
@@ -195,7 +200,7 @@ func (frame *Frame) parseHeader() error {
 	// 1 bit: reserved.
 	x, err = br.Read(1)
 	if err != nil {
-		return err
+		return unexpected(err)
 	}
 	if x != 0 {
 		return errors.New("frame.Frame.parseHeader: non-zero reserved value")
@@ -204,7 +209,7 @@ func (frame *Frame) parseHeader() error {
 	// 1 bit: HasFixedBlockSize.
 	x, err = br.Read(1)
 	if err != nil {
-		return err
+		return unexpected(err)
 	}
 	if x != 0 {
 		frame.HasFixedBlockSize = true
@@ -214,14 +219,14 @@ func (frame *Frame) parseHeader() error {
 	// the end of the header.
 	blockSize, err := br.Read(4)
 	if err != nil {
-		return err
+		return unexpected(err)
 	}
 
 	// 4 bits: SampleRate. The sample rate parsing is simplified by deferring it
 	// to the end of the header.
 	sampleRate, err := br.Read(4)
 	if err != nil {
-		return err
+		return unexpected(err)
 	}
 
 	// 4 bits: Channels.
@@ -244,7 +249,7 @@ func (frame *Frame) parseHeader() error {
 	//    1111: reserved.
 	x, err = br.Read(4)
 	if err != nil {
-		return err
+		return unexpected(err)
 	}
 	if x >= 0xB {
 		return fmt.Errorf("frame.Frame.parseHeader: reserved channels bit pattern (%04b)", x)
@@ -254,7 +259,7 @@ func (frame *Frame) parseHeader() error {
 	// 3 bits: BitsPerSample.
 	x, err = br.Read(3)
 	if err != nil {
-		return err
+		return unexpected(err)
 	}
 	// The 3 bits are used to specify the sample size as follows:
 	//    000: unknown sample size; get from StreamInfo.
@@ -292,7 +297,7 @@ func (frame *Frame) parseHeader() error {
 	// 1 bit: reserved.
 	x, err = br.Read(1)
 	if err != nil {
-		return err
+		return unexpected(err)
 	}
 	if x != 0 {
 		return errors.New("frame.Frame.parseHeader: non-zero reserved value")
@@ -304,7 +309,7 @@ func (frame *Frame) parseHeader() error {
 	//    1-7 bytes: UTF-8 encoded sample number.
 	frame.Num, err = decodeUTF8Int(hr)
 	if err != nil {
-		return err
+		return unexpected(err)
 	}
 
 	// Parse block size.
@@ -331,14 +336,14 @@ func (frame *Frame) parseHeader() error {
 		// 0110: get 8 bit (block size)-1 from the end of the header.
 		x, err = br.Read(8)
 		if err != nil {
-			return err
+			return unexpected(err)
 		}
 		frame.BlockSize = uint16(x + 1)
 	case n == 0x7:
 		// 0111: get 16 bit (block size)-1 from the end of the header.
 		x, err = br.Read(16)
 		if err != nil {
-			return err
+			return unexpected(err)
 		}
 		frame.BlockSize = uint16(x + 1)
 	default:
@@ -405,21 +410,21 @@ func (frame *Frame) parseHeader() error {
 		// 1100: get 8 bit sample rate (in kHz) from the end of the header.
 		x, err = br.Read(8)
 		if err != nil {
-			return err
+			return unexpected(err)
 		}
 		frame.SampleRate = uint32(x * 1000)
 	case 0xD:
 		// 1101: get 16 bit sample rate (in Hz) from the end of the header.
 		x, err = br.Read(16)
 		if err != nil {
-			return err
+			return unexpected(err)
 		}
 		frame.SampleRate = uint32(x)
 	case 0xE:
 		// 1110: get 16 bit sample rate (in daHz) from the end of the header.
 		x, err = br.Read(16)
 		if err != nil {
-			return err
+			return unexpected(err)
 		}
 		frame.SampleRate = uint32(x * 10)
 	default:
@@ -431,7 +436,7 @@ func (frame *Frame) parseHeader() error {
 	var want uint8
 	err = binary.Read(frame.hr, binary.BigEndian, &want)
 	if err != nil {
-		return err
+		return unexpected(err)
 	}
 	got := h.Sum8()
 	if got != want {
@@ -537,4 +542,13 @@ func (frame *Frame) correlate() {
 			side[i] = (m - s) / 2
 		}
 	}
+}
+
+// unexpected returns io.ErrUnexpectedEOF if err is io.EOF, and returns err
+// otherwise.
+func unexpected(err error) error {
+	if err == io.EOF {
+		return io.ErrUnexpectedEOF
+	}
+	return err
 }

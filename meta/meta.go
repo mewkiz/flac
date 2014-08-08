@@ -1,3 +1,6 @@
+// TODO(u): Return io.ErrUnexpectedEOF if EOF occurs in the middle of a metadata
+// block.
+
 // Package meta implements access to FLAC metadata blocks.
 //
 // A brief introduction of the FLAC metadata format [1] follows. FLAC metadata
@@ -50,8 +53,10 @@ type Block struct {
 }
 
 // New creates a new Block for accessing the metadata of r. It reads and parses
-// a metadata block header. Call Block.Parse to parse the metadata block body,
-// and call Block.Skip to ignore it.
+// a metadata block header.
+//
+// Call Block.Parse to parse the metadata block body, and call Block.Skip to
+// ignore it.
 func New(r io.Reader) (block *Block, err error) {
 	block = new(Block)
 	err = block.parseHeader(r)
