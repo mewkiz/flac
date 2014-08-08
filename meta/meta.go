@@ -19,7 +19,7 @@
 //
 //    [1]: https://www.xiph.org/flac/format.html#format_overview
 //    [2]: https://godoc.org/github.com/mewkiz/flac/meta#StreamInfo
-//    [3]: https://godoc.org/github.com/mewkiz/flac/meta#Padding
+//    [3]: https://www.xiph.org/flac/format.html#metadata_block_padding
 //    [4]: https://godoc.org/github.com/mewkiz/flac/meta#Application
 //    [5]: https://godoc.org/github.com/mewkiz/flac/meta#SeekTable
 //    [6]: https://godoc.org/github.com/mewkiz/flac/meta#VorbisComment
