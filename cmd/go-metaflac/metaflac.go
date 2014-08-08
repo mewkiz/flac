@@ -90,13 +90,29 @@ func list(path string) (err error) {
 	if blockNums != nil {
 		// Only list blocks specified in the "--block-number" command line flag.
 		for _, blockNum := range blockNums {
+			if blockNum == 0 {
+				listStreamInfo(stream.Info)
+			} else {
+				// strea.Blocks doesn't contain StreamInfo, therefore the blockNum
+				// is one less.
+				blockNum--
+			}
 			if blockNum < len(stream.Blocks) {
 				listBlock(stream.Blocks[blockNum], blockNum)
 			}
 		}
 	} else {
 		// List all blocks.
+		var isLast bool
+		if len(stream.Blocks) == 0 {
+			isLast = true
+		}
+		listStreamInfoHeader(isLast)
+		listStreamInfo(stream.Info)
 		for blockNum, block := range stream.Blocks {
+			// strea.Blocks doesn't contain StreamInfo, therefore the blockNum
+			// is one less.
+			blockNum--
 			listBlock(block, blockNum)
 		}
 	}
@@ -107,8 +123,6 @@ func list(path string) (err error) {
 func listBlock(block *meta.Block, blockNum int) {
 	listHeader(&block.Header, blockNum)
 	switch body := block.Body.(type) {
-	case *meta.StreamInfo:
-		listStreamInfo(body)
 	case *meta.Application:
 		listApplication(body)
 	case *meta.SeekTable:
@@ -131,6 +145,21 @@ var typeName = map[meta.Type]string{
 	meta.TypeVorbisComment: "VORBIS_COMMENT",
 	meta.TypeCueSheet:      "CUESHEET",
 	meta.TypePicture:       "PICTURE",
+}
+
+// Each field of the StreamInfo header is constant, with the exception of
+// is_last.
+//
+// Example:
+//    METADATA block #0
+//      type: 0 (STREAMINFO)
+//      is last: false
+//      length: 34
+func listStreamInfoHeader(isLast bool) {
+	fmt.Println("METADATA block #0")
+	fmt.Println("  type: 0 (STREAMINFO)")
+	fmt.Println("  is last:", isLast)
+	fmt.Println("  length: 34")
 }
 
 // Example:
