@@ -1,5 +1,3 @@
-// TODO(u): Verify the decoded audio samples using StreamInfo.MD5sum.
-
 // Package frame implements access to FLAC audio frames.
 //
 // A brief introduction of the FLAC audio format [1] follows. FLAC encoders
@@ -146,7 +144,11 @@ func (frame *Frame) Parse() error {
 	return nil
 }
 
-// Hash adds the unencoded audio samples of the frame to a running MD5 hash.
+// Hash adds the unencoded audio samples of the frame to a running MD5 hash. It
+// can be used in conjunction with StreamInfo.MD5sum to verify the integrity of
+// the decoded audio samples.
+//
+// Note: The audio samples of the frame must be decoded before calling Hash.
 func (frame *Frame) Hash(md5sum hash.Hash) {
 	// Write decoded samples to a running MD5 hash.
 	// TODO(u): Make buf of size md5.BlockSize if it increases performance.
