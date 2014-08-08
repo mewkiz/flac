@@ -29,16 +29,11 @@ import (
 	"github.com/mewkiz/flac/meta"
 )
 
-// flagList states if the list operation should be performed, which lists the
-// content of one or more metadata blocks to stdout.
-var flagList bool
-
 // flagBlockNum contains an optional comma-separated list of block numbers to
-// display, which can be used in conjunction with flagList.
+// display.
 var flagBlockNum string
 
 func init() {
-	flag.BoolVar(&flagList, "list", false, "List the contents of one or more metadata blocks to stdout.")
 	flag.StringVar(&flagBlockNum, "block-number", "", "An optional comma-separated list of block numbers to display.")
 	flag.Usage = usage
 }
@@ -56,25 +51,23 @@ func main() {
 		flag.Usage()
 		os.Exit(1)
 	}
-	for _, filePath := range flag.Args() {
-		err := metaflac(filePath)
+	for _, path := range flag.Args() {
+		err := metaflac(path)
 		if err != nil {
 			log.Fatalln(err)
 		}
 	}
 }
 
-func metaflac(filePath string) (err error) {
-	if flagList {
-		err = list(filePath)
-		if err != nil {
-			return err
-		}
+func metaflac(path string) (err error) {
+	err = list(path)
+	if err != nil {
+		return err
 	}
 	return nil
 }
 
-func list(filePath string) (err error) {
+func list(path string) (err error) {
 	var blockNums []int
 	if flagBlockNum != "" {
 		// Parse "--block-number" command line flag.
@@ -89,11 +82,7 @@ func list(filePath string) (err error) {
 	}
 
 	// Open FLAC stream.
-	s, err := flac.Open(filePath)
-	if err != nil {
-		return err
-	}
-	err = s.ParseBlocks(meta.TypeAll)
+	stream, err := flac.ParseFile(path)
 	if err != nil {
 		return err
 	}
@@ -101,13 +90,13 @@ func list(filePath string) (err error) {
 	if blockNums != nil {
 		// Only list blocks specified in the "--block-number" command line flag.
 		for _, blockNum := range blockNums {
-			if blockNum < len(s.MetaBlocks) {
-				listBlock(s.MetaBlocks[blockNum], blockNum)
+			if blockNum < len(stream.Blocks) {
+				listBlock(stream.Blocks[blockNum], blockNum)
 			}
 		}
 	} else {
 		// List all blocks.
-		for blockNum, block := range s.MetaBlocks {
+		for blockNum, block := range stream.Blocks {
 			listBlock(block, blockNum)
 		}
 	}
@@ -116,7 +105,7 @@ func list(filePath string) (err error) {
 }
 
 func listBlock(block *meta.Block, blockNum int) {
-	listHeader(block.Header, blockNum)
+	listHeader(&block.Header, blockNum)
 	switch body := block.Body.(type) {
 	case *meta.StreamInfo:
 		listStreamInfo(body)
@@ -133,30 +122,29 @@ func listBlock(block *meta.Block, blockNum int) {
 	}
 }
 
+// typeName maps from metadata block type to a string version of its name.
+var typeName = map[meta.Type]string{
+	meta.TypeStreamInfo:    "STREAMINFO",
+	meta.TypePadding:       "PADDING",
+	meta.TypeApplication:   "APPLICATION",
+	meta.TypeSeekTable:     "SEEKTABLE",
+	meta.TypeVorbisComment: "VORBIS_COMMENT",
+	meta.TypeCueSheet:      "CUESHEET",
+	meta.TypePicture:       "PICTURE",
+}
+
 // Example:
 //    METADATA block #0
 //      type: 0 (STREAMINFO)
 //      is last: false
 //      length: 34
-func listHeader(header *meta.BlockHeader, blockNum int) {
-	var blockTypeName = map[meta.BlockType]string{
-		meta.TypeStreamInfo:    "STREAMINFO",
-		meta.TypePadding:       "PADDING",
-		meta.TypeApplication:   "APPLICATION",
-		meta.TypeSeekTable:     "SEEKTABLE",
-		meta.TypeVorbisComment: "VORBIS_COMMENT",
-		meta.TypeCueSheet:      "CUESHEET",
-		meta.TypePicture:       "PICTURE",
-	}
-	name, ok := blockTypeName[header.BlockType]
+func listHeader(header *meta.Header, blockNum int) {
+	name, ok := typeName[header.Type]
 	if !ok {
 		name = "UNKNOWN"
 	}
 	fmt.Printf("METADATA block #%d\n", blockNum)
-	// TODO(u): Figure out how to solve the inconsistency of BlockType between
-	// the Go and C version of metaflac. BlockType is a bitfield in the Go
-	// version and a sequential integer in the C version.
-	fmt.Printf("  type: %d (%s)\n", header.BlockType, name)
+	fmt.Printf("  type: %d (%s)\n", header.Type, name)
 	fmt.Printf("  is last: %t\n", header.IsLast)
 	fmt.Printf("  length: %d\n", header.Length)
 }
@@ -177,9 +165,9 @@ func listStreamInfo(si *meta.StreamInfo) {
 	fmt.Printf("  minimum framesize: %d bytes\n", si.FrameSizeMin)
 	fmt.Printf("  maximum framesize: %d bytes\n", si.FrameSizeMax)
 	fmt.Printf("  sample_rate: %d Hz\n", si.SampleRate)
-	fmt.Printf("  channels: %d\n", si.ChannelCount)
+	fmt.Printf("  channels: %d\n", si.NChannels)
 	fmt.Printf("  bits-per-sample: %d\n", si.BitsPerSample)
-	fmt.Printf("  total samples: %d\n", si.SampleCount)
+	fmt.Printf("  total samples: %d\n", si.NSamples)
 	fmt.Printf("  MD5 signature: %x\n", si.MD5sum)
 }
 
@@ -206,7 +194,7 @@ func listSeekTable(st *meta.SeekTable) {
 		if point.SampleNum == meta.PlaceholderPoint {
 			fmt.Printf("    point %d: PLACEHOLDER\n", pointNum)
 		} else {
-			fmt.Printf("    point %d: sample_number=%d, stream_offset=%d, frame_samples=%d\n", pointNum, point.SampleNum, point.Offset, point.SampleCount)
+			fmt.Printf("    point %d: sample_number=%d, stream_offset=%d, frame_samples=%d\n", pointNum, point.SampleNum, point.Offset, point.NSamples)
 		}
 	}
 }
@@ -219,9 +207,9 @@ func listSeekTable(st *meta.SeekTable) {
 //        ...
 func listVorbisComment(vc *meta.VorbisComment) {
 	fmt.Printf("  vendor string: %s\n", vc.Vendor)
-	fmt.Printf("  comments: %d\n", len(vc.Entries))
-	for entryNum, entry := range vc.Entries {
-		fmt.Printf("    comment[%d]: %s=%s\n", entryNum, entry.Name, entry.Value)
+	fmt.Printf("  comments: %d\n", len(vc.Tags))
+	for tagNum, tag := range vc.Tags {
+		fmt.Printf("    comment[%d]: %s=%s\n", tagNum, tag[0], tag[1])
 	}
 }
 
@@ -256,18 +244,18 @@ func listVorbisComment(vc *meta.VorbisComment) {
 //          number: 170 (LEAD-OUT)
 func listCueSheet(cs *meta.CueSheet) {
 	fmt.Printf("  media catalog number: %s\n", cs.MCN)
-	fmt.Printf("  lead-in: %d\n", cs.LeadInSampleCount)
+	fmt.Printf("  lead-in: %d\n", cs.NLeadInSamples)
 	fmt.Printf("  is CD: %t\n", cs.IsCompactDisc)
-	fmt.Printf("  number of tracks: %d\n", cs.TrackCount)
+	fmt.Printf("  number of tracks: %d\n", len(cs.Tracks))
 	for trackNum, track := range cs.Tracks {
 		fmt.Printf("    track[%d]\n", trackNum)
 		fmt.Printf("      offset: %d\n", track.Offset)
 		if trackNum == len(cs.Tracks)-1 {
 			// Lead-out track.
-			fmt.Printf("      number: %d (LEAD-OUT)\n", track.TrackNum)
+			fmt.Printf("      number: %d (LEAD-OUT)\n", track.Num)
 			continue
 		}
-		fmt.Printf("      number: %d\n", track.TrackNum)
+		fmt.Printf("      number: %d\n", track.Num)
 		fmt.Printf("      ISRC: %s\n", track.ISRC)
 		var trackTypeName = map[bool]string{
 			false: "DATA",
@@ -275,11 +263,11 @@ func listCueSheet(cs *meta.CueSheet) {
 		}
 		fmt.Printf("      type: %s\n", trackTypeName[track.IsAudio])
 		fmt.Printf("      pre-emphasis: %t\n", track.HasPreEmphasis)
-		fmt.Printf("      number of index points: %d\n", track.TrackIndexCount)
-		for indexNum, index := range track.TrackIndexes {
+		fmt.Printf("      number of index points: %d\n", len(track.Indicies))
+		for indexNum, index := range track.Indicies {
 			fmt.Printf("        index[%d]\n", indexNum)
 			fmt.Printf("          offset: %d\n", index.Offset)
-			fmt.Printf("          number: %d\n", index.IndexPointNum)
+			fmt.Printf("          number: %d\n", index.Num)
 		}
 	}
 }
@@ -325,9 +313,9 @@ func listPicture(pic *meta.Picture) {
 	fmt.Printf("  description: %s\n", pic.Desc)
 	fmt.Printf("  width: %d\n", pic.Width)
 	fmt.Printf("  height: %d\n", pic.Height)
-	fmt.Printf("  depth: %d\n", pic.ColorDepth)
-	fmt.Printf("  colors: %d", pic.ColorCount)
-	if pic.ColorCount == 0 {
+	fmt.Printf("  depth: %d\n", pic.Depth)
+	fmt.Printf("  colors: %d", pic.NPalColors)
+	if pic.NPalColors == 0 {
 		fmt.Print(" (unindexed)")
 	}
 	fmt.Println()
