@@ -2,28 +2,29 @@
 
 // Package frame implements access to FLAC audio frames.
 //
-// A brief introduction of the FLAC audio format follows. FLAC encoders divide
-// the audio stream into blocks through a process called blocking [1]. A block
-// contains the unencoded audio samples from all channels during a short period
-// of time. Each audio block is divided into subblocks, one per channel.
+// A brief introduction of the FLAC audio format [1] follows. FLAC encoders
+// divide the audio stream into blocks through a process called blocking [2]. A
+// block contains the unencoded audio samples from all channels during a short
+// period of time. Each audio block is divided into subblocks, one per channel.
 //
 // There is often a correlation between the left and right channel of stereo
-// audio. Using inter-channel decorrelation [2] it is possible to store only one
+// audio. Using inter-channel decorrelation [3] it is possible to store only one
 // of the channels and the difference between the channels, or store the average
 // of the channels and their difference. An encoder decorrelates audio samples
 // as follows:
 //    mid = (left + right)/2 // average of the channels
 //    side = left - right    // difference between the channels
 //
-// The blocks are encoded using a variety of prediction methods [3][4] and
+// The blocks are encoded using a variety of prediction methods [4][5] and
 // stored in frames. Blocks and subblocks contains unencoded audio samples while
 // frames and subframes contain encoded audio samples. A FLAC stream contains
 // one or more audio frames.
 //
-// [1]: https://www.xiph.org/flac/format.html#blocking
-// [2]: https://www.xiph.org/flac/format.html#interchannel
-// [3]: https://www.xiph.org/flac/format.html#prediction
-// [4]: https://godoc.org/github.com/mewkiz/flac/frame#Pred
+// [1]: https://www.xiph.org/flac/format.html#architecture
+// [2]: https://www.xiph.org/flac/format.html#blocking
+// [3]: https://www.xiph.org/flac/format.html#interchannel
+// [4]: https://www.xiph.org/flac/format.html#prediction
+// [5]: https://godoc.org/github.com/mewkiz/flac/frame#Pred
 package frame
 
 import (

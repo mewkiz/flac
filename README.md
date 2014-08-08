@@ -18,7 +18,7 @@ Documentation provided by GoDoc.
 
 - [flac][]: provides access to FLAC (Free Lossless Audio Codec) streams.
 	- [frame][flac/frame]: implements access to FLAC audio frames.
-	- [meta][flac/meta]: implements access to FLAC metadata.
+	- [meta][flac/meta]: implements access to FLAC metadata blocks.
 
 [flac]: http://godoc.org/github.com/mewkiz/flac
 [flac/frame]: http://godoc.org/github.com/mewkiz/flac/frame
