@@ -2,92 +2,66 @@ package meta
 
 import (
 	"encoding/binary"
+	"errors"
 	"fmt"
-	"io"
 )
 
-// A SeekTable metadata block is an optional block for storing seek points. It
-// is possible to seek to any given sample in a FLAC stream without a seek
-// table, but the delay can be unpredictable since the bitrate may vary widely
-// within a stream. By adding seek points to a stream, this delay can be
-// significantly reduced. Each seek point takes 18 bytes, so 1% resolution
-// within a stream adds less than 2k.
+// SeekTable contains one or more pre-calculated audio frame seek points.
 //
-// There can be only one SeekTable in a stream, but the table can have any
-// number of seek points. There is also a special 'placeholder' seekpoint which
-// will be ignored by decoders but which can be used to reserve space for future
-// seek point insertion.
+// ref: https://www.xiph.org/flac/format.html#metadata_block_seektable
 type SeekTable struct {
 	// One or more seek points.
 	Points []SeekPoint
 }
 
-// A SeekPoint specifies the offset of a sample.
+// parseSeekTable reads and parses the body of an SeekTable metadata block.
+func (block *Block) parseSeekTable() error {
+	// The number of seek points is derived from the header length, divided by
+	// the size of a SeekPoint; which is 18 bytes.
+	n := block.Length / 18
+	if n < 1 {
+		return errors.New("meta.Block.parseSeekTable: at least one seek point is required")
+	}
+	table := &SeekTable{Points: make([]SeekPoint, n)}
+	block.Body = table
+	var prev uint64
+	for i := range table.Points {
+		point := &table.Points[i]
+		err := binary.Read(block.lr, binary.BigEndian, point)
+		if err != nil {
+			return unexpected(err)
+		}
+		// Seek points within a table must be sorted in ascending order by sample
+		// number. Each seek point must have a unique sample number, except for
+		// placeholder points.
+		sampleNum := point.SampleNum
+		if i != 0 && sampleNum != PlaceholderPoint {
+			switch {
+			case sampleNum < prev:
+				return fmt.Errorf("meta.Block.parseSeekTable: invalid seek point order; sample number (%d) < prev (%d)", sampleNum, prev)
+			case sampleNum == prev:
+				return fmt.Errorf("meta.Block.parseSeekTable: duplicate seek point with sample number (%d)", sampleNum)
+			}
+		}
+	}
+	return nil
+}
+
+// A SeekPoint specifies the byte offset and initial sample number of a given
+// target frame.
+//
+// ref: https://www.xiph.org/flac/format.html#seekpoint
 type SeekPoint struct {
-	// Sample number of first sample in the target frame, or 0xFFFFFFFFFFFFFFFF
-	// for a placeholder point.
+	// Sample number of the first sample in the target frame, or
+	// 0xFFFFFFFFFFFFFFFF for a placeholder point.
 	SampleNum uint64
-	// Offset (in bytes) from the first byte of the first frame header to the
-	// first byte of the target frame's header.
+	// Offset in bytes from the first byte of the first frame header to the first
+	// byte of the target frame's header.
 	Offset uint64
 	// Number of samples in the target frame.
-	SampleCount uint16
+	NSamples uint16
 }
 
-// PlaceholderPoint is the sample number used for placeholder points. For
-// placeholder points, the second and third field values in the SeekPoint
-// structure are undefined.
+// PlaceholderPoint represent the sample number used to specify placeholder seek
+// points.
 const PlaceholderPoint = 0xFFFFFFFFFFFFFFFF
-
-// ParseSeekTable parses and returns a new SeekTable metadata block. The
-// provided io.Reader should limit the amount of data that can be read to
-// header.Length bytes.
-//
-// Seek table format (pseudo code):
-//
-//    type METADATA_BLOCK_SEEKTABLE struct {
-//       // The number of seek points is implied by the metadata header 'length'
-//       // field, i.e. equal to length / 18.
-//       points []point
-//    }
-//
-//    type point struct {
-//       sample_num   uint64
-//       offset       uint64
-//       sample_count uint16
-//    }
-//
-// ref: http://flac.sourceforge.net/format.html#metadata_block_seektable
-func ParseSeekTable(r io.Reader) (st *SeekTable, err error) {
-	st = new(SeekTable)
-	var hasPrev bool
-	var prevSampleNum uint64
-	for {
-		var point SeekPoint
-		err = binary.Read(r, binary.BigEndian, &point)
-		if err != nil {
-			if err == io.EOF {
-				break
-			}
-			return nil, err
-		}
-		if hasPrev && point.SampleNum != PlaceholderPoint {
-			// - Seek points within a table must be sorted in ascending order by
-			//   sample number.
-			// - Seek points within a table must be unique by sample number, with
-			//   the exception of placeholder points.
-			// - The previous two notes imply that there may be any number of
-			//   placeholder points, but they must all occur at the end of the
-			//   table.
-			if prevSampleNum == point.SampleNum {
-				return nil, fmt.Errorf("meta.ParseSeekTable: invalid seek point; sample number (%d) is not unique", point.SampleNum)
-			} else if prevSampleNum > point.SampleNum {
-				return nil, fmt.Errorf("meta.ParseSeekTable: invalid seek point; sample number (%d) is not in ascending order", point.SampleNum)
-			}
-		}
-		prevSampleNum = point.SampleNum
-		hasPrev = true
-		st.Points = append(st.Points, point)
-	}
-	return st, nil
-}

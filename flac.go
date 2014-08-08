@@ -1,17 +1,29 @@
-// Package flac provides access to FLAC (Free Lossless Audio Codec) files. [1]
+// TODO(u): Evaluate storing the samples (and residuals) during frame audio
+// decoding in a buffer allocated for the stream. This buffer would be allocated
+// using BlockSize and NChannels from the StreamInfo block, and it could be
+// reused in between calls to Next and ParseNext. This should reduce GC
+// pressure.
+
+// Package flac provides access to FLAC (Free Lossless Audio Codec) streams.
 //
-// The basic structure of a FLAC bitstream is:
-//    - The four byte string signature "fLaC".
-//    - The StreamInfo metadata block.
-//    - Zero or more other metadata blocks.
-//    - One or more audio frames.
+// A brief introduction of the FLAC stream format [1] follows. Each FLAC stream
+// starts with a 32-bit signature ("fLaC"), followed by one or more metadata
+// blocks, and then one or more audio frames. The first metadata block
+// (StreamInfo) describes the basic properties of the audio stream and it is the
+// only mandatory metadata block. Subsequent metadata blocks may appear in an
+// arbitrary order.
 //
-// [1]: http://flac.sourceforge.net/format.html
+// Please refer to the documentation of the meta [2] and the frame [3] packages
+// for a brief introduction of their respective formats.
+//
+// [1]: https://www.xiph.org/flac/format.html#stream
+// [2]: https://godoc.org/github.com/mewkiz/flac/meta
+// [3]: https://godoc.org/github.com/mewkiz/flac/frame
 package flac
 
 import (
+	"bufio"
 	"bytes"
-	"crypto/md5"
 	"fmt"
 	"io"
 	"os"
@@ -20,176 +32,171 @@ import (
 	"github.com/mewkiz/flac/meta"
 )
 
-// A Stream is a FLAC bitstream.
+// A Stream contains the metadata blocks and provides access to the audio frames
+// of a FLAC stream.
+//
+// ref: https://www.xiph.org/flac/format.html#stream
 type Stream struct {
-	// Metadata blocks.
-	MetaBlocks []*meta.Block
-	// Audio frames.
-	Frames []*frame.Frame
-	// The underlying reader of the stream.
+	// The StreamInfo metadata block describes the basic properties of the FLAC
+	// audio stream.
+	Info *meta.StreamInfo
+	// Zero or more metadata blocks.
+	Blocks []*meta.Block
+	// Underlying io.Reader.
 	r io.Reader
 }
 
-// Parse reads the provided file and returns a parsed FLAC bitstream. It parses
-// all metadata blocks and all audio frames. Use Open instead for more
-// granularity.
-func Parse(filePath string) (s *Stream, err error) {
-	f, err := os.Open(filePath)
+// New creates a new Stream for accessing the audio samples of r. It reads and
+// parses the FLAC signature and the StreamInfo metadata block, but skips all
+// other metadata blocks.
+//
+// Call Stream.Next to parse the frame header of the next audio frame, and call
+// Stream.ParseNext to parse the entire next frame including audio samples.
+func New(r io.Reader) (stream *Stream, err error) {
+	// Verify FLAC signature and parse the StreamInfo metadata block.
+	stream = &Stream{r: bufio.NewReader(r)}
+	isLast, err := stream.parseStreamInfo()
 	if err != nil {
 		return nil, err
 	}
-	defer f.Close()
 
-	return ParseStream(f)
+	// Skip the remaining metadata blocks.
+	for !isLast {
+		block, err := meta.New(r)
+		if err != nil && err != meta.ErrReservedType {
+			return stream, err
+		}
+		err = block.Skip()
+		if err != nil {
+			return stream, err
+		}
+		isLast = block.IsLast
+	}
+
+	return stream, nil
 }
 
-// Open validates the FLAC signature of the provided file and returns a handle
-// to the FLAC bitstream. Callers should close the stream when done reading from
-// it. Call either Stream.Parse or Stream.ParseBlocks and Stream.ParseFrames to
-// parse the metadata blocks and audio frames.
-func Open(filePath string) (s *Stream, err error) {
-	f, err := os.Open(filePath)
+// signature marks the beginning of a FLAC stream.
+var signature = []byte("fLaC")
+
+// parseStreamInfo verifies the signature which marks the beginning of a FLAC
+// stream, and parses the StreamInfo metadata block. It returns a boolean value
+// which specifies if the StreamInfo block was the last metadata block of the
+// FLAC stream.
+func (stream *Stream) parseStreamInfo() (isLast bool, err error) {
+	// Verify FLAC signature.
+	r := stream.r
+	var buf [4]byte
+	_, err = io.ReadFull(r, buf[:])
+	if err != nil {
+		return false, err
+	}
+	if !bytes.Equal(buf[:], signature) {
+		return false, fmt.Errorf("flac.parseStreamInfo: invalid FLAC signature; expected %q, got %q", signature, buf)
+	}
+
+	// Parse StreamInfo metadata block.
+	block, err := meta.Parse(r)
+	if err != nil {
+		return false, err
+	}
+	si, ok := block.Body.(*meta.StreamInfo)
+	if !ok {
+		return false, fmt.Errorf("flac.parseStreamInfo: incorrect type of first metadata block; expected *meta.StreamInfo, got %T", si)
+	}
+	stream.Info = si
+	return block.IsLast, nil
+}
+
+// Parse creates a new Stream for accessing the metadata blocks and audio
+// samples of r. It reads and parses the FLAC signature and all metadata blocks.
+//
+// Call Stream.Next to parse the frame header of the next audio frame, and call
+// Stream.ParseNext to parse the entire next frame including audio samples.
+func Parse(r io.Reader) (stream *Stream, err error) {
+	// Verify FLAC signature and parse the StreamInfo metadata block.
+	stream = &Stream{r: r}
+	isLast, err := stream.parseStreamInfo()
 	if err != nil {
 		return nil, err
 	}
-	return NewStream(f)
+
+	// Parse the remaining metadata blocks.
+	for !isLast {
+		block, err := meta.Parse(r)
+		if err != nil {
+			if err != meta.ErrReservedType {
+				return stream, err
+			}
+			// Skip the body of unknown (reserved) metadata blocks, as stated by
+			// the specification.
+			//
+			// ref: https://www.xiph.org/flac/format.html#format_overview
+			err = block.Skip()
+			if err != nil {
+				return stream, err
+			}
+		}
+		stream.Blocks = append(stream.Blocks, block)
+		isLast = block.IsLast
+	}
+
+	return stream, nil
 }
 
-// Close closes the underlying reader of the stream.
-func (s *Stream) Close() error {
-	r, ok := s.r.(io.Closer)
-	if ok {
+// Open creates a new Stream for accessing the audio samples of path. It reads
+// and parses the FLAC signature and the StreamInfo metadata block, but skips
+// all other metadata blocks.
+//
+// Call Stream.Next to parse the frame header of the next audio frame, and call
+// Stream.ParseNext to parse the entire next frame including audio samples.
+//
+// Note: The Close method of the stream must be called when finished using it.
+func Open(path string) (stream *Stream, err error) {
+	f, err := os.Open(path)
+	if err != nil {
+		return nil, err
+	}
+	return New(f)
+}
+
+// ParseFile creates a new Stream for accessing the metadata blocks and audio
+// samples of path. It reads and parses the FLAC signature and all metadata
+// blocks.
+//
+// Call Stream.Next to parse the frame header of the next audio frame, and call
+// Stream.ParseNext to parse the entire next frame including audio samples.
+//
+// Note: The Close method of the stream must be called when finished using it.
+func ParseFile(path string) (stream *Stream, err error) {
+	f, err := os.Open(path)
+	if err != nil {
+		return nil, err
+	}
+	return Parse(f)
+}
+
+// Close closes the stream if opened through a call to Open or ParseFile, and
+// performs no operation otherwise.
+func (stream *Stream) Close() error {
+	if r, ok := stream.r.(io.Closer); ok {
 		return r.Close()
 	}
 	return nil
 }
 
-// ParseStream reads from the provided io.Reader and returns a parsed FLAC
-// bitstream. It parses all metadata blocks and all audio frames.  Use NewStream
-// instead for more granularity.
-func ParseStream(r io.Reader) (s *Stream, err error) {
-	s, err = NewStream(r)
-	if err != nil {
-		return nil, err
-	}
-	err = s.Parse()
-	if err != nil {
-		return nil, err
-	}
-	return s, nil
+// Next parses the frame header of the next audio frame. It returns io.EOF to
+// signal a graceful end of FLAC stream.
+//
+// Call Frame.Parse to parse the audio samples of its subframes.
+func (stream *Stream) Next() (f *frame.Frame, err error) {
+	return frame.New(stream.r)
 }
 
-// NewStream validates the FLAC signature of the provided io.Reader and returns
-// a handle to the FLAC bitstream. Call either Stream.Parse or
-// Stream.ParseBlocks and Stream.ParseFrames to parse the metadata blocks and
-// audio frames.
-func NewStream(r io.Reader) (s *Stream, err error) {
-	// signature is present at the beginning of each FLAC file.
-	const signature = "fLaC"
-
-	// Verify "fLaC" signature (size: 4 bytes).
-	buf := make([]byte, 4)
-	_, err = io.ReadFull(r, buf)
-	if err != nil {
-		return nil, err
-	}
-	sig := string(buf)
-	if sig != signature {
-		return nil, fmt.Errorf("flac.NewStream: invalid signature; expected %q, got %q", signature, sig)
-	}
-
-	s = &Stream{r: r}
-	return s, nil
+// ParseNext parses the entire next frame including audio samples. It returns
+// io.EOF to signal a graceful end of FLAC stream.
+func (stream *Stream) ParseNext() (f *frame.Frame, err error) {
+	return frame.Parse(stream.r)
 }
 
-// Parse reads and parses all metadata blocks and audio frames of the stream.
-// Use Stream.ParseBlocks and Stream.ParseFrames instead for more granularity.
-func (s *Stream) Parse() (err error) {
-	err = s.ParseBlocks(meta.TypeAll)
-	if err != nil {
-		return err
-	}
-	err = s.ParseFrames()
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-// ParseBlocks reads and parses the specified metadata blocks of the stream,
-// based on the provided types bitfield. The StreamInfo block type is always
-// included.
-func (s *Stream) ParseBlocks(types meta.BlockType) (err error) {
-	// The StreamInfo block type is always included.
-	types |= meta.TypeStreamInfo
-
-	// Read metadata blocks.
-	isFirst := true
-	var isLast bool
-	for !isLast {
-		// Read metadata block header.
-		block, err := meta.NewBlock(s.r)
-		if err != nil {
-			return err
-		}
-		if block.Header.IsLast {
-			isLast = true
-		}
-
-		// The first block type must be StreamInfo.
-		if isFirst {
-			if block.Header.BlockType != meta.TypeStreamInfo {
-				return fmt.Errorf("flac.Stream.ParseBlocks: first block type is invalid; expected %d (StreamInfo), got %d", meta.TypeStreamInfo, block.Header.BlockType)
-			}
-			isFirst = false
-		}
-
-		// Check if the metadata block type is present in the provided types
-		// bitfield.
-		if block.Header.BlockType&types != 0 {
-			// Read metadata block body.
-			err = block.Parse()
-			if err != nil {
-				return err
-			}
-		} else {
-			// Ignore metadata block body.
-			err = block.Skip()
-			if err != nil {
-				return err
-			}
-		}
-
-		// Store the decoded metadata block.
-		s.MetaBlocks = append(s.MetaBlocks, block)
-	}
-
-	return nil
-}
-
-// ParseFrames reads and parses the audio frames of the stream.
-func (s *Stream) ParseFrames() (err error) {
-	// The first block is always a StreamInfo block.
-	si := s.MetaBlocks[0].Body.(*meta.StreamInfo)
-
-	// Read audio frames.
-	// uint64 won't overflow since the max value of SampleCount is
-	// 0x0000000FFFFFFFFF.
-	md5sum := md5.New()
-	var i uint64
-	for i < si.SampleCount {
-		f, err := frame.NewFrame(s.r, md5sum)
-		if err != nil {
-			return err
-		}
-		s.Frames = append(s.Frames, f)
-		i += uint64(len(f.SubFrames[0].Samples))
-	}
-	got := md5sum.Sum(nil)
-	want := si.MD5sum[:]
-	if !bytes.Equal(got, want) {
-		return fmt.Errorf("flac.Stream.ParseFrames: md5 mismatch; got %32x, want %32x", got, want)
-	}
-
-	return nil
-}
+// TODO(u): Implement a Seek method.

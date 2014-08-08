@@ -1,92 +1,38 @@
 package meta
 
 import (
-	"fmt"
-	"io"
+	"encoding/binary"
 	"io/ioutil"
-	"log"
 )
 
-// registeredApplications maps from a registered application ID to a
-// description.
+// Application contains third party application specific data.
 //
-// ref: http://flac.sourceforge.net/id.html
-var registeredApplications = map[ID]string{
-	"ATCH": "FlacFile",
-	"BSOL": "beSolo",
-	"BUGS": "Bugs Player",
-	"Cues": "GoldWave cue points (specification)",
-	"Fica": "CUE Splitter",
-	"Ftol": "flac-tools",
-	"MOTB": "MOTB MetaCzar",
-	"MPSE": "MP3 Stream Editor",
-	"MuML": "MusicML: Music Metadata Language",
-	"RIFF": "Sound Devices RIFF chunk storage",
-	"SFFL": "Sound Font FLAC",
-	"SONY": "Sony Creative Software",
-	"SQEZ": "flacsqueeze",
-	"TtWv": "TwistedWave",
-	"UITS": "UITS Embedding tools",
-	"aiff": "FLAC AIFF chunk storage",
-	"imag": "flac-image application for storing arbitrary files in APPLICATION metadata blocks",
-	"peem": "Parseable Embedded Extensible Metadata (specification)",
-	"qfst": "QFLAC Studio",
-	"riff": "FLAC RIFF chunk storage",
-	"tune": "TagTuner",
-	"xbat": "XBAT",
-	"xmcd": "xmcd",
-}
-
-// An ID is a 4 byte identifier of a registered application.
-type ID string
-
-func (id ID) String() string {
-	s, ok := registeredApplications[id]
-	if ok {
-		return s
-	}
-	return fmt.Sprintf("<unregistered ID: %q>", string(id))
-}
-
-// An Application metadata block is used by third-party applications. The only
-// mandatory field is a 32-bit identifier. This ID is granted upon request to an
-// application by the FLAC maintainers. The remainder of the block is defined by
-// the registered application.
+// ref: https://www.xiph.org/flac/format.html#metadata_block_application
 type Application struct {
 	// Registered application ID.
-	ID ID
+	//
+	// ref: https://www.xiph.org/flac/id.html
+	ID uint32
 	// Application data.
 	Data []byte
 }
 
-// ParseApplication parses and returns a new Application metadata block. The
-// provided io.Reader should limit the amount of data that can be read to
-// header.Length bytes.
-//
-// Application format (pseudo code):
-//
-//    type METADATA_BLOCK_APPLICATION struct {
-//       ID   uint32
-//       Data [header.Length-4]byte
-//    }
-//
-// ref: http://flac.sourceforge.net/format.html#metadata_block_application
-func ParseApplication(r io.Reader) (app *Application, err error) {
-	// Application ID (size: 4 bytes).
-	buf, err := readBytes(r, 4)
+// parseApplication reads and parses the body of an Application metadata block.
+func (block *Block) parseApplication() error {
+	// 32 bits: ID.
+	app := new(Application)
+	block.Body = app
+	err := binary.Read(block.lr, binary.BigEndian, &app.ID)
 	if err != nil {
-		return nil, err
-	}
-	app = &Application{ID: ID(buf)}
-	if _, ok := registeredApplications[app.ID]; !ok {
-		log.Printf("meta.ParseApplication: unregistered application ID %q.\n", string(app.ID))
+		return unexpected(err)
 	}
 
-	// Data.
-	app.Data, err = ioutil.ReadAll(r)
-	if err != nil {
-		return nil, err
+	// Check if the Application block only contains an ID.
+	if block.Length == 4 {
+		return nil
 	}
 
-	return app, nil
+	// (block length)-4 bytes: Data.
+	app.Data, err = ioutil.ReadAll(block.lr)
+	return unexpected(err)
 }

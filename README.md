@@ -7,7 +7,7 @@ subject to change. The documentation can be inaccurate.
 flac
 ====
 
-This package provides access to [FLAC][1] (Free Lossless Audio Codec) files.
+This package provides access to [FLAC][1] (Free Lossless Audio Codec) streams.
 
 [1]: http://flac.sourceforge.net/format.html
 
@@ -16,13 +16,13 @@ Documentation
 
 Documentation provided by GoDoc.
 
-- [flac][]: implements access to FLAC files.
-	- [frame][]: contains functions for parsing FLAC encoded audio data.
-	- [meta][]: contains functions for parsing FLAC metadata.
+- [flac][]: provides access to FLAC (Free Lossless Audio Codec) streams.
+	- [frame][flac/frame]: implements access to FLAC audio frames.
+	- [meta][flac/meta]: implements access to FLAC metadata blocks.
 
 [flac]: http://godoc.org/github.com/mewkiz/flac
-[frame]: http://godoc.org/github.com/mewkiz/flac/frame
-[meta]: http://godoc.org/github.com/mewkiz/flac/meta
+[flac/frame]: http://godoc.org/github.com/mewkiz/flac/frame
+[flac/meta]: http://godoc.org/github.com/mewkiz/flac/meta
 
 public domain
 -------------

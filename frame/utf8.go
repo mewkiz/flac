@@ -116,6 +116,9 @@ func decodeUTF8Int(r io.Reader) (n uint64, err error) {
 		n <<= 6
 		c, err := readerutil.ReadByte(r)
 		if err != nil {
+			if err == io.EOF {
+				return 0, io.ErrUnexpectedEOF
+			}
 			return 0, err
 		}
 		if c < tx || t2 <= c {

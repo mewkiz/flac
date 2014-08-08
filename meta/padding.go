@@ -3,36 +3,37 @@ package meta
 import (
 	"errors"
 	"io"
+	"io/ioutil"
 )
 
-// VerifyPadding verifies that the padding metadata block only contains 0 bits.
-// The provided io.Reader should limit the amount of data that can be read to
-// header.Length bytes.
-func VerifyPadding(r io.Reader) (err error) {
-	// Verify up to 4 kb of padding each iteration.
-	var buf [4096]byte
-	for {
-		n, err := r.Read(buf[:])
-		if err != nil {
-			if err == io.EOF {
-				break
-			}
-			return err
-		}
-		if !isAllZero(buf[:n]) {
-			return errors.New("meta.VerifyPadding: invalid padding; must contain only zeroes")
-		}
-	}
-	return nil
+// verifyPadding verifies the body of a Padding metadata block. It should only
+// contain zero-padding.
+//
+// ref: https://www.xiph.org/flac/format.html#metadata_block_padding
+func (block *Block) verifyPadding() error {
+	zr := zeros{r: block.lr}
+	_, err := io.Copy(ioutil.Discard, zr)
+	return err
 }
 
-// isAllZero returns true if the value of each byte in the provided slice is 0,
-// and false otherwise.
-func isAllZero(buf []byte) bool {
-	for _, b := range buf {
-		if b != 0 {
-			return false
+// Errors returned by zeros.Read.
+var (
+	ErrInvalidPadding = errors.New("invalid padding")
+)
+
+// zeros implements an io.Reader, with a Read method which returns an error if
+// any byte read isn't zero.
+type zeros struct {
+	r io.Reader
+}
+
+// Read returns an error if any byte read isn't zero.
+func (zr zeros) Read(p []byte) (n int, err error) {
+	n, err = zr.r.Read(p)
+	for i := 0; i < n; i++ {
+		if p[i] != 0 {
+			return n, ErrInvalidPadding
 		}
 	}
-	return true
+	return n, err
 }

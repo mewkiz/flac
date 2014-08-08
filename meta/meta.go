@@ -1,220 +1,191 @@
-// Package meta contains functions for parsing FLAC metadata.
+// Package meta implements access to FLAC metadata blocks.
+//
+// A brief introduction of the FLAC metadata format [1] follows. FLAC metadata
+// is stored in blocks; each block contains a header followed by a body. The
+// block header describes the type of the block body, its length in bytes, and
+// specifies if the block was the last metadata block in a FLAC stream. The
+// contents of the block body depends on the type specified in the block header.
+//
+// At the time of this writing, the FLAC metadata format defines seven different
+// metadata block types, namely:
+//    * StreamInfo [2]
+//    * Padding [3]
+//    * Application [4]
+//    * SeekTable [5]
+//    * VorbisComment [6]
+//    * CueSheet [7]
+//    * Picture [8]
+// Please refer to their respective documentation for further information.
+//
+// [1]: https://www.xiph.org/flac/format.html#format_overview
+// [2]: https://godoc.org/github.com/mewkiz/flac/meta#StreamInfo
+// [3]: https://godoc.org/github.com/mewkiz/flac/meta#Padding
+// [4]: https://godoc.org/github.com/mewkiz/flac/meta#Application
+// [5]: https://godoc.org/github.com/mewkiz/flac/meta#SeekTable
+// [6]: https://godoc.org/github.com/mewkiz/flac/meta#VorbisComment
+// [7]: https://godoc.org/github.com/mewkiz/flac/meta#CueSheet
+// [8]: https://godoc.org/github.com/mewkiz/flac/meta#Picture
 package meta
 
 import (
 	"errors"
-	"fmt"
 	"io"
 	"io/ioutil"
-	"log"
 	"os"
 
-	"github.com/eaburns/bit"
+	"github.com/mewkiz/pkg/bit"
 )
 
-// A Block is a metadata block, consisting of a block header and a block body.
+// A Block contains the header and body of a metadata block.
+//
+// ref: https://www.xiph.org/flac/format.html#metadata_block
 type Block struct {
-	// The underlying reader of the block.
-	r io.Reader
 	// Metadata block header.
-	Header *BlockHeader
-	// Metadata block body: *StreamInfo, *Application, *SeekTable, etc.
+	Header
+	// Metadata block body of type *StreamInfo, *Application, ... etc. Body is
+	// initially nil, and gets populated by a call to Block.Parse.
 	Body interface{}
+	// Underlying io.Reader; limited by the length of the block body.
+	lr io.Reader
 }
 
-// ParseBlock reads from the provided io.Reader and returns a parsed metadata
-// block. It parses both the header and the body of the metadata block. Use
-// NewBlock instead for more granularity.
-func ParseBlock(r io.Reader) (block *Block, err error) {
-	block, err = NewBlock(r)
+// New creates a new Block for accessing the metadata of r. It reads and parses
+// a metadata block header.
+//
+// Call Block.Parse to parse the metadata block body, and call Block.Skip to
+// ignore it.
+func New(r io.Reader) (block *Block, err error) {
+	block = new(Block)
+	err = block.parseHeader(r)
 	if err != nil {
-		return nil, err
+		return block, err
 	}
+	block.lr = io.LimitReader(r, block.Length)
+	return block, nil
+}
 
+// Parse reads and parses the header and body of a metadata block. Use New for
+// additional granularity.
+func Parse(r io.Reader) (block *Block, err error) {
+	block, err = New(r)
+	if err != nil {
+		return block, err
+	}
 	err = block.Parse()
 	if err != nil {
-		return nil, err
+		return block, err
 	}
-
 	return block, nil
 }
 
-// NewBlock reads and parses a metadata block header from the provided io.Reader
-// and returns a handle to the metadata block. Call Block.Parse to parse the
-// metadata block body and Block.Skip to ignore it.
-func NewBlock(r io.Reader) (block *Block, err error) {
-	// Read metadata block header.
-	block = &Block{r: r}
-	block.Header, err = ParseBlockHeader(r)
-	if err != nil {
-		return nil, err
-	}
-
-	return block, nil
-}
+// Errors returned by Parse.
+var (
+	ErrReservedType = errors.New("meta.Block.Parse: reserved block type")
+	ErrInvalidType  = errors.New("meta.Block.Parse: invalid block type")
+)
 
 // Parse reads and parses the metadata block body.
-func (block *Block) Parse() (err error) {
-	// Read metadata block.
-	lr := io.LimitReader(block.r, int64(block.Header.Length))
-	switch block.Header.BlockType {
+func (block *Block) Parse() error {
+	switch block.Type {
 	case TypeStreamInfo:
-		block.Body, err = ParseStreamInfo(lr)
+		return block.parseStreamInfo()
 	case TypePadding:
-		err = VerifyPadding(lr)
+		return block.verifyPadding()
 	case TypeApplication:
-		block.Body, err = ParseApplication(lr)
+		return block.parseApplication()
 	case TypeSeekTable:
-		block.Body, err = ParseSeekTable(lr)
+		return block.parseSeekTable()
 	case TypeVorbisComment:
-		block.Body, err = ParseVorbisComment(lr)
+		return block.parseVorbisComment()
 	case TypeCueSheet:
-		block.Body, err = ParseCueSheet(lr)
+		return block.parseCueSheet()
 	case TypePicture:
-		block.Body, err = ParsePicture(lr)
-	case TypeReserved:
-		block.Body, err = ioutil.ReadAll(lr)
-	default:
-		return fmt.Errorf("meta.Block.ParseBlock: block type '%d' not yet supported", block.Header.BlockType)
+		return block.parsePicture()
 	}
-	if err != nil {
-		return err
+	if block.Type >= 7 && block.Type <= 126 {
+		return ErrReservedType
 	}
-
-	return nil
+	return ErrInvalidType
 }
 
 // Skip ignores the contents of the metadata block body.
-func (block *Block) Skip() (err error) {
-	if r, ok := block.r.(io.Seeker); ok {
-		_, err = r.Seek(int64(block.Header.Length), os.SEEK_CUR)
-		if err != nil {
-			return err
-		}
-	} else {
-		_, err = io.CopyN(ioutil.Discard, block.r, int64(block.Header.Length))
-		if err != nil {
-			return err
-		}
+func (block *Block) Skip() error {
+	if sr, ok := block.lr.(io.Seeker); ok {
+		_, err := sr.Seek(0, os.SEEK_END)
+		return err
 	}
+	_, err := io.Copy(ioutil.Discard, block.lr)
+	return err
+}
+
+// A Header contains information about the type and length of a metadata block.
+//
+// ref: https://www.xiph.org/flac/format.html#metadata_block_header
+type Header struct {
+	// Metadata block body type.
+	Type Type
+	// Length of body data in bytes.
+	Length int64
+	// IsLast specifies if the block is the last metadata block.
+	IsLast bool
+}
+
+// parseHeader reads and parses the header of a metadata block.
+func (block *Block) parseHeader(r io.Reader) error {
+	// 1 bit: IsLast.
+	br := bit.NewReader(r)
+	x, err := br.Read(1)
+	if err != nil {
+		// This is the only place a metadata block may return io.EOF, which
+		// signals a graceful end of a FLAC stream (from a metadata point of
+		// view).
+		//
+		// Note that valid FLAC streams always contain at least one audio frame
+		// after the last metadata block. Therefore an io.EOF error at this
+		// location is always invalid. This logic is to be handled by the flac
+		// package however.
+		return err
+	}
+	if x != 0 {
+		block.IsLast = true
+	}
+
+	// 7 bits: Type.
+	x, err = br.Read(7)
+	if err != nil {
+		return unexpected(err)
+	}
+	block.Type = Type(x)
+
+	// 24 bits: Length.
+	x, err = br.Read(24)
+	if err != nil {
+		return unexpected(err)
+	}
+	block.Length = int64(x)
+
 	return nil
 }
 
-// BlockType is used to identify the metadata block type.
-type BlockType uint8
+// Type represents the type of a metadata block body.
+type Type uint8
 
-// Metadata block types.
+// Metadata block body types.
 const (
-	TypeStreamInfo BlockType = 1 << iota
+	TypeStreamInfo Type = iota
 	TypePadding
 	TypeApplication
 	TypeSeekTable
 	TypeVorbisComment
 	TypeCueSheet
 	TypePicture
-	TypeReserved
-
-	// TypeAll is a bitmask of all block types, except padding.
-	TypeAll = TypeStreamInfo | TypeApplication | TypeSeekTable | TypeVorbisComment | TypeCueSheet | TypePicture | TypeReserved
-	// TypeAllStrict is a bitmask of all block types, including padding but excluding reserved.
-	TypeAllStrict = TypeStreamInfo | TypePadding | TypeApplication | TypeSeekTable | TypeVorbisComment | TypeCueSheet | TypePicture
 )
 
-// blockTypeName is a map from BlockType to name.
-var blockTypeName = map[BlockType]string{
-	TypeStreamInfo:    "stream info",
-	TypePadding:       "padding",
-	TypeApplication:   "application",
-	TypeSeekTable:     "seek table",
-	TypeVorbisComment: "vorbis comment",
-	TypeCueSheet:      "cue sheet",
-	TypePicture:       "picture",
-}
-
-func (t BlockType) String() string {
-	if s, ok := blockTypeName[t]; ok {
-		return s
+// unexpected returns io.ErrUnexpectedEOF if err is io.EOF, and returns err
+// otherwise.
+func unexpected(err error) error {
+	if err == io.EOF {
+		return io.ErrUnexpectedEOF
 	}
-	return fmt.Sprintf("unknown block type %d", uint8(t))
-}
-
-// A BlockHeader contains type and length information about a metadata block.
-type BlockHeader struct {
-	// IsLast is true if this block is the last metadata block before the audio
-	// frames, and false otherwise.
-	IsLast bool
-	// Block type.
-	BlockType BlockType
-	// Length in bytes of the metadata body.
-	Length int
-}
-
-// ParseBlockHeader parses and returns a new metadata block header.
-//
-// Block header format (pseudo code):
-//
-//    type METADATA_BLOCK_HEADER struct {
-//       is_last    bool
-//       block_type uint7
-//       length     uint24
-//    }
-//
-// ref: http://flac.sourceforge.net/format.html#metadata_block_header
-func ParseBlockHeader(r io.Reader) (h *BlockHeader, err error) {
-	br := bit.NewReader(r)
-	// field 0: is_last    (1 bit)
-	// field 1: block_type (7 bits)
-	// field 2: length     (24 bits)
-	fields, err := br.ReadFields(1, 7, 24)
-	if err != nil {
-		return nil, err
-	}
-
-	// Is last.
-	h = new(BlockHeader)
-	if fields[0] != 0 {
-		h.IsLast = true
-	}
-
-	// Block type.
-	//    0:     Streaminfo
-	//    1:     Padding
-	//    2:     Application
-	//    3:     Seektable
-	//    4:     Vorbis_comment
-	//    5:     Cuesheet
-	//    6:     Picture
-	//    7-126: reserved
-	//    127:   invalid, to avoid confusion with a frame sync code
-	blockType := fields[1]
-	switch blockType {
-	case 0:
-		h.BlockType = TypeStreamInfo
-	case 1:
-		h.BlockType = TypePadding
-	case 2:
-		h.BlockType = TypeApplication
-	case 3:
-		h.BlockType = TypeSeekTable
-	case 4:
-		h.BlockType = TypeVorbisComment
-	case 5:
-		h.BlockType = TypeCueSheet
-	case 6:
-		h.BlockType = TypePicture
-	default:
-		if blockType >= 7 && blockType <= 126 {
-			// block type 7-126: reserved.
-			log.Printf("meta.ParseBlockHeader: reserved block type %d.\n", uint8(blockType))
-			h.BlockType = TypeReserved
-		} else {
-			// block type 127: invalid.
-			return nil, errors.New("meta.ParseBlockHeader: invalid block type")
-		}
-	}
-
-	// Length.
-	// int won't overflow since the max value of Length is 0x00FFFFFF.
-	h.Length = int(fields[2])
-	return h, nil
+	return err
 }
