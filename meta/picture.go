@@ -37,7 +37,7 @@ type Picture struct {
 	Type uint32
 	// MIME type string. The MIME type "-->" specifies that the picture data is
 	// to be interpreted as an URL instead of image data.
-	MIMEType string
+	MIME string
 	// Description of the picture.
 	Desc string
 	// Image dimensions.
@@ -67,12 +67,12 @@ func (block *Block) parsePicture() error {
 		return unexpected(err)
 	}
 
-	// (MIME type length) bytes: MIMEType.
+	// (MIME type length) bytes: MIME.
 	buf, err := readBytes(block.lr, int(x))
 	if err != nil {
 		return unexpected(err)
 	}
-	pic.MIMEType = string(buf)
+	pic.MIME = string(buf)
 
 	// 32 bits: (description length).
 	err = binary.Read(block.lr, binary.BigEndian, &x)
