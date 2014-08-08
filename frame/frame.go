@@ -31,7 +31,9 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"hash"
 	"io"
+	"log"
 
 	"github.com/mewkiz/pkg/bit"
 	"github.com/mewkiz/pkg/hashutil"
@@ -142,6 +144,35 @@ func (frame *Frame) Parse() error {
 	}
 
 	return nil
+}
+
+// Hash adds the unencoded audio samples of the frame to a running MD5 hash.
+func (frame *Frame) Hash(md5sum hash.Hash) {
+	// Write decoded samples to a running MD5 hash.
+	// TODO(u): Make buf of size md5.BlockSize if it increases performance.
+	bps := frame.BitsPerSample
+	var buf [3]byte
+	for i := 0; i < int(frame.BlockSize); i++ {
+		for _, subframe := range frame.Subframes {
+			sample := subframe.Samples[i]
+			switch bps {
+			case 8:
+				buf[0] = uint8(sample)
+				md5sum.Write(buf[:1])
+			case 16:
+				buf[0] = uint8(sample)
+				buf[1] = uint8(sample >> 8)
+				md5sum.Write(buf[:2])
+			case 24:
+				buf[0] = uint8(sample)
+				buf[1] = uint8(sample >> 8)
+				buf[2] = uint8(sample >> 16)
+				md5sum.Write(buf[:])
+			default:
+				log.Printf("frame.Frame.Hash: support for %d-bit sample size not yet implemented.\n", bps)
+			}
+		}
+	}
 }
 
 // A Header contains the basic properties of an audio frame, such as its sample
