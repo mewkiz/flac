@@ -54,6 +54,10 @@ func flac2wav(path string) error {
 		}
 	}
 	fw, err := os.Create(wavPath)
+	if err != nil {
+		return err
+	}
+	defer fw.Close()
 
 	// Create WAV encoder.
 	conf := audio.Config{
