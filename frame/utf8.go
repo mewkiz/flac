@@ -4,8 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-
-	"github.com/mewkiz/pkg/readerutil"
 )
 
 const (
@@ -58,7 +56,7 @@ const (
 //         - set R = R or <the lower 6 bits from B>
 //    - the read value is R
 func decodeUTF8Int(r io.Reader) (n uint64, err error) {
-	c0, err := readerutil.ReadByte(r)
+	c0, err := readByte(r)
 	if err != nil {
 		return 0, err
 	}
@@ -114,7 +112,7 @@ func decodeUTF8Int(r io.Reader) (n uint64, err error) {
 	// store bits from continuation bytes.
 	for i := 0; i < l; i++ {
 		n <<= 6
-		c, err := readerutil.ReadByte(r)
+		c, err := readByte(r)
 		if err != nil {
 			if err == io.EOF {
 				return 0, io.ErrUnexpectedEOF
@@ -157,4 +155,14 @@ func decodeUTF8Int(r io.Reader) (n uint64, err error) {
 	}
 
 	return n, nil
+}
+
+// readByte reads and returns the next byte from the provided io.Reader.
+func readByte(r io.Reader) (c byte, err error) {
+	buf := make([]byte, 1)
+	_, err = io.ReadFull(r, buf)
+	if err != nil {
+		return 0, err
+	}
+	return buf[0], nil
 }

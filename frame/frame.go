@@ -33,10 +33,10 @@ import (
 	"io"
 	"log"
 
-	"github.com/mewkiz/pkg/bit"
-	"github.com/mewkiz/pkg/hashutil"
-	"github.com/mewkiz/pkg/hashutil/crc16"
-	"github.com/mewkiz/pkg/hashutil/crc8"
+	"gopkg.in/mewpkg/bits.v1"
+	"gopkg.in/mewpkg/hashutil.v1"
+	"gopkg.in/mewpkg/hashutil.v1/crc16"
+	"gopkg.in/mewpkg/hashutil.v1/crc8"
 )
 
 // A Frame contains the header and subframes of an audio frame. It holds the
@@ -52,7 +52,7 @@ type Frame struct {
 	// CRC-16 hash sum, calculated by read operations on hr.
 	crc hashutil.Hash16
 	// A bit reader, wrapping read operations to hr.
-	br *bit.Reader
+	br *bits.Reader
 	// A CRC-16 hash reader, wrapping read operations to r.
 	hr io.Reader
 	// Underlying io.Reader.
@@ -218,7 +218,7 @@ func (frame *Frame) parseHeader() error {
 	hr := io.TeeReader(frame.hr, h)
 
 	// 14 bits: sync-code (11111111111110)
-	br := bit.NewReader(hr)
+	br := bits.NewReader(hr)
 	frame.br = br
 	x, err := br.Read(14)
 	if err != nil {

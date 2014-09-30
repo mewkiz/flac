@@ -4,8 +4,7 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/mewkiz/pkg/bit"
-	"github.com/mewkiz/pkg/bits"
+	"gopkg.in/mewpkg/bits.v1"
 )
 
 // A Subframe contains the encoded audio samples from one channel of an audio
@@ -25,7 +24,7 @@ type Subframe struct {
 	// Number of audio samples in the subframe.
 	NSamples int
 	// A bit reader, wrapping read operations to frame.hr.
-	br *bit.Reader
+	br *bits.Reader
 }
 
 // parseSubframe reads and parses the header, and the audio samples of a
@@ -133,7 +132,7 @@ func (subframe *Subframe) parseHeader() error {
 	}
 	if x != 0 {
 		// The number of wasted bits-per-sample is unary coded.
-		_, err = bits.Unary(br)
+		_, err = br.ReadUnary()
 		if err != nil {
 			return unexpected(err)
 		}
@@ -417,7 +416,7 @@ func (subframe *Subframe) decodeRicePart(paramSize uint) error {
 func (subframe *Subframe) decodeRiceResidual(k uint) error {
 	// Read unary encoded most significant bits.
 	br := subframe.br
-	high, err := bits.Unary(br)
+	high, err := br.ReadUnary()
 	if err != nil {
 		return unexpected(err)
 	}

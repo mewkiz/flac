@@ -9,7 +9,7 @@ import (
 	"os"
 	"runtime/pprof"
 
-	"github.com/mewkiz/flac"
+	"gopkg.in/mewkiz/flac.v1"
 )
 
 func main() {

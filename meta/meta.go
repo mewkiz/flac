@@ -33,7 +33,7 @@ import (
 	"io/ioutil"
 	"os"
 
-	"github.com/mewkiz/pkg/bit"
+	"gopkg.in/mewpkg/bits.v1"
 )
 
 // A Block contains the header and body of a metadata block.
@@ -133,7 +133,7 @@ type Header struct {
 // parseHeader reads and parses the header of a metadata block.
 func (block *Block) parseHeader(r io.Reader) error {
 	// 1 bit: IsLast.
-	br := bit.NewReader(r)
+	br := bits.NewReader(r)
 	x, err := br.Read(1)
 	if err != nil {
 		// This is the only place a metadata block may return io.EOF, which

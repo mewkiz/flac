@@ -28,8 +28,8 @@ import (
 	"io"
 	"os"
 
-	"github.com/mewkiz/flac/frame"
-	"github.com/mewkiz/flac/meta"
+	"gopkg.in/mewkiz/flac.v1/frame"
+	"gopkg.in/mewkiz/flac.v1/meta"
 )
 
 // A Stream contains the metadata blocks and provides access to the audio frames

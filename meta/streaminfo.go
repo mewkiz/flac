@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/mewkiz/pkg/bit"
+	"gopkg.in/mewpkg/bits.v1"
 )
 
 // StreamInfo contains the basic properties of a FLAC audio stream, such as its
@@ -42,7 +42,7 @@ type StreamInfo struct {
 // parseStreamInfo reads and parses the body of an StreamInfo metadata block.
 func (block *Block) parseStreamInfo() error {
 	// 16 bits: BlockSizeMin.
-	br := bit.NewReader(block.lr)
+	br := bits.NewReader(block.lr)
 	x, err := br.Read(16)
 	if err != nil {
 		return unexpected(err)

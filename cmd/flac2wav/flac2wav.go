@@ -10,9 +10,9 @@ import (
 
 	"azul3d.org/audio.v1"
 	"github.com/mewkiz/audio/wav"
-	"github.com/mewkiz/flac"
 	"github.com/mewkiz/pkg/osutil"
 	"github.com/mewkiz/pkg/pathutil"
+	"gopkg.in/mewkiz/flac.v1"
 )
 
 // flagForce specifies if file overwriting should be forced, when a WAV file of
