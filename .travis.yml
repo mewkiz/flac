@@ -20,6 +20,7 @@ install:
   - go get gopkg.in/mewkiz/flac.v1/...
 
 script:
+  - cd $HOME/gopath/src/gopkg.in/mewkiz/flac.v1
   - wget https://gist.githubusercontent.com/mewmew/379014c9a2e6885e238d/raw/fb0c7d164113b1428f886dd470a613c74b9a9997/goclean.sh
   - chmod +x goclean.sh
   - ./goclean.sh
