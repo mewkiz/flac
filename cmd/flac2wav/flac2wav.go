@@ -9,7 +9,7 @@ import (
 	"os"
 
 	"azul3d.org/audio.v1"
-	"github.com/mewkiz/audio/wav"
+	"azul3d.org/audio/wav.v1"
 	"github.com/mewkiz/pkg/osutil"
 	"github.com/mewkiz/pkg/pathutil"
 	"gopkg.in/mewkiz/flac.v1"
