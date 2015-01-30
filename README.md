@@ -23,7 +23,7 @@ Documentation provided by GoDoc.
 ## Changes
 
 * Version 1.0.1
-    - Fix two subframe decoding bugs (see [#7](https://github.com/mewkiz/flac/pull/7)). Thanks to Jonathan MacMillan.
+    - Fix two subframe decoding bugs (see [#7](https://github.com/mewkiz/flac/pull/7)). Thanks to [Jonathan MacMillan](https://github.com/perotinus).
     - Add frame decoding test cases.
 
 ## Public domain
