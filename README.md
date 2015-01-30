@@ -1,5 +1,4 @@
-flac
-====
+# flac
 
 [![Build Status](https://travis-ci.org/mewkiz/flac.svg?branch=master)](https://travis-ci.org/mewkiz/flac)
 [![Coverage Status](https://img.shields.io/coveralls/mewkiz/flac.svg)](https://coveralls.io/r/mewkiz/flac?branch=master)
@@ -9,22 +8,26 @@ This package provides access to [FLAC][1] (Free Lossless Audio Codec) streams.
 
 [1]: http://flac.sourceforge.net/format.html
 
-Documentation
--------------
+## Documentation
 
 Documentation provided by GoDoc.
 
-- [flac][]: provides access to FLAC (Free Lossless Audio Codec) streams.
-	- [frame][flac/frame]: implements access to FLAC audio frames.
-	- [meta][flac/meta]: implements access to FLAC metadata blocks.
+- [flac]: provides access to FLAC (Free Lossless Audio Codec) streams.
+    - [frame][flac/frame]: implements access to FLAC audio frames.
+    - [meta][flac/meta]: implements access to FLAC metadata blocks.
 
 [flac]: http://godoc.org/gopkg.in/mewkiz/flac.v1
 [flac/frame]: http://godoc.org/gopkg.in/mewkiz/flac.v1/frame
 [flac/meta]: http://godoc.org/gopkg.in/mewkiz/flac.v1/meta
 
-public domain
--------------
+## Changes
 
-This code is hereby released into the *[public domain][]*.
+* Version 1.0.1
+    - Fix two subframe decoding bugs (see #7). Thanks to Jonathan MacMillan.
+    - Add frame decoding test cases.
+
+## Public domain
+
+This code is hereby released into the [public domain].
 
 [public domain]: https://creativecommons.org/publicdomain/zero/1.0/
