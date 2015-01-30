@@ -50,7 +50,7 @@ func flac2wav(path string) error {
 			return err
 		}
 		if exists {
-			return fmt.Errorf("the file %q exists already.", wavPath)
+			return fmt.Errorf("the file %q exists already", wavPath)
 		}
 	}
 	fw, err := os.Create(wavPath)
