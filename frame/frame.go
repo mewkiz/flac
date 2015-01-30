@@ -22,7 +22,7 @@
 //    [2]: https://www.xiph.org/flac/format.html#blocking
 //    [3]: https://www.xiph.org/flac/format.html#interchannel
 //    [4]: https://www.xiph.org/flac/format.html#prediction
-//    [5]: https://godoc.org/github.com/mewkiz/flac/frame#Pred
+//    [5]: https://godoc.org/gopkg.in/mewkiz/flac.v1/frame#Pred
 package frame
 
 import (
