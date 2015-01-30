@@ -144,7 +144,7 @@ func (frame *Frame) Parse() error {
 	return nil
 }
 
-// Hash adds the unencoded audio samples of the frame to a running MD5 hash. It
+// Hash adds the decoded audio samples of the frame to a running MD5 hash. It
 // can be used in conjunction with StreamInfo.MD5sum to verify the integrity of
 // the decoded audio samples.
 //

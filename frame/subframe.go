@@ -23,16 +23,14 @@ type Subframe struct {
 	Samples []int32
 	// Number of audio samples in the subframe.
 	NSamples int
-	// A bit reader, wrapping read operations to frame.hr.
-	br *bits.Reader
 }
 
 // parseSubframe reads and parses the header, and the audio samples of a
 // subframe.
 func (frame *Frame) parseSubframe(bps uint) (subframe *Subframe, err error) {
 	// Parse subframe header.
-	subframe = &Subframe{br: frame.br}
-	err = subframe.parseHeader()
+	subframe = new(Subframe)
+	err = subframe.parseHeader(frame.br)
 	if err != nil {
 		return subframe, err
 	}
@@ -42,13 +40,13 @@ func (frame *Frame) parseSubframe(bps uint) (subframe *Subframe, err error) {
 	subframe.Samples = make([]int32, 0, subframe.NSamples)
 	switch subframe.Pred {
 	case PredConstant:
-		err = subframe.decodeConstant(bps)
+		err = subframe.decodeConstant(frame.br, bps)
 	case PredVerbatim:
-		err = subframe.decodeVerbatim(bps)
+		err = subframe.decodeVerbatim(frame.br, bps)
 	case PredFixed:
-		err = subframe.decodeFixed(bps)
+		err = subframe.decodeFixed(frame.br, bps)
 	case PredFIR:
-		err = subframe.decodeFIR(bps)
+		err = subframe.decodeFIR(frame.br, bps)
 	}
 	return subframe, err
 }
@@ -65,9 +63,8 @@ type SubHeader struct {
 }
 
 // parseHeader reads and parses the header of a subframe.
-func (subframe *Subframe) parseHeader() error {
+func (subframe *Subframe) parseHeader(br *bits.Reader) error {
 	// 1 bit: zero-padding.
-	br := subframe.br
 	x, err := br.Read(1)
 	if err != nil {
 		return unexpected(err)
@@ -194,9 +191,8 @@ func signExtend(x uint64, n uint) int32 {
 // of as run-length encoding.
 //
 // ref: https://www.xiph.org/flac/format.html#subframe_constant
-func (subframe *Subframe) decodeConstant(bps uint) error {
+func (subframe *Subframe) decodeConstant(br *bits.Reader, bps uint) error {
 	// (bits-per-sample) bits: Unencoded constant value of the subblock.
-	br := subframe.br
 	x, err := br.Read(bps)
 	if err != nil {
 		return unexpected(err)
@@ -214,9 +210,8 @@ func (subframe *Subframe) decodeConstant(bps uint) error {
 // decodeVerbatim reads the unencoded audio samples of the subframe.
 //
 // ref: https://www.xiph.org/flac/format.html#subframe_verbatim
-func (subframe *Subframe) decodeVerbatim(bps uint) error {
+func (subframe *Subframe) decodeVerbatim(br *bits.Reader, bps uint) error {
 	// Parse the unencoded audio samples of the subframe.
-	br := subframe.br
 	for i := 0; i < subframe.NSamples; i++ {
 		// (bits-per-sample) bits: Unencoded constant value of the subblock.
 		x, err := br.Read(bps)
@@ -250,9 +245,8 @@ var fixedCoeffs = [...][]int32{
 // using a fixed set of predefined polynomial coefficients.
 //
 // ref: https://www.xiph.org/flac/format.html#subframe_fixed
-func (subframe *Subframe) decodeFixed(bps uint) error {
+func (subframe *Subframe) decodeFixed(br *bits.Reader, bps uint) error {
 	// Parse unencoded warm-up samples.
-	br := subframe.br
 	for i := 0; i < subframe.Order; i++ {
 		// (bits-per-sample) bits: Unencoded warm-up sample.
 		x, err := br.Read(bps)
@@ -264,7 +258,7 @@ func (subframe *Subframe) decodeFixed(bps uint) error {
 	}
 
 	// Decode subframe residuals.
-	err := subframe.decodeResidual()
+	err := subframe.decodeResidual(br)
 	if err != nil {
 		return err
 	}
@@ -279,9 +273,8 @@ func (subframe *Subframe) decodeFixed(bps uint) error {
 // polynomial coefficients stored in the stream.
 //
 // ref: https://www.xiph.org/flac/format.html#subframe_lpc
-func (subframe *Subframe) decodeFIR(bps uint) error {
+func (subframe *Subframe) decodeFIR(br *bits.Reader, bps uint) error {
 	// Parse unencoded warm-up samples.
-	br := subframe.br
 	for i := 0; i < subframe.Order; i++ {
 		// (bits-per-sample) bits: Unencoded warm-up sample.
 		x, err := br.Read(bps)
@@ -321,7 +314,7 @@ func (subframe *Subframe) decodeFIR(bps uint) error {
 	}
 
 	// Decode subframe residuals.
-	err = subframe.decodeResidual()
+	err = subframe.decodeResidual(br)
 	if err != nil {
 		return err
 	}
@@ -336,9 +329,8 @@ func (subframe *Subframe) decodeFIR(bps uint) error {
 // signals) of the subframe.
 //
 // ref: https://www.xiph.org/flac/format.html#residual
-func (subframe *Subframe) decodeResidual() error {
+func (subframe *Subframe) decodeResidual(br *bits.Reader) error {
 	// 2 bits: Residual coding method.
-	br := subframe.br
 	x, err := br.Read(2)
 	if err != nil {
 		return unexpected(err)
@@ -350,9 +342,9 @@ func (subframe *Subframe) decodeResidual() error {
 	//    11: reserved.
 	switch x {
 	case 0x0:
-		return subframe.decodeRicePart(4)
+		return subframe.decodeRicePart(br, 4)
 	case 0x1:
-		return subframe.decodeRicePart(5)
+		return subframe.decodeRicePart(br, 5)
 	default:
 		return fmt.Errorf("frame.Subframe.decodeResidual: reserved residual coding method bit pattern (%02b)", x)
 	}
@@ -363,9 +355,8 @@ func (subframe *Subframe) decodeResidual() error {
 //
 // ref: https://www.xiph.org/flac/format.html#partitioned_rice
 // ref: https://www.xiph.org/flac/format.html#partitioned_rice2
-func (subframe *Subframe) decodeRicePart(paramSize uint) error {
+func (subframe *Subframe) decodeRicePart(br *bits.Reader, paramSize uint) error {
 	// 4 bits: Partition order.
-	br := subframe.br
 	x, err := br.Read(4)
 	if err != nil {
 		return unexpected(err)
@@ -402,7 +393,7 @@ func (subframe *Subframe) decodeRicePart(paramSize uint) error {
 
 		// Decode the Rice encoded residuals of the partition.
 		for j := 0; j < nsamples; j++ {
-			err = subframe.decodeRiceResidual(param)
+			err = subframe.decodeRiceResidual(br, param)
 			if err != nil {
 				return err
 			}
@@ -413,9 +404,8 @@ func (subframe *Subframe) decodeRicePart(paramSize uint) error {
 }
 
 // decodeRiceResidual decodes a Rice encoded residual (error signal).
-func (subframe *Subframe) decodeRiceResidual(k uint) error {
+func (subframe *Subframe) decodeRiceResidual(br *bits.Reader, k uint) error {
 	// Read unary encoded most significant bits.
-	br := subframe.br
 	high, err := br.ReadUnary()
 	if err != nil {
 		return unexpected(err)
