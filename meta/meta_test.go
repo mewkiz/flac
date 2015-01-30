@@ -221,23 +221,23 @@ func TestParseBlocks(t *testing.T) {
 		blocks := stream.Blocks
 
 		if len(blocks) != len(g.blocks) {
-			t.Errorf("i=%d: invalid number of metadata blocks; expected %d, got %d.", i, len(g.blocks), len(blocks))
+			t.Errorf("i=%d: invalid number of metadata blocks; expected %d, got %d", i, len(g.blocks), len(blocks))
 			continue
 		}
 
 		got := stream.Info
 		want := g.info
 		if !reflect.DeepEqual(got, want) {
-			t.Errorf("i=%d: metadata StreamInfo block bodies differ; expected %#v, got %#v.", i, want, got)
+			t.Errorf("i=%d: metadata StreamInfo block bodies differ; expected %#v, got %#v", i, want, got)
 		}
 
 		for j, got := range blocks {
 			want := g.blocks[j]
 			if !reflect.DeepEqual(got.Header, want.Header) {
-				t.Errorf("i=%d, j=%d: metadata block headers differ; expected %#v, got %#v.", i, j, want.Header, got.Header)
+				t.Errorf("i=%d, j=%d: metadata block headers differ; expected %#v, got %#v", i, j, want.Header, got.Header)
 			}
 			if !reflect.DeepEqual(got.Body, want.Body) {
-				t.Errorf("i=%d, j=%d: metadata block bodies differ; expected %#v, got %#v.", i, j, want.Body, got.Body)
+				t.Errorf("i=%d, j=%d: metadata block bodies differ; expected %#v, got %#v", i, j, want.Body, got.Body)
 			}
 		}
 	}
