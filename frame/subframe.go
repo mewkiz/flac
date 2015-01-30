@@ -374,7 +374,7 @@ func (subframe *Subframe) decodeRicePart(br *bits.Reader, paramSize uint) error 
 		if err != nil {
 			return unexpected(err)
 		}
-		if paramSize == 4 && x == 0xF || paramSize == 4 && x == 0x1F {
+		if paramSize == 4 && x == 0xF || paramSize == 5 && x == 0x1F {
 			// 1111 or 11111: Escape code, meaning the partition is in unencoded
 			// binary form using n bits per sample; n follows as a 5-bit number.
 			panic("not yet implemented; Rice parameter escape code.")
@@ -436,11 +436,11 @@ func (subframe *Subframe) decodeLPC(coeffs []int32, shift int32) error {
 		panic("not yet implemented; negative shift.")
 	}
 	for i := subframe.Order; i < subframe.NSamples; i++ {
-		var sample int32
+		var sample int64
 		for j, c := range coeffs {
-			sample += c * subframe.Samples[i-j-1]
+			sample += int64(c) * int64(subframe.Samples[i-j-1])
 		}
-		subframe.Samples[i] += sample >> uint(shift)
+		subframe.Samples[i] += int32(sample >> uint(shift))
 	}
 	return nil
 }
