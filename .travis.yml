@@ -8,12 +8,10 @@ env:
     - secure: "JtfIj2ItU0o6/wxnwaCULmPnWO1fQHrX3hGbWey56hPzybA3pQEs5YOZt16nQU5GS8p3Z3OIILUP4LGebqsLU5dyWA/GxnZv45MoZ8TS8lB7aie7l5Y6yYvq0ZBJoMWxXSY6sZJ1sKJG1F7NlQoknZToxvlkfF4nP9N5RQpL8iU="
     - PATH=$HOME/gopath/bin:$PATH
 
-# TODO(u): Update import path of vet and cover when Travis starts using Go 1.4.
-
 before_install:
-  - go get code.google.com/p/go.tools/cmd/cover
-  - go get code.google.com/p/go.tools/cmd/vet
+  - go get golang.org/x/tools/cmd/cover
   - go get golang.org/x/tools/cmd/goimports
+  - go get golang.org/x/tools/cmd/vet
   - go get github.com/golang/lint/golint
   - go get github.com/mattn/goveralls
 
@@ -23,7 +21,7 @@ install:
 
 before_script:
   - cd $HOME/gopath/src/gopkg.in/mewkiz/flac.v1
-  - wget https://gist.githubusercontent.com/mewmew/379014c9a2e6885e238d/raw/fb0c7d164113b1428f886dd470a613c74b9a9997/goclean.sh
+  - wget https://gist.github.com/mewmew/379014c9a2e6885e238d/raw/goclean.sh
   - chmod +x goclean.sh
 
 script:
