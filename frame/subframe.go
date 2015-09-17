@@ -133,7 +133,7 @@ func (subframe *Subframe) parseHeader(br *bits.Reader) error {
 		if err != nil {
 			return unexpected(err)
 		}
-		panic("Never seen a FLAC file contain wasted-bits-per-sample before. Not really a reason to panic, but I want to dissect one of those files. Please send it to me :)")
+		return fmt.Errorf("Never seen a FLAC file contain wasted-bits-per-sample before. I want to dissect one of those files. Please send it to me :)")
 	}
 
 	return nil
@@ -377,7 +377,7 @@ func (subframe *Subframe) decodeRicePart(br *bits.Reader, paramSize uint) error 
 		if paramSize == 4 && x == 0xF || paramSize == 5 && x == 0x1F {
 			// 1111 or 11111: Escape code, meaning the partition is in unencoded
 			// binary form using n bits per sample; n follows as a 5-bit number.
-			panic("not yet implemented; Rice parameter escape code.")
+			return fmt.Errorf("not yet implemented; Rice parameter escape code.")
 		}
 		param := uint(x)
 
@@ -433,7 +433,7 @@ func (subframe *Subframe) decodeLPC(coeffs []int32, shift int32) error {
 		return fmt.Errorf("frame.Subframe.decodeLPC: prediction order (%d) differs from number of coefficients (%d)", subframe.Order, len(coeffs))
 	}
 	if shift < 0 {
-		panic("not yet implemented; negative shift.")
+		return fmt.Errorf("not yet implemented; negative shift.")
 	}
 	for i := subframe.Order; i < subframe.NSamples; i++ {
 		var sample int64
