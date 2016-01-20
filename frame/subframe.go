@@ -3,6 +3,7 @@ package frame
 import (
 	"errors"
 	"fmt"
+	"log"
 
 	"gopkg.in/mewpkg/bits.v1"
 )
@@ -133,7 +134,7 @@ func (subframe *Subframe) parseHeader(br *bits.Reader) error {
 		if err != nil {
 			return unexpected(err)
 		}
-		return fmt.Errorf("frame.Subframe.parseHeader: Never seen a FLAC file contain wasted-bits-per-sample before. I want to dissect one of those files. Please send it to me :)")
+		return fmt.Errorf("frame.Subframe.parseHeader: not yet implemented. Never seen a FLAC file contain wasted-bits-per-sample before. I want to dissect one of those files. Please send it to me :)")
 	}
 
 	return nil
@@ -374,11 +375,6 @@ func (subframe *Subframe) decodeRicePart(br *bits.Reader, paramSize uint) error 
 		if err != nil {
 			return unexpected(err)
 		}
-		if paramSize == 4 && x == 0xF || paramSize == 5 && x == 0x1F {
-			// 1111 or 11111: Escape code, meaning the partition is in unencoded
-			// binary form using n bits per sample; n follows as a 5-bit number.
-			return fmt.Errorf("frame.Subframe.decodeRicePart: not yet implemented; Rice parameter escape code.")
-		}
 		param := uint(x)
 
 		// Determine the number of Rice encoded samples in the partition.
@@ -389,6 +385,25 @@ func (subframe *Subframe) decodeRicePart(br *bits.Reader, paramSize uint) error 
 			nsamples = subframe.NSamples / nparts
 		} else {
 			nsamples = subframe.NSamples/nparts - subframe.Order
+		}
+
+		if paramSize == 4 && param == 0xF || paramSize == 5 && param == 0x1F {
+			// 1111 or 11111: Escape code, meaning the partition is in unencoded
+			// binary form using n bits per sample; n follows as a 5-bit number.
+			x, err := br.Read(5)
+			if err != nil {
+				return unexpected(err)
+			}
+			n := uint(x)
+			for j := 0; j < nsamples; j++ {
+				sample, err := br.Read(n)
+				if err != nil {
+					return unexpected(err)
+				}
+				subframe.Samples = append(subframe.Samples, int32(sample))
+			}
+			log.Printf("frame.Subframe.decodeRicePart: not yet implemented; Rice parameter escape code. Please send this file to us, we would like to verify this part of the code.")
+			return nil
 		}
 
 		// Decode the Rice encoded residuals of the partition.
