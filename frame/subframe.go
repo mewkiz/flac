@@ -448,7 +448,7 @@ func (subframe *Subframe) decodeLPC(coeffs []int32, shift int32) error {
 		return fmt.Errorf("frame.Subframe.decodeLPC: prediction order (%d) differs from number of coefficients (%d)", subframe.Order, len(coeffs))
 	}
 	if shift < 0 {
-		return fmt.Errorf("frame.Subframe.decodeLPC: not yet implemented; negative shift.")
+		return fmt.Errorf("frame.Subframe.decodeLPC: invalid negative shift")
 	}
 	for i := subframe.Order; i < subframe.NSamples; i++ {
 		var sample int64
