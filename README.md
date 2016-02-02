@@ -22,15 +22,19 @@ Documentation provided by GoDoc.
 
 ## Changes
 
-* Version 1.0.3
+* Version 1.0.3 (2016-02-02)
     - Fix decoding of FLAC files with wasted bits-per-sample (see [#12](https://github.com/mewkiz/flac/issues/12)).
 
-* Version 1.0.2
+* Version 1.0.2 (2015-06-05)
     - Fix decoding of blocking strategy (see [#9](https://github.com/mewkiz/flac/pull/9)). Thanks to [Sergey Didyk](https://github.com/sdidyk).
 
-* Version 1.0.1
+* Version 1.0.1 (2015-02-25)
     - Fix two subframe decoding bugs (see [#7](https://github.com/mewkiz/flac/pull/7)). Thanks to [Jonathan MacMillan](https://github.com/perotinus).
     - Add frame decoding test cases.
+
+* Version 1.0.0 (2014-09-30)
+    - Initial release.
+    - Implement decoding of FLAC files.
 
 ## Public domain
 
