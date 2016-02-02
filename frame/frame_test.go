@@ -26,6 +26,11 @@ var golden = []struct {
 	{
 		name: "../testdata/189983.flac",
 	},
+
+	// i=3
+	{
+		name: "../testdata/love.flac",
+	},
 }
 
 func TestFrameHash(t *testing.T) {

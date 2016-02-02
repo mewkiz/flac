@@ -35,6 +35,8 @@ func (frame *Frame) parseSubframe(bps uint) (subframe *Subframe, err error) {
 	if err != nil {
 		return subframe, err
 	}
+	// Adjust bps of subframe for wasted bits-per-sample.
+	bps -= subframe.Wasted
 
 	// Decode subframe audio samples.
 	subframe.NSamples = int(frame.BlockSize)
@@ -52,8 +54,7 @@ func (frame *Frame) parseSubframe(bps uint) (subframe *Subframe, err error) {
 
 	// Left shift to accout for wasted bits-per-sample.
 	for i, sample := range subframe.Samples {
-		// TODO: Verify after a FLAC file with wasted bits-per-sample has been found.
-		subframe.Samples[i] = sample << subframe.WastedBits
+		subframe.Samples[i] = sample << subframe.Wasted
 	}
 
 	return subframe, err
@@ -69,7 +70,7 @@ type SubHeader struct {
 	// Prediction order used by fixed and FIR linear prediction decoding.
 	Order int
 	// Wasted bits-per-sample.
-	WastedBits uint
+	Wasted uint
 }
 
 // parseHeader reads and parses the header of a subframe.
@@ -138,14 +139,13 @@ func (subframe *Subframe) parseHeader(br *bits.Reader) error {
 		return unexpected(err)
 	}
 	if x != 0 {
-		// The number of wasted bits-per-sample is unary coded.
+		// k wasted bits-per-sample in source subblock, k-1 follows, unary coded;
+		// e.g. k=3 => 001 follows, k=7 => 0000001 follows.
 		x, err = br.ReadUnary()
 		if err != nil {
 			return unexpected(err)
 		}
-		subframe.WastedBits = uint(x)
-		log.Printf("frame.Subframe.parseHeader: Never seen a FLAC file contain wasted-bits-per-sample before. I want to dissect one of those files. Please send it to me :)")
-		return nil
+		subframe.Wasted = uint(x) + 1
 	}
 
 	return nil
