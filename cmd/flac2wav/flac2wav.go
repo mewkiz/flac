@@ -1,3 +1,10 @@
+// TODO: Remove +build ignore when azul3d.org is go get'able from Travis CI
+// again.
+//
+// Issue tracking this: https://github.com/azul3d/audio/issues/16
+
+//+build ignore
+
 // flac2wav is a tool which converts FLAC files to WAV files.
 package main
 
