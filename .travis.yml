@@ -17,6 +17,8 @@ before_install:
 
 install:
   - go get gopkg.in/mewkiz/flac.v1
+  - cd $HOME/gopath/src/gopkg.in/mewkiz/flac.v1
+  - git pull https://github.com/mewkiz/flac.git
   - go get gopkg.in/mewkiz/flac.v1/...
 
 before_script:
