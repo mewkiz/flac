@@ -22,6 +22,10 @@ Documentation provided by GoDoc.
 
 ## Changes
 
+* Version 1.0.4 (2016-02-11)
+    - Add API examples to documentation (see [#11](https://github.com/mewkiz/flac/issues/11)).
+    - Extend test cases (see [aadf80a](https://github.com/mewkiz/flac/commit/aadf80aa28c463a94b8d5c49757e5a0948613ce2))
+
 * Version 1.0.3 (2016-02-02)
     - Implement decoding of FLAC files with wasted bits-per-sample (see [#12](https://github.com/mewkiz/flac/issues/12)).
 
