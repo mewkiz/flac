@@ -29,7 +29,7 @@ var golden = []struct {
 
 func TestFrameHash(t *testing.T) {
 	for i, g := range golden {
-		stream, err := flac.ParseFile(g.name)
+		stream, err := flac.Open(g.name)
 		if err != nil {
 			t.Fatal(err)
 		}
