@@ -151,7 +151,6 @@ func (frame *Frame) Parse() error {
 // Note: The audio samples of the frame must be decoded before calling Hash.
 func (frame *Frame) Hash(md5sum hash.Hash) {
 	// Write decoded samples to a running MD5 hash.
-	// TODO(u): Make buf of size md5.BlockSize if it increases performance.
 	bps := frame.BitsPerSample
 	var buf [3]byte
 	for i := 0; i < int(frame.BlockSize); i++ {
