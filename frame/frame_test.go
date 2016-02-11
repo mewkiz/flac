@@ -56,3 +56,24 @@ func TestFrameHash(t *testing.T) {
 		}
 	}
 }
+
+func BenchmarkFrameParse(b *testing.B) {
+	// The file 151185.flac is a 119.5 MB public domain FLAC file used to
+	// benchmark the flac library. Because of its size, it has not been included
+	// in the repository, but is available for download at
+	//
+	//    http://freesound.org/people/jarfil/sounds/151185/
+	stream, err := flac.Open("../testdata/benchmark/151185.flac")
+	if err != nil {
+		b.Fatal(err)
+	}
+	for i := 0; i < b.N; i++ {
+		_, err := stream.ParseNext()
+		if err != nil {
+			if err == io.EOF {
+				break
+			}
+			b.Fatal(err)
+		}
+	}
+}
