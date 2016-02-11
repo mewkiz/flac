@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"crypto/md5"
 	"io"
-	"log"
 	"testing"
 
 	"gopkg.in/mewkiz/flac.v1"
@@ -30,7 +29,6 @@ var golden = []struct {
 
 func TestFrameHash(t *testing.T) {
 	for i, g := range golden {
-		log.Printf("i=%d: %v\n", i, g.name)
 		stream, err := flac.ParseFile(g.name)
 		if err != nil {
 			t.Fatal(err)
