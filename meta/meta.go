@@ -181,6 +181,27 @@ const (
 	TypePicture
 )
 
+func (t Type) String() string {
+	switch t {
+	case TypeStreamInfo:
+		return "stream info"
+	case TypePadding:
+		return "padding"
+	case TypeApplication:
+		return "application"
+	case TypeSeekTable:
+		return "seek table"
+	case TypeVorbisComment:
+		return "vorbis comment"
+	case TypeCueSheet:
+		return "cue sheet"
+	case TypePicture:
+		return "picture"
+	default:
+		return "<unknown block type>"
+	}
+}
+
 // unexpected returns io.ErrUnexpectedEOF if err is io.EOF, and returns err
 // otherwise.
 func unexpected(err error) error {
