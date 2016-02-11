@@ -398,6 +398,8 @@ func (subframe *Subframe) decodeRicePart(br *bits.Reader, paramSize uint) error 
 			nsamples = subframe.NSamples/nparts - subframe.Order
 		}
 
+		// TODO(u): Verify that decoding of subframes with Rice parameter escape
+		// codes have been implemented correctly.
 		if paramSize == 4 && param == 0xF || paramSize == 5 && param == 0x1F {
 			// 1111 or 11111: Escape code, meaning the partition is in unencoded
 			// binary form using n bits per sample; n follows as a 5-bit number.
@@ -413,7 +415,8 @@ func (subframe *Subframe) decodeRicePart(br *bits.Reader, paramSize uint) error 
 				}
 				subframe.Samples = append(subframe.Samples, int32(sample))
 			}
-			log.Printf("frame.Subframe.decodeRicePart: not yet implemented; Rice parameter escape code. Please send this file to us, we would like to verify this part of the code.")
+			// TODO(u): Remove log message when the test cases have been extended.
+			log.Print("frame.Subframe.decodeRicePart: The flac library test cases do not yet include any audio files with Rice parameter escape codes. If possible please consider contributing this audio sample to improve the reliability of the test cases.")
 			return nil
 		}
 
