@@ -16,16 +16,11 @@ before_install:
   - go get github.com/mattn/goveralls
 
 install:
-  - go get gopkg.in/mewkiz/flac.v1
-  - cd $HOME/gopath/src/gopkg.in/mewkiz/flac.v1
-  - git pull https://github.com/mewkiz/flac.git
-  - go get gopkg.in/mewkiz/flac.v1/...
+  - go get ./...
 
 before_script:
-  - cd $HOME/gopath/src/gopkg.in/mewkiz/flac.v1
   - wget https://gist.github.com/mewmew/379014c9a2e6885e238d/raw/goclean.sh
   - chmod +x goclean.sh
 
 script:
-  - cd $HOME/gopath/src/gopkg.in/mewkiz/flac.v1
   - ./goclean.sh

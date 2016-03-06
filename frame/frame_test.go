@@ -6,7 +6,7 @@ import (
 	"io"
 	"testing"
 
-	"gopkg.in/mewkiz/flac.v1"
+	"github.com/mewkiz/flac"
 )
 
 var golden = []struct {

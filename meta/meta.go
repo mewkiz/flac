@@ -18,13 +18,13 @@
 // Please refer to their respective documentation for further information.
 //
 //    [1]: https://www.xiph.org/flac/format.html#format_overview
-//    [2]: https://godoc.org/gopkg.in/mewkiz/flac.v1/meta#StreamInfo
+//    [2]: https://godoc.org/github.com/mewkiz/flac/meta#StreamInfo
 //    [3]: https://www.xiph.org/flac/format.html#metadata_block_padding
-//    [4]: https://godoc.org/gopkg.in/mewkiz/flac.v1/meta#Application
-//    [5]: https://godoc.org/gopkg.in/mewkiz/flac.v1/meta#SeekTable
-//    [6]: https://godoc.org/gopkg.in/mewkiz/flac.v1/meta#VorbisComment
-//    [7]: https://godoc.org/gopkg.in/mewkiz/flac.v1/meta#CueSheet
-//    [8]: https://godoc.org/gopkg.in/mewkiz/flac.v1/meta#Picture
+//    [4]: https://godoc.org/github.com/mewkiz/flac/meta#Application
+//    [5]: https://godoc.org/github.com/mewkiz/flac/meta#SeekTable
+//    [6]: https://godoc.org/github.com/mewkiz/flac/meta#VorbisComment
+//    [7]: https://godoc.org/github.com/mewkiz/flac/meta#CueSheet
+//    [8]: https://godoc.org/github.com/mewkiz/flac/meta#Picture
 package meta
 
 import (
@@ -33,7 +33,7 @@ import (
 	"io/ioutil"
 	"os"
 
-	"gopkg.in/mewpkg/bits.v1"
+	"github.com/mewpkg/bits"
 )
 
 // A Block contains the header and body of a metadata block.

@@ -6,8 +6,8 @@ import (
 	"reflect"
 	"testing"
 
-	"gopkg.in/mewkiz/flac.v1"
-	"gopkg.in/mewkiz/flac.v1/meta"
+	"github.com/mewkiz/flac"
+	"github.com/mewkiz/flac/meta"
 )
 
 var golden = []struct {

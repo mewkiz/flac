@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"log"
 
-	"gopkg.in/mewpkg/bits.v1"
+	"github.com/mewpkg/bits"
 )
 
 // A Subframe contains the encoded audio samples from one channel of an audio

@@ -17,8 +17,8 @@
 // for a brief introduction of their respective formats.
 //
 //    [1]: https://www.xiph.org/flac/format.html#stream
-//    [2]: https://godoc.org/gopkg.in/mewkiz/flac.v1/meta
-//    [3]: https://godoc.org/gopkg.in/mewkiz/flac.v1/frame
+//    [2]: https://godoc.org/github.com/mewkiz/flac/meta
+//    [3]: https://godoc.org/github.com/mewkiz/flac/frame
 package flac
 
 import (
@@ -28,8 +28,8 @@ import (
 	"io"
 	"os"
 
-	"gopkg.in/mewkiz/flac.v1/frame"
-	"gopkg.in/mewkiz/flac.v1/meta"
+	"github.com/mewkiz/flac/frame"
+	"github.com/mewkiz/flac/meta"
 )
 
 // A Stream contains the metadata blocks and provides access to the audio frames

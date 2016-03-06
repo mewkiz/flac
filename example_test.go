@@ -7,7 +7,7 @@ import (
 	"io"
 	"log"
 
-	"gopkg.in/mewkiz/flac.v1"
+	"github.com/mewkiz/flac"
 )
 
 func ExampleParseFile() {

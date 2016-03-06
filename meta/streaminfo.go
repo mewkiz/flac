@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"io"
 
-	"gopkg.in/mewpkg/bits.v1"
+	"github.com/mewpkg/bits"
 )
 
 // StreamInfo contains the basic properties of a FLAC audio stream, such as its
