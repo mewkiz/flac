@@ -1,7 +1,8 @@
-// TODO: Remove +build ignore when azul3d.org is go get'able from Travis CI
-// again.
-//
-// Issue tracking this: https://github.com/azul3d/audio/issues/16
+// NOTE: This example is longer than needs to be when using Azul3d. The reason
+// for this is to make the FLAC decoding explicit to showcase the low-level API,
+// rather than using the front-end decoder implemented for Azul3d. An equivalent
+// example using the Azul3d audio decoder interface for FLAC decoding may be
+// viewed at github.com/azul3d/examples/azul3d_flac2wav.
 
 // flac2wav is a tool which converts FLAC files to WAV files.
 package main
@@ -33,7 +34,7 @@ func main() {
 	for _, path := range flag.Args() {
 		err := flac2wav(path)
 		if err != nil {
-			log.Fatalln(err)
+			log.Fatal(err)
 		}
 	}
 }
