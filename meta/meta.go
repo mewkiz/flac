@@ -33,7 +33,7 @@ import (
 	"io/ioutil"
 	"os"
 
-	"github.com/mewpkg/bits"
+	"github.com/mewkiz/flac/internal/bits"
 )
 
 // A Block contains the header and body of a metadata block.
