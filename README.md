@@ -22,6 +22,10 @@ Documentation provided by GoDoc.
 
 ## Changes
 
+* Version 1.0.5 (2016-05-06)
+    - Simplify import paths. Drop use of gopkg.in, and rely on vendoring instead (see [azul3d/engine#1](https://github.com/azul3d/engine/issues/1)).
+    - Add FLAC decoding benchmark (see [d675e0a](https://github.com/mewkiz/flac/blob/d675e0aaccf2e43055f56b9b3feeddfdeed402e2/frame/frame_test.go#L60))
+
 * Version 1.0.4 (2016-02-11)
     - Add API examples to documentation (see [#11](https://github.com/mewkiz/flac/issues/11)).
     - Extend test cases (see [aadf80a](https://github.com/mewkiz/flac/commit/aadf80aa28c463a94b8d5c49757e5a0948613ce2)).
