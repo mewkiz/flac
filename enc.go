@@ -14,12 +14,17 @@ import (
 // Encode writes the FLAC audio stream to w.
 func Encode(w io.Writer, stream *Stream) error {
 	// Create a bit writer to the output stream.
+
+	// TODO: Remove buf when me manage to find a way to flush bits without
+	// closing the underlying writer.
+
+	// Use a temporary buffer to avoid closing the underlying writer when calling
+	// `Close` on the bit writer to flushing pending bits.
 	buf := new(bytes.Buffer)
-	bw := bitio.NewWriter(buf)
-	enc := &encoder{bw: bw}
+	enc := &encoder{bw: bitio.NewWriter(buf)}
 
 	// Store FLAC signature.
-	if _, err := bw.Write(signature); err != nil {
+	if _, err := enc.bw.Write(signature); err != nil {
 		return errutil.Err(err)
 	}
 
@@ -72,7 +77,7 @@ func Encode(w io.Writer, stream *Stream) error {
 	}
 
 	// Flush pending bit writes.
-	if err := bw.Close(); err != nil {
+	if err := enc.bw.Close(); err != nil {
 		return errutil.Err(err)
 	}
 
@@ -95,8 +100,6 @@ type encoder struct {
 	// Bit writer to the output stream.
 	bw bitio.Writer
 }
-
-// TODO: Consider moving metadata related encoding to the meta package.
 
 // writeBlockHeader writes the header of a metadata block.
 func (enc *encoder) writeBlockHeader(hdr meta.Header) error {
