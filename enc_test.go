@@ -27,7 +27,6 @@ func TestEncode(t *testing.T) {
 		"testdata/243749.flac",
 		"testdata/256529.flac",
 		"testdata/257344.flac",
-		"testdata/benchmark/151185.flac",
 		"testdata/love.flac",
 	}
 	for _, path := range paths {
