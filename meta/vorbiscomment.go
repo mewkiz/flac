@@ -18,11 +18,10 @@ type VorbisComment struct {
 
 // parseVorbisComment reads and parses the body of an VorbisComment metadata
 // block.
-func (block *Block) parseVorbisComment() error {
+func (block *Block) parseVorbisComment() (err error) {
 	// 32 bits: vendor length.
 	var x uint32
-	err := binary.Read(block.lr, binary.LittleEndian, &x)
-	if err != nil {
+	if err = binary.Read(block.lr, binary.LittleEndian, &x); err != nil {
 		return unexpected(err)
 	}
 
@@ -37,8 +36,7 @@ func (block *Block) parseVorbisComment() error {
 
 	// Parse tags.
 	// 32 bits: number of tags.
-	err = binary.Read(block.lr, binary.LittleEndian, &x)
-	if err != nil {
+	if err = binary.Read(block.lr, binary.LittleEndian, &x); err != nil {
 		return unexpected(err)
 	}
 	if x < 1 {
@@ -47,8 +45,7 @@ func (block *Block) parseVorbisComment() error {
 	comment.Tags = make([][2]string, x)
 	for i := range comment.Tags {
 		// 32 bits: vector length
-		err = binary.Read(block.lr, binary.LittleEndian, &x)
-		if err != nil {
+		if err = binary.Read(block.lr, binary.LittleEndian, &x); err != nil {
 			return unexpected(err)
 		}
 
