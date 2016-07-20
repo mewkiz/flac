@@ -16,7 +16,7 @@ type VorbisComment struct {
 	Tags [][2]string
 }
 
-// parseVorbisComment reads and parses the body of an VorbisComment metadata
+// parseVorbisComment reads and parses the body of a VorbisComment metadata
 // block.
 func (block *Block) parseVorbisComment() error {
 	// 32 bits: vendor length.

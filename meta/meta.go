@@ -172,13 +172,13 @@ type Type uint8
 
 // Metadata block body types.
 const (
-	TypeStreamInfo Type = iota
-	TypePadding
-	TypeApplication
-	TypeSeekTable
-	TypeVorbisComment
-	TypeCueSheet
-	TypePicture
+	TypeStreamInfo    Type = 0
+	TypePadding       Type = 1
+	TypeApplication   Type = 2
+	TypeSeekTable     Type = 3
+	TypeVorbisComment Type = 4
+	TypeCueSheet      Type = 5
+	TypePicture       Type = 6
 )
 
 func (t Type) String() string {

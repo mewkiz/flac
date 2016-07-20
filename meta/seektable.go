@@ -14,7 +14,7 @@ type SeekTable struct {
 	Points []SeekPoint
 }
 
-// parseSeekTable reads and parses the body of an SeekTable metadata block.
+// parseSeekTable reads and parses the body of a SeekTable metadata block.
 func (block *Block) parseSeekTable() error {
 	// The number of seek points is derived from the header length, divided by
 	// the size of a SeekPoint; which is 18 bytes.

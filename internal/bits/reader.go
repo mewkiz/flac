@@ -1,4 +1,4 @@
-// Package bits provides bit reading operations and binary decoding algorithms.
+// Package bits provides bit access operations and binary decoding algorithms.
 package bits
 
 import (
@@ -20,7 +20,7 @@ type Reader struct {
 }
 
 // NewReader returns a new Reader that reads bits from r.
-func NewReader(r io.Reader) (br *Reader) {
+func NewReader(r io.Reader) *Reader {
 	return &Reader{r: r}
 }
 

@@ -50,7 +50,7 @@ type Picture struct {
 	Data []byte
 }
 
-// parsePicture reads and parses the body of an Picture metadata block.
+// parsePicture reads and parses the body of a Picture metadata block.
 func (block *Block) parsePicture() error {
 	// 32 bits: Type.
 	pic := new(Picture)

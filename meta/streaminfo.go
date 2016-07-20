@@ -39,7 +39,7 @@ type StreamInfo struct {
 	MD5sum [md5.Size]uint8
 }
 
-// parseStreamInfo reads and parses the body of an StreamInfo metadata block.
+// parseStreamInfo reads and parses the body of a StreamInfo metadata block.
 func (block *Block) parseStreamInfo() error {
 	// 16 bits: BlockSizeMin.
 	br := bits.NewReader(block.lr)
