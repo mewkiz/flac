@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/binary"
 	"io"
+	"log"
 
 	"github.com/icza/bitio"
 	"github.com/mewkiz/flac/meta"
@@ -43,7 +44,8 @@ func Encode(w io.Writer, stream *Stream) error {
 	// Store metadata blocks.
 	for _, block := range stream.Blocks {
 		if block.Type > meta.TypePicture {
-			return errutil.Newf("flac.Encode: support for encoding %T of block type %d not yet implemented", block, block.Type)
+			log.Printf("ignoring metadata block of unknown block type %d", block.Type)
+			continue
 		}
 
 		if err := enc.writeBlockHeader(block.Header); err != nil {
