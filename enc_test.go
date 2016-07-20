@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/mewkiz/flac"
+	"github.com/mewkiz/flac/meta"
 )
 
 func TestEncode(t *testing.T) {
@@ -55,6 +56,46 @@ func TestEncode(t *testing.T) {
 		if !bytes.Equal(got, want) {
 			t.Errorf("%q: content mismatch; expected % X, got % X", path, want, got)
 			continue
+		}
+	}
+}
+
+func TestEncodeComment(t *testing.T) {
+	// Decode FLAC file.
+	src, err := flac.ParseFile("testdata/love.flac")
+	if err != nil {
+		t.Fatalf("unable to parse input FLAC file; %v", err)
+	}
+	defer src.Close()
+
+	// Add custom vorbis comment.
+	const want = "FLAC encoding test case"
+	for _, block := range src.Blocks {
+		if comment, ok := block.Body.(*meta.VorbisComment); ok {
+			comment.Vendor = want
+		}
+	}
+
+	// Encode FLAC file.
+	out := new(bytes.Buffer)
+	if err := flac.Encode(out, src); err != nil {
+		t.Fatalf("unable to encode FLAC file; %v", err)
+	}
+
+	stream, err := flac.Parse(out)
+	if err != nil {
+		t.Fatalf("unable to parse output FLAC file; %v", err)
+	}
+	defer stream.Close()
+
+	// Add custom vorbis comment.
+	for _, block := range stream.Blocks {
+		if comment, ok := block.Body.(*meta.VorbisComment); ok {
+			got := comment.Vendor
+			if got != want {
+				t.Errorf("Vorbis comment mismatch; expected %q, got %q", want, got)
+				continue
+			}
 		}
 	}
 }
