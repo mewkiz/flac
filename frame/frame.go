@@ -33,10 +33,10 @@ import (
 	"io"
 	"log"
 
-	"github.com/mewpkg/bits"
-	"github.com/mewpkg/hashutil"
-	"github.com/mewpkg/hashutil/crc16"
-	"github.com/mewpkg/hashutil/crc8"
+	"github.com/mewkiz/flac/internal/bits"
+	"github.com/mewkiz/flac/internal/hashutil"
+	"github.com/mewkiz/flac/internal/hashutil/crc16"
+	"github.com/mewkiz/flac/internal/hashutil/crc8"
 )
 
 // A Frame contains the header and subframes of an audio frame. It holds the

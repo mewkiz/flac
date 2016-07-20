@@ -26,7 +26,7 @@ type CueSheet struct {
 	Tracks []CueSheetTrack
 }
 
-// parseCueSheet reads and parses the body of an CueSheet metadata block.
+// parseCueSheet reads and parses the body of a CueSheet metadata block.
 func (block *Block) parseCueSheet() error {
 	// Parse cue sheet.
 	// 128 bytes: MCN.
