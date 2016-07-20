@@ -1,6 +1,6 @@
 ## Public domain
 
-The following testcase sounds have been released have been released into the [public domain].
+The following testcase sounds have been released into the [public domain].
 
 * [19875.flac](http://freesound.org/people/yawfle/sounds/19875/)
 * [44127.flac](http://freesound.org/people/dland/sounds/44127/)

@@ -21,7 +21,7 @@ sed 's/title=/title /' input-SCVA.flac > missing-value.flac
 
 ## Public domain
 
-The following testcase images and sounds have been released have been released into the [public domain].
+The following testcase images and sounds have been released into the [public domain].
 
 * [silence.jpg](http://www.pdpics.com/photo/2546-silence-word-magnified/)
 * `silence.flac`, created using the following commands.
