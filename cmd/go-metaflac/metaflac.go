@@ -52,18 +52,14 @@ func main() {
 		os.Exit(1)
 	}
 	for _, path := range flag.Args() {
-		err := metaflac(path)
+		err := list(path)
 		if err != nil {
 			log.Fatalln(err)
 		}
 	}
 }
 
-func metaflac(path string) (err error) {
-	return list(path)
-}
-
-func list(path string) (err error) {
+func list(path string) error {
 	var blockNums []int
 	if flagBlockNum != "" {
 		// Parse "--block-number" command line flag.
