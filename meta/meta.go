@@ -56,8 +56,7 @@ type Block struct {
 // ignore it.
 func New(r io.Reader) (block *Block, err error) {
 	block = new(Block)
-	err = block.parseHeader(r)
-	if err != nil {
+	if err = block.parseHeader(r); err != nil {
 		return block, err
 	}
 	block.lr = io.LimitReader(r, block.Length)
@@ -71,8 +70,7 @@ func Parse(r io.Reader) (block *Block, err error) {
 	if err != nil {
 		return block, err
 	}
-	err = block.Parse()
-	if err != nil {
+	if err = block.Parse(); err != nil {
 		return block, err
 	}
 	return block, nil

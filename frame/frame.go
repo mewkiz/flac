@@ -132,8 +132,7 @@ func (frame *Frame) Parse() error {
 
 	// 2 bytes: CRC-16 checksum.
 	var want uint16
-	err = binary.Read(frame.r, binary.BigEndian, &want)
-	if err != nil {
+	if err = binary.Read(frame.r, binary.BigEndian, &want); err != nil {
 		return unexpected(err)
 	}
 	got := frame.crc.Sum16()
@@ -482,8 +481,7 @@ func (frame *Frame) parseHeader() error {
 
 	// 1 byte: CRC-8 checksum.
 	var want uint8
-	err = binary.Read(frame.hr, binary.BigEndian, &want)
-	if err != nil {
+	if err = binary.Read(frame.hr, binary.BigEndian, &want); err != nil {
 		return unexpected(err)
 	}
 	got := h.Sum8()

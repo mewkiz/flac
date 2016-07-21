@@ -39,15 +39,13 @@ func (block *Block) parseCueSheet() error {
 	cs.MCN = stringFromSZ(buf)
 
 	// 64 bits: NLeadInSamples.
-	err = binary.Read(block.lr, binary.BigEndian, &cs.NLeadInSamples)
-	if err != nil {
+	if err = binary.Read(block.lr, binary.BigEndian, &cs.NLeadInSamples); err != nil {
 		return unexpected(err)
 	}
 
 	// 1 bit: IsCompactDisc.
 	var x uint8
-	err = binary.Read(block.lr, binary.BigEndian, &x)
-	if err != nil {
+	if err = binary.Read(block.lr, binary.BigEndian, &x); err != nil {
 		return unexpected(err)
 	}
 	// mask = 10000000
@@ -69,8 +67,7 @@ func (block *Block) parseCueSheet() error {
 
 	// Parse cue sheet tracks.
 	// 8 bits: (number of tracks)
-	err = binary.Read(block.lr, binary.BigEndian, &x)
-	if err != nil {
+	if err = binary.Read(block.lr, binary.BigEndian, &x); err != nil {
 		return unexpected(err)
 	}
 	if x < 1 {
@@ -86,8 +83,7 @@ func (block *Block) parseCueSheet() error {
 	for i := range cs.Tracks {
 		// 64 bits: Offset.
 		track := &cs.Tracks[i]
-		err = binary.Read(block.lr, binary.BigEndian, &track.Offset)
-		if err != nil {
+		if err = binary.Read(block.lr, binary.BigEndian, &track.Offset); err != nil {
 			return unexpected(err)
 		}
 		if cs.IsCompactDisc && track.Offset%588 != 0 {
@@ -95,8 +91,7 @@ func (block *Block) parseCueSheet() error {
 		}
 
 		// 8 bits: Num.
-		err = binary.Read(block.lr, binary.BigEndian, &track.Num)
-		if err != nil {
+		if err = binary.Read(block.lr, binary.BigEndian, &track.Num); err != nil {
 			return unexpected(err)
 		}
 		if _, ok := uniq[track.Num]; ok {
@@ -131,8 +126,7 @@ func (block *Block) parseCueSheet() error {
 		track.ISRC = stringFromSZ(buf)
 
 		// 1 bit: IsAudio.
-		err = binary.Read(block.lr, binary.BigEndian, &x)
-		if err != nil {
+		if err = binary.Read(block.lr, binary.BigEndian, &x); err != nil {
 			return unexpected(err)
 		}
 		// mask = 10000000
@@ -160,8 +154,7 @@ func (block *Block) parseCueSheet() error {
 
 		// Parse indicies.
 		// 8 bits: (number of indicies)
-		err = binary.Read(block.lr, binary.BigEndian, &x)
-		if err != nil {
+		if err = binary.Read(block.lr, binary.BigEndian, &x); err != nil {
 			return unexpected(err)
 		}
 		if x < 1 {
@@ -174,14 +167,12 @@ func (block *Block) parseCueSheet() error {
 		for i := range track.Indicies {
 			index := &track.Indicies[i]
 			// 64 bits: Offset.
-			err = binary.Read(block.lr, binary.BigEndian, &index.Offset)
-			if err != nil {
+			if err = binary.Read(block.lr, binary.BigEndian, &index.Offset); err != nil {
 				return unexpected(err)
 			}
 
 			// 8 bits: Num.
-			err = binary.Read(block.lr, binary.BigEndian, &index.Num)
-			if err != nil {
+			if err = binary.Read(block.lr, binary.BigEndian, &index.Num); err != nil {
 				return unexpected(err)
 			}
 

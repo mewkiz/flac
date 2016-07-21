@@ -60,11 +60,7 @@ func main() {
 }
 
 func metaflac(path string) (err error) {
-	err = list(path)
-	if err != nil {
-		return err
-	}
-	return nil
+	return list(path)
 }
 
 func list(path string) (err error) {

@@ -62,8 +62,7 @@ func (block *Block) parsePicture() error {
 
 	// 32 bits: (MIME type length).
 	var x uint32
-	err = binary.Read(block.lr, binary.BigEndian, &x)
-	if err != nil {
+	if err = binary.Read(block.lr, binary.BigEndian, &x); err != nil {
 		return unexpected(err)
 	}
 
@@ -75,8 +74,7 @@ func (block *Block) parsePicture() error {
 	pic.MIME = string(buf)
 
 	// 32 bits: (description length).
-	err = binary.Read(block.lr, binary.BigEndian, &x)
-	if err != nil {
+	if err = binary.Read(block.lr, binary.BigEndian, &x); err != nil {
 		return unexpected(err)
 	}
 
@@ -88,32 +86,27 @@ func (block *Block) parsePicture() error {
 	pic.Desc = string(buf)
 
 	// 32 bits: Width.
-	err = binary.Read(block.lr, binary.BigEndian, &pic.Width)
-	if err != nil {
+	if err = binary.Read(block.lr, binary.BigEndian, &pic.Width); err != nil {
 		return unexpected(err)
 	}
 
 	// 32 bits: Height.
-	err = binary.Read(block.lr, binary.BigEndian, &pic.Height)
-	if err != nil {
+	if err = binary.Read(block.lr, binary.BigEndian, &pic.Height); err != nil {
 		return unexpected(err)
 	}
 
 	// 32 bits: Depth.
-	err = binary.Read(block.lr, binary.BigEndian, &pic.Depth)
-	if err != nil {
+	if err = binary.Read(block.lr, binary.BigEndian, &pic.Depth); err != nil {
 		return unexpected(err)
 	}
 
 	// 32 bits: NPalColors.
-	err = binary.Read(block.lr, binary.BigEndian, &pic.NPalColors)
-	if err != nil {
+	if err = binary.Read(block.lr, binary.BigEndian, &pic.NPalColors); err != nil {
 		return unexpected(err)
 	}
 
 	// 32 bits: (data length).
-	err = binary.Read(block.lr, binary.BigEndian, &x)
-	if err != nil {
+	if err = binary.Read(block.lr, binary.BigEndian, &x); err != nil {
 		return unexpected(err)
 	}
 	if x == 0 {

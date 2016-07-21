@@ -70,8 +70,7 @@ func New(r io.Reader) (stream *Stream, err error) {
 		if err != nil && err != meta.ErrReservedType {
 			return stream, err
 		}
-		err = block.Skip()
-		if err != nil {
+		if err = block.Skip(); err != nil {
 			return stream, err
 		}
 		isLast = block.IsLast
@@ -137,8 +136,7 @@ func Parse(r io.Reader) (stream *Stream, err error) {
 			// the specification.
 			//
 			// ref: https://www.xiph.org/flac/format.html#format_overview
-			err = block.Skip()
-			if err != nil {
+			if err = block.Skip(); err != nil {
 				return stream, err
 			}
 		}

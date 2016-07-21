@@ -31,8 +31,7 @@ type Subframe struct {
 func (frame *Frame) parseSubframe(bps uint) (subframe *Subframe, err error) {
 	// Parse subframe header.
 	subframe = new(Subframe)
-	err = subframe.parseHeader(frame.br)
-	if err != nil {
+	if err = subframe.parseHeader(frame.br); err != nil {
 		return subframe, err
 	}
 	// Adjust bps of subframe for wasted bits-per-sample.
@@ -326,8 +325,7 @@ func (subframe *Subframe) decodeFIR(br *bits.Reader, bps uint) error {
 	}
 
 	// Decode subframe residuals.
-	err = subframe.decodeResidual(br)
-	if err != nil {
+	if err = subframe.decodeResidual(br); err != nil {
 		return err
 	}
 
@@ -422,8 +420,7 @@ func (subframe *Subframe) decodeRicePart(br *bits.Reader, paramSize uint) error 
 
 		// Decode the Rice encoded residuals of the partition.
 		for j := 0; j < nsamples; j++ {
-			err = subframe.decodeRiceResidual(br, param)
-			if err != nil {
+			if err = subframe.decodeRiceResidual(br, param); err != nil {
 				return err
 			}
 		}
