@@ -38,7 +38,7 @@ func Encode(w io.Writer, stream *Stream) error {
 	}
 
 	// Store metadata blocks.
-	for _, block := range stream.Blocks {
+	for i, block := range stream.Blocks {
 		if block.Type > meta.TypePicture {
 			log.Printf("ignoring metadata block of unknown block type %d", block.Type)
 			continue
@@ -46,19 +46,21 @@ func Encode(w io.Writer, stream *Stream) error {
 
 		// Store metadata block body.
 		var err error
+		hdr := block.Header
+		hdr.IsLast = i == len(stream.Blocks)-1
 		switch body := block.Body.(type) {
 		case *meta.Application:
-			err = enc.writeApplication(block.Header, body)
+			err = enc.writeApplication(hdr, body)
 		case *meta.SeekTable:
-			err = enc.writeSeekTable(block.Header, body)
+			err = enc.writeSeekTable(hdr, body)
 		case *meta.VorbisComment:
-			err = enc.writeVorbisComment(block.Header, body)
+			err = enc.writeVorbisComment(hdr, body)
 		case *meta.CueSheet:
-			err = enc.writeCueSheet(block.Header, body)
+			err = enc.writeCueSheet(hdr, body)
 		case *meta.Picture:
-			err = enc.writePicture(block.Header, body)
+			err = enc.writePicture(hdr, body)
 		default:
-			err = enc.writePadding(block.Header)
+			err = enc.writePadding(hdr)
 		}
 		if err != nil {
 			return errutil.Err(err)
