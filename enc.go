@@ -28,21 +28,12 @@ func Encode(w io.Writer, stream *Stream) error {
 		return errutil.Err(err)
 	}
 
-	// Store StreamInfo metadata block header.
+	// Store the StreamInfo metadata block.
 	infoHdr := meta.Header{
 		IsLast: len(stream.Blocks) == 0,
 		Type:   meta.TypeStreamInfo,
-		// The StreamInfo metadata block body is 34 bytes in length.
-		//
-		//    34 = (16+16+24+24+20+3+5+36+8*16)/8
-		Length: 34,
 	}
-	if err := enc.writeBlockHeader(infoHdr); err != nil {
-		return errutil.Err(err)
-	}
-
-	// Store the StreamInfo metadata block.
-	if err := enc.writeStreamInfo(stream.Info); err != nil {
+	if err := enc.writeStreamInfo(infoHdr, stream.Info); err != nil {
 		return errutil.Err(err)
 	}
 
@@ -53,23 +44,21 @@ func Encode(w io.Writer, stream *Stream) error {
 			continue
 		}
 
-		if err := enc.writeBlockHeader(block.Header); err != nil {
-			return errutil.Err(err)
-		}
+		// Store metadata block body.
 		var err error
 		switch body := block.Body.(type) {
 		case *meta.Application:
-			err = enc.writeApplication(body)
+			err = enc.writeApplication(block.Header, body)
 		case *meta.SeekTable:
-			err = enc.writeSeekTable(body)
+			err = enc.writeSeekTable(block.Header, body)
 		case *meta.VorbisComment:
-			err = enc.writeVorbisComment(body)
+			err = enc.writeVorbisComment(block.Header, body)
 		case *meta.CueSheet:
-			err = enc.writeCueSheet(body)
+			err = enc.writeCueSheet(block.Header, body)
 		case *meta.Picture:
-			err = enc.writePicture(body)
+			err = enc.writePicture(block.Header, body)
 		default:
-			err = enc.writePadding(int(block.Length))
+			err = enc.writePadding(block.Header)
 		}
 		if err != nil {
 			return errutil.Err(err)
@@ -126,7 +115,28 @@ func (enc *encoder) writeBlockHeader(hdr meta.Header) error {
 }
 
 // writeStreamInfo stores the body of a StreamInfo metadata block.
-func (enc *encoder) writeStreamInfo(si *meta.StreamInfo) error {
+func (enc *encoder) writeStreamInfo(hdr meta.Header, si *meta.StreamInfo) error {
+	// Store metadata block header.
+	const (
+		BlockSizeMinBits  = 16
+		BlockSizeMaxBits  = 16
+		FrameSizeMinBits  = 24
+		FrameSizeMaxBits  = 24
+		SampleRateBits    = 20
+		NChannelsBits     = 3
+		BitsPerSampleBits = 5
+		NSamplesBits      = 36
+		MD5sumBits        = 8 * 16
+	)
+	nbits := int64(BlockSizeMinBits + BlockSizeMaxBits + FrameSizeMinBits +
+		FrameSizeMaxBits + SampleRateBits + NChannelsBits + BitsPerSampleBits +
+		NSamplesBits + MD5sumBits)
+	hdr.Length = nbits / 8
+	if err := enc.writeBlockHeader(hdr); err != nil {
+		return errutil.Err(err)
+	}
+
+	// Store metadata block body.
 	// 16 bits: BlockSizeMin.
 	if err := enc.bw.WriteBits(uint64(si.BlockSizeMin), 16); err != nil {
 		return errutil.Err(err)
@@ -176,8 +186,14 @@ func (enc *encoder) writeStreamInfo(si *meta.StreamInfo) error {
 }
 
 // writePadding writes the body of a Padding metadata block.
-func (enc *encoder) writePadding(n int) error {
-	for i := 0; i < n; i++ {
+func (enc *encoder) writePadding(hdr meta.Header) error {
+	// Store metadata block header.
+	if err := enc.writeBlockHeader(hdr); err != nil {
+		return errutil.Err(err)
+	}
+
+	// Store metadata block body.
+	for i := 0; i < int(hdr.Length); i++ {
 		if err := enc.bw.WriteByte(0); err != nil {
 			return errutil.Err(err)
 		}
@@ -186,7 +202,18 @@ func (enc *encoder) writePadding(n int) error {
 }
 
 // writeApplication writes the body of an Application metadata block.
-func (enc *encoder) writeApplication(app *meta.Application) error {
+func (enc *encoder) writeApplication(hdr meta.Header, app *meta.Application) error {
+	// Store metadata block header.
+	const (
+		IDBits = 32
+	)
+	nbits := int64(IDBits + 8*len(app.Data))
+	hdr.Length = nbits / 8
+	if err := enc.writeBlockHeader(hdr); err != nil {
+		return errutil.Err(err)
+	}
+
+	// Store metadata block body.
 	// 32 bits: ID.
 	if err := enc.bw.WriteBits(uint64(app.ID), 32); err != nil {
 		return errutil.Err(err)
@@ -201,7 +228,21 @@ func (enc *encoder) writeApplication(app *meta.Application) error {
 }
 
 // writeSeekTable writes the body of a SeekTable metadata block.
-func (enc *encoder) writeSeekTable(table *meta.SeekTable) error {
+func (enc *encoder) writeSeekTable(hdr meta.Header, table *meta.SeekTable) error {
+	// Store metadata block header.
+	const (
+		SampleNumBits = 64
+		OffsetBits    = 64
+		NSamplesBits  = 16
+		PointBits     = SampleNumBits + OffsetBits + NSamplesBits
+	)
+	nbits := int64(PointBits * len(table.Points))
+	hdr.Length = nbits / 8
+	if err := enc.writeBlockHeader(hdr); err != nil {
+		return errutil.Err(err)
+	}
+
+	// Store metadata block body.
 	for _, point := range table.Points {
 		if err := binary.Write(enc.bw, binary.BigEndian, point); err != nil {
 			return errutil.Err(err)
@@ -211,7 +252,26 @@ func (enc *encoder) writeSeekTable(table *meta.SeekTable) error {
 }
 
 // writeVorbisComment writes the body of a VorbisComment metadata block.
-func (enc *encoder) writeVorbisComment(comment *meta.VorbisComment) error {
+func (enc *encoder) writeVorbisComment(hdr meta.Header, comment *meta.VorbisComment) error {
+	// Store metadata block header.
+	const (
+		VendorLenBits = 32
+		NTagsBits     = 32
+	)
+	nbits := int64(VendorLenBits + 8*len(comment.Vendor) + NTagsBits)
+	for _, tag := range comment.Tags {
+		const (
+			VectorLenBits = 32
+			EqualBits     = 8 * 1
+		)
+		nbits += int64(VectorLenBits + 8*len(tag[0]) + EqualBits + 8*len(tag[1]))
+	}
+	hdr.Length = nbits / 8
+	if err := enc.writeBlockHeader(hdr); err != nil {
+		return errutil.Err(err)
+	}
+
+	// Store metadata block body.
 	// 32 bits: vendor length.
 	x := uint32(len(comment.Vendor))
 	if err := binary.Write(enc.bw, binary.LittleEndian, x); err != nil {
@@ -250,7 +310,43 @@ func (enc *encoder) writeVorbisComment(comment *meta.VorbisComment) error {
 }
 
 // writeCueSheet writes the body of a CueSheet metadata block.
-func (enc *encoder) writeCueSheet(cs *meta.CueSheet) error {
+func (enc *encoder) writeCueSheet(hdr meta.Header, cs *meta.CueSheet) error {
+	// Store metadata block header.
+	const (
+		MCNBits            = 8 * 128
+		NLeadInSamplesBits = 64
+		IsCompactDiscBits  = 1
+		Reserved1Bits      = 7 + 8*258
+		NTracksBits        = 8
+	)
+	nbits := int64(MCNBits + NLeadInSamplesBits + IsCompactDiscBits +
+		Reserved1Bits + NTracksBits)
+	for _, track := range cs.Tracks {
+		const (
+			OffsetBits         = 64
+			NumBits            = 8
+			ISRCBits           = 8 * 12
+			IsAudioBits        = 1
+			HasPreEmphasisBits = 1
+			Reserved2Bits      = 6 + 8*13
+			NIndicesBits       = 8
+		)
+		nbits += OffsetBits + NumBits + ISRCBits + IsAudioBits + HasPreEmphasisBits + Reserved2Bits + NIndicesBits
+		for range track.Indicies {
+			const (
+				OffsetBits    = 64
+				NumBits       = 8
+				Reserved3Bits = 8 * 3
+			)
+			nbits += OffsetBits + NumBits + Reserved3Bits
+		}
+	}
+	hdr.Length = nbits / 8
+	if err := enc.writeBlockHeader(hdr); err != nil {
+		return errutil.Err(err)
+	}
+
+	// Store metadata block body.
 	// Parse cue sheet.
 	// 128 bytes: MCN.
 	mcn := make([]byte, 128)
@@ -367,7 +463,27 @@ func (enc *encoder) writeCueSheet(cs *meta.CueSheet) error {
 }
 
 // writePicture writes the body of a Picture metadata block.
-func (enc *encoder) writePicture(pic *meta.Picture) error {
+func (enc *encoder) writePicture(hdr meta.Header, pic *meta.Picture) error {
+	// Store metadata block header.
+	const (
+		TypeBits       = 32
+		MIMELenBits    = 32
+		DescLenBits    = 32
+		WidthBits      = 32
+		HeightBits     = 32
+		DepthBits      = 32
+		NPalColorsBits = 32
+		DataLenBits    = 32
+	)
+	nbits := int64(TypeBits + MIMELenBits + 8*len(pic.MIME) + DescLenBits +
+		8*len(pic.Desc) + WidthBits + HeightBits + DepthBits + NPalColorsBits +
+		DataLenBits + 8*len(pic.Data))
+	hdr.Length = nbits / 8
+	if err := enc.writeBlockHeader(hdr); err != nil {
+		return errutil.Err(err)
+	}
+
+	// Store metadata block body.
 	// 32 bits: Type.
 	if err := enc.bw.WriteBits(uint64(pic.Type), 32); err != nil {
 		return errutil.Err(err)
