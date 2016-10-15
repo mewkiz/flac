@@ -213,3 +213,6 @@ func (stream *Stream) ParseNext() (f *frame.Frame, err error) {
 }
 
 // TODO(u): Implement a Seek method.
+func (stream *Stream) Seek(offset int64, whence int) (read int64, err error) {
+	return 0, nil
+}
