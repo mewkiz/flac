@@ -182,6 +182,9 @@ func ParseFile(path string) (stream *Stream, err error) {
 		return nil, err
 	}
 	stream, err = Parse(f)
+	if err != nil {
+		return nil, err
+	}
 	stream.c = f
 	return stream, err
 }
