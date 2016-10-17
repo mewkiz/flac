@@ -273,5 +273,4 @@ func TestMissingValue(t *testing.T) {
 	if err.Error() != `meta.Block.parseVorbisComment: unable to locate '=' in vector "title 2"` {
 		t.Fatal(err)
 	}
-	defer stream.Close()
 }
