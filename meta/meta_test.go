@@ -269,7 +269,7 @@ func TestParsePicture(t *testing.T) {
 
 // TODO: better error verification than string-based comparisons.
 func TestMissingValue(t *testing.T) {
-	stream, err := flac.ParseFile("testdata/missing-value.flac")
+	_, err := flac.ParseFile("testdata/missing-value.flac")
 	if err.Error() != `meta.Block.parseVorbisComment: unable to locate '=' in vector "title 2"` {
 		t.Fatal(err)
 	}
