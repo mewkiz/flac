@@ -51,11 +51,7 @@ func flac2wav(path string) error {
 	// Create WAV file.
 	wavPath := pathutil.TrimExt(path) + ".wav"
 	if !flagForce {
-		exists, err := osutil.Exists(wavPath)
-		if err != nil {
-			return err
-		}
-		if exists {
+		if osutil.Exists(wavPath) {
 			return fmt.Errorf("the file %q exists already", wavPath)
 		}
 	}
