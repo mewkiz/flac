@@ -16,3 +16,7 @@ The following testcase sounds have been released into the [public domain].
 * [257344.flac](http://freesound.org/people/arseniiv/sounds/257344/)
 
 [public domain]: https://creativecommons.org/publicdomain/zero/1.0/
+
+The following flac files are CC BY 4.0:
+
+* [8297-275156-0011.flac](http://www.openslr.org/12/) - a single file from the LibriSpeech ASR corpus, by Vassil Panyotov and DanielPovey.
