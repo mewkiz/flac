@@ -580,7 +580,7 @@ func (frame *Frame) correlate() {
 			m *= 2
 			// Notice that the integer division in mid = (left + right)/2 discards
 			// the least significant bit. It can be reconstructed however, since a
-			// sum A+B and a differance A-B has the same least significant bit.
+			// sum A+B and a difference A-B has the same least significant bit.
 			//
 			// ref: Data Compression: The Complete Reference (ch. 7, Decorrelation)
 			m |= s & 1
