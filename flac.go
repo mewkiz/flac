@@ -192,8 +192,8 @@ func ParseFile(path string) (stream *Stream, err error) {
 // Close closes the stream if opened through a call to Open or ParseFile, and
 // performs no operation otherwise.
 func (stream *Stream) Close() error {
-	if r, ok := stream.r.(io.Closer); ok {
-		return r.Close()
+	if stream.c != nil {
+		return stream.c.Close()
 	}
 	return nil
 }
