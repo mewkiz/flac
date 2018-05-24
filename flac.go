@@ -82,6 +82,9 @@ func New(r io.Reader) (stream *Stream, err error) {
 // signature marks the beginning of a FLAC stream.
 var flacSignature = []byte("fLaC")
 
+// signature marks the beginning of a FLAC stream.
+var id3Signature = []byte("ID3")
+
 // parseStreamInfo verifies the signature which marks the beginning of a FLAC
 // stream, and parses the StreamInfo metadata block. It returns a boolean value
 // which specifies if the StreamInfo block was the last metadata block of the
@@ -93,6 +96,19 @@ func (stream *Stream) parseStreamInfo() (isLast bool, err error) {
 	_, err = io.ReadFull(r, buf[:])
 	if err != nil {
 		return false, err
+	}
+
+	// Skip prepended ID3v2 data.
+	if bytes.Equal(buf[:3], id3Signature) {
+		if err := stream.skipId3v2(); err != nil {
+			return false, err
+		}
+
+		// Second attempt at verifying signature.
+		_, err = io.ReadFull(r, buf[:])
+		if err != nil {
+			return false, err
+		}
 	}
 
 	if !bytes.Equal(buf[:], flacSignature) {
@@ -110,6 +126,10 @@ func (stream *Stream) parseStreamInfo() (isLast bool, err error) {
 	}
 	stream.Info = si
 	return block.IsLast, nil
+}
+
+// skipId3v2 skips ID3v2 data prepended to flac files.
+func (stream *Stream) skipId3v2() (err error) {
 }
 
 // Parse creates a new Stream for accessing the metadata blocks and audio
