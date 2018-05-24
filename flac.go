@@ -80,7 +80,7 @@ func New(r io.Reader) (stream *Stream, err error) {
 }
 
 // signature marks the beginning of a FLAC stream.
-var signature = []byte("fLaC")
+var flacSignature = []byte("fLaC")
 
 // parseStreamInfo verifies the signature which marks the beginning of a FLAC
 // stream, and parses the StreamInfo metadata block. It returns a boolean value
@@ -94,8 +94,9 @@ func (stream *Stream) parseStreamInfo() (isLast bool, err error) {
 	if err != nil {
 		return false, err
 	}
-	if !bytes.Equal(buf[:], signature) {
-		return false, fmt.Errorf("flac.parseStreamInfo: invalid FLAC signature; expected %q, got %q", signature, buf)
+
+	if !bytes.Equal(buf[:], flacSignature) {
+		return false, fmt.Errorf("flac.parseStreamInfo: invalid FLAC signature; expected %q, got %q", flacSignature, buf)
 	}
 
 	// Parse StreamInfo metadata block.

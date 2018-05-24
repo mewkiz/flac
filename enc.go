@@ -24,7 +24,7 @@ func Encode(w io.Writer, stream *Stream) error {
 	enc := &encoder{bw: bitio.NewWriter(buf)}
 
 	// Store FLAC signature.
-	if _, err := enc.bw.Write(signature); err != nil {
+	if _, err := enc.bw.Write(flacSignature); err != nil {
 		return errutil.Err(err)
 	}
 
