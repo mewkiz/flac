@@ -101,7 +101,7 @@ func (stream *Stream) parseStreamInfo() (isLast bool, err error) {
 
 	// Skip prepended ID3v2 data.
 	if bytes.Equal(buf[:3], id3Signature) {
-		if err := stream.skipId3v2(); err != nil {
+		if err := stream.skipID3v2(); err != nil {
 			return false, err
 		}
 
@@ -129,7 +129,7 @@ func (stream *Stream) parseStreamInfo() (isLast bool, err error) {
 }
 
 // skipId3v2 skips ID3v2 data prepended to flac files.
-func (stream *Stream) skipId3v2() (err error) {
+func (stream *Stream) skipID3v2() error {
 	r := bufio.NewReader(stream.r)
 
 	// Discard unnecessary data from the ID3v2 header.
