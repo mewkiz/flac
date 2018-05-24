@@ -135,7 +135,10 @@ func (stream *Stream) skipId3v2() (err error) {
 	r := bufio.NewReader(stream.r)
 
 	// Discard unnecessary data from the ID3v2 header.
-	r.Discard(2)
+	_, err = r.Discard(2)
+	if err != nil {
+		return err
+	}
 
 	// Read the size from the ID3v2 header.
 	var sizeBuf [4]byte
@@ -150,8 +153,8 @@ func (stream *Stream) skipId3v2() (err error) {
 		return err
 	}
 
-	r.Discard(int(size))
-	return nil
+	_, err = r.Discard(int(size))
+	return err
 }
 
 // Parse creates a new Stream for accessing the metadata blocks and audio
