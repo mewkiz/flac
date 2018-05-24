@@ -95,8 +95,7 @@ func (stream *Stream) parseStreamInfo() (isLast bool, err error) {
 	// Verify FLAC signature.
 	r := stream.r
 	var buf [4]byte
-	_, err = io.ReadFull(r, buf[:])
-	if err != nil {
+	if _, err = io.ReadFull(r, buf[:]); err != nil {
 		return false, err
 	}
 
@@ -107,8 +106,7 @@ func (stream *Stream) parseStreamInfo() (isLast bool, err error) {
 		}
 
 		// Second attempt at verifying signature.
-		_, err = io.ReadFull(r, buf[:])
-		if err != nil {
+		if _, err = io.ReadFull(r, buf[:]); err != nil {
 			return false, err
 		}
 	}
@@ -135,15 +133,13 @@ func (stream *Stream) skipId3v2() (err error) {
 	r := bufio.NewReader(stream.r)
 
 	// Discard unnecessary data from the ID3v2 header.
-	_, err = r.Discard(2)
-	if err != nil {
+	if _, err := r.Discard(2); err != nil {
 		return err
 	}
 
 	// Read the size from the ID3v2 header.
 	var sizeBuf [4]byte
-	_, err = r.Read(sizeBuf[:])
-	if err != nil {
+	if _, err := r.Read(sizeBuf[:]); err != nil {
 		return err
 	}
 
