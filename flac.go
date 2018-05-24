@@ -30,6 +30,8 @@ import (
 
 	"github.com/mewkiz/flac/frame"
 	"github.com/mewkiz/flac/meta"
+
+	"github.com/mikkyang/id3-go/encodedbytes"
 )
 
 // A Stream contains the metadata blocks and provides access to the audio frames
@@ -130,6 +132,26 @@ func (stream *Stream) parseStreamInfo() (isLast bool, err error) {
 
 // skipId3v2 skips ID3v2 data prepended to flac files.
 func (stream *Stream) skipId3v2() (err error) {
+	r := bufio.NewReader(stream.r)
+
+	// Discard unnecessary data from the ID3v2 header.
+	r.Discard(2)
+
+	// Read the size from the ID3v2 header.
+	var sizeBuf [4]byte
+	_, err = r.Read(sizeBuf[:])
+	if err != nil {
+		return err
+	}
+
+	// The size is encoded as a synchsafe integer.
+	size, err := encodedbytes.SynchInt(sizeBuf[:])
+	if err != nil {
+		return err
+	}
+
+	r.Discard(int(size))
+	return nil
 }
 
 // Parse creates a new Stream for accessing the metadata blocks and audio
