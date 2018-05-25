@@ -128,7 +128,7 @@ func (stream *Stream) parseStreamInfo() (isLast bool, err error) {
 	return block.IsLast, nil
 }
 
-// skipId3v2 skips ID3v2 data prepended to flac files.
+// skipID3v2 skips ID3v2 data prepended to flac files.
 func (stream *Stream) skipID3v2() error {
 	r := bufio.NewReader(stream.r)
 
