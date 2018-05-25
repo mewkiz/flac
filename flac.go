@@ -81,10 +81,10 @@ func New(r io.Reader) (stream *Stream, err error) {
 	return stream, nil
 }
 
-// signature marks the beginning of a FLAC stream.
+// flacSignature marks the beginning of a FLAC stream.
 var flacSignature = []byte("fLaC")
 
-// signature marks the beginning of a FLAC stream.
+// id3Signature marks the beginning of an ID3 stream, used to skip over ID3 data.
 var id3Signature = []byte("ID3")
 
 // parseStreamInfo verifies the signature which marks the beginning of a FLAC
