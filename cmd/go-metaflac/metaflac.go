@@ -79,22 +79,8 @@ func list(path string) error {
 		return err
 	}
 
-	if blockNums != nil {
-		// Only list blocks specified in the "--block-number" command line flag.
-		for _, blockNum := range blockNums {
-			if blockNum == 0 {
-				listStreamInfo(stream.Info)
-			} else {
-				// strea.Blocks doesn't contain StreamInfo, therefore the blockNum
-				// is one less.
-				blockNum--
-			}
-			if blockNum < len(stream.Blocks) {
-				listBlock(stream.Blocks[blockNum], blockNum)
-			}
-		}
-	} else {
-		// List all blocks.
+	// List all blocks.
+	if blockNums == nil {
 		var isLast bool
 		if len(stream.Blocks) == 0 {
 			isLast = true
@@ -107,8 +93,22 @@ func list(path string) error {
 			blockNum--
 			listBlock(block, blockNum)
 		}
+		return nil
 	}
 
+	// Only list blocks specified in the "--block-number" command line flag.
+	for _, blockNum := range blockNums {
+		if blockNum == 0 {
+			listStreamInfo(stream.Info)
+		} else {
+			// strea.Blocks doesn't contain StreamInfo, therefore the blockNum
+			// is one less.
+			blockNum--
+		}
+		if blockNum < len(stream.Blocks) {
+			listBlock(stream.Blocks[blockNum], blockNum)
+		}
+	}
 	return nil
 }
 
