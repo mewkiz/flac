@@ -34,9 +34,10 @@ func (block *Block) parseCueSheet() error {
 	if err != nil {
 		return unexpected(err)
 	}
-	cs := new(CueSheet)
+	cs := &CueSheet{
+		MCN: stringFromSZ(buf),
+	}
 	block.Body = cs
-	cs.MCN = stringFromSZ(buf)
 
 	// 64 bits: NLeadInSamples.
 	if err = binary.Read(block.lr, binary.BigEndian, &cs.NLeadInSamples); err != nil {
@@ -45,7 +46,7 @@ func (block *Block) parseCueSheet() error {
 
 	// 1 bit: IsCompactDisc.
 	var x uint8
-	if err = binary.Read(block.lr, binary.BigEndian, &x); err != nil {
+	if err := binary.Read(block.lr, binary.BigEndian, &x); err != nil {
 		return unexpected(err)
 	}
 	// mask = 10000000
@@ -60,14 +61,13 @@ func (block *Block) parseCueSheet() error {
 	}
 	lr := io.LimitReader(block.lr, 258)
 	zr := zeros{r: lr}
-	_, err = io.Copy(ioutil.Discard, zr)
-	if err != nil {
+	if _, err := io.Copy(ioutil.Discard, zr); err != nil {
 		return err
 	}
 
 	// Parse cue sheet tracks.
 	// 8 bits: (number of tracks)
-	if err = binary.Read(block.lr, binary.BigEndian, &x); err != nil {
+	if err := binary.Read(block.lr, binary.BigEndian, &x); err != nil {
 		return unexpected(err)
 	}
 	if x < 1 {
@@ -81,111 +81,122 @@ func (block *Block) parseCueSheet() error {
 	// track.
 	uniq := make(map[uint8]struct{})
 	for i := range cs.Tracks {
-		// 64 bits: Offset.
-		track := &cs.Tracks[i]
-		if err = binary.Read(block.lr, binary.BigEndian, &track.Offset); err != nil {
-			return unexpected(err)
+		if err := block.parseTrack(cs, i, uniq); err != nil {
+			return err
 		}
-		if cs.IsCompactDisc && track.Offset%588 != 0 {
-			return fmt.Errorf("meta.Block.parseCueSheet: CD-DA track offset (%d) must be evenly divisible by 588", track.Offset)
+	}
+
+	return nil
+}
+
+// parseTrack parses the i:th cue sheet track, and ensures that its track number
+// is unique.
+func (block *Block) parseTrack(cs *CueSheet, i int, uniq map[uint8]struct{}) error {
+	track := &cs.Tracks[i]
+	// 64 bits: Offset.
+	if err := binary.Read(block.lr, binary.BigEndian, &track.Offset); err != nil {
+		return unexpected(err)
+	}
+	if cs.IsCompactDisc && track.Offset%588 != 0 {
+		return fmt.Errorf("meta.Block.parseCueSheet: CD-DA track offset (%d) must be evenly divisible by 588", track.Offset)
+	}
+
+	// 8 bits: Num.
+	if err := binary.Read(block.lr, binary.BigEndian, &track.Num); err != nil {
+		return unexpected(err)
+	}
+	if _, ok := uniq[track.Num]; ok {
+		return fmt.Errorf("meta.Block.parseCueSheet: duplicated track number %d", track.Num)
+	}
+	uniq[track.Num] = struct{}{}
+	if track.Num == 0 {
+		return errors.New("meta.Block.parseCueSheet: invalid track number (0)")
+	}
+	isLeadOut := i == len(cs.Tracks)-1
+	if cs.IsCompactDisc {
+		if !isLeadOut {
+			if track.Num >= 100 {
+				return fmt.Errorf("meta.Block.parseCueSheet: CD-DA track number (%d) exceeds 99", track.Num)
+			}
+		} else {
+			if track.Num != 170 {
+				return fmt.Errorf("meta.Block.parseCueSheet: invalid lead-out CD-DA track number; expected 170, got %d", track.Num)
+			}
+		}
+	} else {
+		if isLeadOut && track.Num != 255 {
+			return fmt.Errorf("meta.Block.parseCueSheet: invalid lead-out track number; expected 255, got %d", track.Num)
+		}
+	}
+
+	// 12 bytes: ISRC.
+	buf, err := readBytes(block.lr, 12)
+	if err != nil {
+		return unexpected(err)
+	}
+	track.ISRC = stringFromSZ(buf)
+
+	// 1 bit: IsAudio.
+	var x uint8
+	if err = binary.Read(block.lr, binary.BigEndian, &x); err != nil {
+		return unexpected(err)
+	}
+	// mask = 10000000
+	if x&0x80 == 0 {
+		track.IsAudio = true
+	}
+
+	// 1 bit: HasPreEmphasis.
+	// mask = 01000000
+	if x&0x40 != 0 {
+		track.HasPreEmphasis = true
+	}
+
+	// 6 bits and 13 bytes: reserved.
+	// mask = 00111111
+	if x&0x3F != 0 {
+		return ErrInvalidPadding
+	}
+	lr := io.LimitReader(block.lr, 13)
+	zr := zeros{r: lr}
+	_, err = io.Copy(ioutil.Discard, zr)
+	if err != nil {
+		return err
+	}
+
+	// Parse indicies.
+	// 8 bits: (number of indicies)
+	if err = binary.Read(block.lr, binary.BigEndian, &x); err != nil {
+		return unexpected(err)
+	}
+	if x < 1 {
+		if !isLeadOut {
+			return errors.New("meta.Block.parseCueSheet: at least one track index required")
+		}
+		// Lead-out track has no track indices to parse; return early.
+		return nil
+	}
+	track.Indicies = make([]CueSheetTrackIndex, x)
+	for i := range track.Indicies {
+		index := &track.Indicies[i]
+		// 64 bits: Offset.
+		if err = binary.Read(block.lr, binary.BigEndian, &index.Offset); err != nil {
+			return unexpected(err)
 		}
 
 		// 8 bits: Num.
-		if err = binary.Read(block.lr, binary.BigEndian, &track.Num); err != nil {
+		if err = binary.Read(block.lr, binary.BigEndian, &index.Num); err != nil {
 			return unexpected(err)
 		}
-		if _, ok := uniq[track.Num]; ok {
-			return fmt.Errorf("meta.Block.parseCueSheet: duplicated track number %d", track.Num)
-		}
-		uniq[track.Num] = struct{}{}
-		if track.Num == 0 {
-			return errors.New("meta.Block.parseCueSheet: invalid track number (0)")
-		}
-		isLeadOut := i == len(cs.Tracks)-1
-		if cs.IsCompactDisc {
-			if !isLeadOut {
-				if track.Num >= 100 {
-					return fmt.Errorf("meta.Block.parseCueSheet: CD-DA track number (%d) exceeds 99", track.Num)
-				}
-			} else {
-				if track.Num != 170 {
-					return fmt.Errorf("meta.Block.parseCueSheet: invalid lead-out CD-DA track number; expected 170, got %d", track.Num)
-				}
-			}
-		} else {
-			if isLeadOut && track.Num != 255 {
-				return fmt.Errorf("meta.Block.parseCueSheet: invalid lead-out track number; expected 255, got %d", track.Num)
-			}
-		}
 
-		// 12 bytes: ISRC.
-		buf, err = readBytes(block.lr, 12)
-		if err != nil {
-			return unexpected(err)
-		}
-		track.ISRC = stringFromSZ(buf)
-
-		// 1 bit: IsAudio.
-		if err = binary.Read(block.lr, binary.BigEndian, &x); err != nil {
-			return unexpected(err)
-		}
-		// mask = 10000000
-		if x&0x80 == 0 {
-			track.IsAudio = true
-		}
-
-		// 1 bit: HasPreEmphasis.
-		// mask = 01000000
-		if x&0x40 != 0 {
-			track.HasPreEmphasis = true
-		}
-
-		// 6 bits and 13 bytes: reserved.
-		// mask = 00111111
-		if x&0x3F != 0 {
-			return ErrInvalidPadding
-		}
-		lr = io.LimitReader(block.lr, 13)
+		// 3 bytes: reserved.
+		lr = io.LimitReader(block.lr, 3)
 		zr = zeros{r: lr}
 		_, err = io.Copy(ioutil.Discard, zr)
 		if err != nil {
 			return err
 		}
-
-		// Parse indicies.
-		// 8 bits: (number of indicies)
-		if err = binary.Read(block.lr, binary.BigEndian, &x); err != nil {
-			return unexpected(err)
-		}
-		if x < 1 {
-			if !isLeadOut {
-				return errors.New("meta.Block.parseCueSheet: at least one track index required")
-			}
-			continue
-		}
-		track.Indicies = make([]CueSheetTrackIndex, x)
-		for i := range track.Indicies {
-			index := &track.Indicies[i]
-			// 64 bits: Offset.
-			if err = binary.Read(block.lr, binary.BigEndian, &index.Offset); err != nil {
-				return unexpected(err)
-			}
-
-			// 8 bits: Num.
-			if err = binary.Read(block.lr, binary.BigEndian, &index.Num); err != nil {
-				return unexpected(err)
-			}
-
-			// 3 bytes: reserved.
-			lr = io.LimitReader(block.lr, 3)
-			zr = zeros{r: lr}
-			_, err = io.Copy(ioutil.Discard, zr)
-			if err != nil {
-				return err
-			}
-		}
 	}
-
 	return nil
 }
 
