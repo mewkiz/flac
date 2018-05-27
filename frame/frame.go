@@ -158,16 +158,16 @@ func (frame *Frame) Hash(md5sum hash.Hash) {
 			switch bps {
 			case 8:
 				buf[0] = uint8(sample)
-				md5sum.Write(buf[:1])
+				_, _ = md5sum.Write(buf[:1])
 			case 16:
 				buf[0] = uint8(sample)
 				buf[1] = uint8(sample >> 8)
-				md5sum.Write(buf[:2])
+				_, _ = md5sum.Write(buf[:2])
 			case 24:
 				buf[0] = uint8(sample)
 				buf[1] = uint8(sample >> 8)
 				buf[2] = uint8(sample >> 16)
-				md5sum.Write(buf[:])
+				_, _ = md5sum.Write(buf[:])
 			default:
 				log.Printf("frame.Frame.Hash: support for %d-bit sample size not yet implemented", bps)
 			}

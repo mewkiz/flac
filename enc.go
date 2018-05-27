@@ -175,7 +175,7 @@ func (enc *encoder) writeStreamInfo(hdr meta.Header, si *meta.StreamInfo) error 
 	}
 
 	// 36 bits: NSamples.
-	if err := enc.bw.WriteBits(uint64(si.NSamples), 36); err != nil {
+	if err := enc.bw.WriteBits(si.NSamples, 36); err != nil {
 		return errutil.Err(err)
 	}
 
@@ -540,7 +540,7 @@ func (enc *encoder) writePicture(hdr meta.Header, pic *meta.Picture) error {
 	}
 
 	// (data length) bytes: Data.
-	if _, err := enc.bw.Write([]byte(pic.Data)); err != nil {
+	if _, err := enc.bw.Write(pic.Data); err != nil {
 		return errutil.Err(err)
 	}
 

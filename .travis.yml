@@ -26,4 +26,4 @@ before_script:
 
 script:
   - ./goclean.sh
-  - golangci-lint run
+  - golangci-lint run --enable-all
