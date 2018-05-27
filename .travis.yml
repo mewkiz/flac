@@ -26,4 +26,4 @@ before_script:
 
 script:
   - ./goclean.sh
-  - golangci-lint run --enable-all -e "(G501:|Error return value of .md5sum\.Write. is not checked)"
+  - golangci-lint run --enable-all --disable maligned --exclude "(G501:|Error return value of .md5sum\.Write. is not checked)"
