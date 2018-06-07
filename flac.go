@@ -143,7 +143,7 @@ func (stream *Stream) skipID3v2() error {
 	// The size is encoded as a synchsafe integer.
 	size := int(sizeBuf[0])<<21 | int(sizeBuf[1])<<14 | int(sizeBuf[2])<<7 | int(sizeBuf[3])
 
-	_, err := r.Discard(int(size))
+	_, err := r.Discard(size)
 	return err
 }
 
