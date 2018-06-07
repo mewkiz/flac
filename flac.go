@@ -30,8 +30,6 @@ import (
 
 	"github.com/mewkiz/flac/frame"
 	"github.com/mewkiz/flac/meta"
-
-	"github.com/mikkyang/id3-go/encodedbytes"
 )
 
 // A Stream contains the metadata blocks and provides access to the audio frames
@@ -142,14 +140,10 @@ func (stream *Stream) skipID3v2() error {
 	if _, err := r.Read(sizeBuf[:]); err != nil {
 		return err
 	}
-
 	// The size is encoded as a synchsafe integer.
-	size, err := encodedbytes.SynchInt(sizeBuf[:])
-	if err != nil {
-		return err
-	}
+	size := int(sizeBuf[0])<<21 | int(sizeBuf[1])<<14 | int(sizeBuf[2])<<7 | int(sizeBuf[3])
 
-	_, err = r.Discard(int(size))
+	_, err := r.Discard(int(size))
 	return err
 }
 
