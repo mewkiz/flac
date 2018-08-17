@@ -1,10 +1,4 @@
-// NOTE: This example is longer than needs to be when using Azul3d. The reason
-// for this is to make the FLAC decoding explicit to showcase the low-level API,
-// rather than using the front-end decoder implemented for Azul3d. An equivalent
-// example using the Azul3d audio decoder interface for FLAC decoding may be
-// viewed at github.com/azul3d/examples/azul3d_flac2wav.
-
-// flac2wav is a tool which converts FLAC files to WAV files.
+// The flac2wav tool converts FLAC files to WAV files.
 package main
 
 import (
@@ -14,64 +8,65 @@ import (
 	"log"
 	"os"
 
-	"azul3d.org/engine/audio"
-	"azul3d.org/engine/audio/wav"
+	"github.com/go-audio/audio"
+	"github.com/go-audio/wav"
 	"github.com/mewkiz/flac"
 	"github.com/mewkiz/pkg/osutil"
 	"github.com/mewkiz/pkg/pathutil"
+	"github.com/pkg/errors"
 )
 
-// flagForce specifies if file overwriting should be forced, when a WAV file of
-// the same name already exists.
-var flagForce bool
-
-func init() {
-	flag.BoolVar(&flagForce, "f", false, "Force overwrite.")
+func usage() {
+	const use = `
+Usage: flac2wav [OPTION]... FILE.flac...`
+	fmt.Fprintln(os.Stderr, use[1:])
+	flag.PrintDefaults()
 }
 
 func main() {
+	// Parse command line arguments.
+	var (
+		// force overwrite WAV file if present already.
+		force bool
+	)
+	flag.BoolVar(&force, "f", false, "force overwrite")
+	flag.Usage = usage
 	flag.Parse()
 	for _, path := range flag.Args() {
-		err := flac2wav(path)
+		err := flac2wav(path, force)
 		if err != nil {
-			log.Fatal(err)
+			log.Fatalf("%+v", err)
 		}
 	}
 }
 
 // flac2wav converts the provided FLAC file to a WAV file.
-func flac2wav(path string) error {
+func flac2wav(path string, force bool) error {
 	// Open FLAC file.
 	stream, err := flac.Open(path)
 	if err != nil {
-		return err
+		return errors.WithStack(err)
 	}
 	defer stream.Close()
 
 	// Create WAV file.
 	wavPath := pathutil.TrimExt(path) + ".wav"
-	if !flagForce {
+	if !force {
 		if osutil.Exists(wavPath) {
-			return fmt.Errorf("the file %q exists already", wavPath)
+			return errors.Errorf("WAV file %q already present; use the -f flag to force overwrite", wavPath)
 		}
 	}
 	fw, err := os.Create(wavPath)
 	if err != nil {
-		return err
+		return errors.WithStack(err)
 	}
 	defer fw.Close()
 
 	// Create WAV encoder.
-	conf := audio.Config{
-		Channels:   int(stream.Info.NChannels),
-		SampleRate: int(stream.Info.SampleRate),
-	}
-	enc, err := wav.NewEncoder(fw, conf)
-	if err != nil {
-		return err
-	}
+	wavAudioFormat := 1 // PCM
+	enc := wav.NewEncoder(fw, int(stream.Info.SampleRate), int(stream.Info.BitsPerSample), int(stream.Info.NChannels), wavAudioFormat)
 	defer enc.Close()
-
+	var data []int
 	for {
 		// Decode FLAC audio samples.
 		frame, err := stream.ParseNext()
@@ -79,19 +74,26 @@ func flac2wav(path string) error {
 			if err == io.EOF {
 				break
 			}
-			return err
+			return errors.WithStack(err)
 		}
 
 		// Encode WAV audio samples.
-		samples := make(audio.Int16, 1)
-		for i := 0; i < int(frame.BlockSize); i++ {
+		data = data[:0]
+		for i := 0; i < frame.Subframes[0].NSamples; i++ {
 			for _, subframe := range frame.Subframes {
-				samples[0] = int16(subframe.Samples[i])
-				_, err = enc.Write(samples)
-				if err != nil {
-					return err
-				}
+				data = append(data, int(subframe.Samples[i]))
 			}
+		}
+		buf := &audio.IntBuffer{
+			Format: &audio.Format{
+				NumChannels: int(stream.Info.NChannels),
+				SampleRate:  int(stream.Info.SampleRate),
+			},
+			Data:           data,
+			SourceBitDepth: int(stream.Info.BitsPerSample),
+		}
+		if err := enc.Write(buf); err != nil {
+			return errors.WithStack(err)
 		}
 	}
 
