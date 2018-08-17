@@ -31,7 +31,6 @@ import (
 	"errors"
 	"io"
 	"io/ioutil"
-	"os"
 
 	"github.com/mewkiz/flac/internal/bits"
 )
@@ -109,7 +108,7 @@ func (block *Block) Parse() error {
 // Skip ignores the contents of the metadata block body.
 func (block *Block) Skip() error {
 	if sr, ok := block.lr.(io.Seeker); ok {
-		_, err := sr.Seek(0, os.SEEK_END)
+		_, err := sr.Seek(0, io.SeekEnd)
 		return err
 	}
 	_, err := io.Copy(ioutil.Discard, block.lr)

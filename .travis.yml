@@ -26,6 +26,6 @@ before_script:
 
 script:
   - ./goclean.sh
-  - golangci-lint run --enable-all --disable maligned --exclude "(G501:|Error return value of .md5sum\.Write. is not checked)"
+  - golangci-lint run --enable-all --disable maligned,lll,dupl --exclude "(G501:|G401:|Error return value of .md5sum\.Write. is not checked)"
 
 # skip G501: Import blacklist: crypto/md5

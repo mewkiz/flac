@@ -48,7 +48,10 @@ var golden = []test{
 func TestCrc8ATM(t *testing.T) {
 	for _, g := range golden {
 		h := NewATM()
-		io.WriteString(h, g.in)
+		if _, err := io.WriteString(h, g.in); err != nil {
+			t.Error(err)
+			continue
+		}
 		got := h.Sum8()
 		if got != g.want {
 			t.Errorf("ATM(%q); expected 0x%02X, got 0x%02X.", g.in, g.want, got)
@@ -94,7 +97,10 @@ func benchmarkCrc8(b *testing.B, count int64) {
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		h.Reset()
-		h.Write(data)
+		if _, err := h.Write(data); err != nil {
+			b.Error(err)
+			continue
+		}
 		h.Sum(in)
 	}
 }

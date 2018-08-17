@@ -646,7 +646,10 @@ func benchmarkReads(b *testing.B, chunk, align int) {
 	for i := 0; i < b.N; i++ {
 		r := NewReader(bytes.NewReader(buf))
 		for j := 0; j < last; j++ {
-			r.Read(bits[j])
+			if _, err := r.Read(bits[j]); err != nil {
+				b.Error(err)
+				continue
+			}
 		}
 	}
 }
