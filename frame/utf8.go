@@ -152,7 +152,6 @@ func decodeUTF8Int(r io.Reader) (n uint64, err error) {
 			return 0, fmt.Errorf("frame.decodeUTF8Int: larger number representation than necessary; n (%d) stored in %d bytes, could be stored in %d bytes", n, l+1, l)
 		}
 	}
-
 	return n, nil
 }
 

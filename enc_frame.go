@@ -1,10 +1,7 @@
 package flac
 
 import (
-	"bytes"
 	"encoding/binary"
-	"encoding/hex"
-	"fmt"
 	"io"
 
 	"github.com/icza/bitio"
@@ -28,8 +25,7 @@ func (enc *Encoder) encodeFrame(samples [][]int32) error {
 	// Create a new CRC-16 hash writer which adds the data from all write
 	// operations to a running hash.
 	h := crc16.NewIBM()
-	buf := &bytes.Buffer{}
-	hw := io.MultiWriter(buf, h, enc.w)
+	hw := io.MultiWriter(h, enc.w)
 
 	// Encode frame header.
 	nchannels := int(enc.stream.Info.NChannels)
@@ -124,9 +120,7 @@ func (enc *Encoder) encodeFrame(samples [][]int32) error {
 	// CRC-16 (polynomial = x^16 + x^15 + x^2 + x^0, initialized with 0) of
 	// everything before the crc, back to and including the frame header sync
 	// code
-	fmt.Println(hex.Dump(buf.Bytes()))
 	crc := h.Sum16()
-	fmt.Printf("crc16: 0x%04X\n", crc)
 	if err := binary.Write(enc.w, binary.BigEndian, crc); err != nil {
 		return errutil.Err(err)
 	}

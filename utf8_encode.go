@@ -55,27 +55,27 @@ func encodeUTF8(bw bitio.Writer, x uint64) error {
 		// if c0 == 110xxxxx
 		// total: 11 bits (5 + 6)
 		l = 1
-		bits = uint64(t2 | x&mask2)
+		bits = uint64(t2 | (x>>6)&mask2)
 	case x <= rune3Max:
 		// if c0 == 1110xxxx
 		// total: 16 bits (4 + 6 + 6)
 		l = 2
-		bits = uint64(t3 | x&mask3)
+		bits = uint64(t3 | (x>>(6*2))&mask3)
 	case x <= rune4Max:
 		// if c0 == 11110xxx
 		// total: 21 bits (3 + 6 + 6 + 6)
 		l = 3
-		bits = uint64(t4 | x&mask4)
+		bits = uint64(t4 | (x>>(6*3))&mask4)
 	case x <= rune5Max:
 		// if c0 == 111110xx
 		// total: 26 bits (2 + 6 + 6 + 6 + 6)
 		l = 4
-		bits = uint64(t5 | x&mask5)
+		bits = uint64(t5 | (x>>(6*4))&mask5)
 	case x <= rune6Max:
 		// if c0 == 1111110x
 		// total: 31 bits (1 + 6 + 6 + 6 + 6 + 6)
 		l = 5
-		bits = uint64(t6 | x&mask6)
+		bits = uint64(t6 | (x>>(6*5))&mask6)
 	case x <= rune7Max:
 		// if c0 == 11111110
 		// total: 36 bits (0 + 6 + 6 + 6 + 6 + 6 + 6)
@@ -86,16 +86,13 @@ func encodeUTF8(bw bitio.Writer, x uint64) error {
 	if err := bw.WriteBits(bits, 8); err != nil {
 		return errutil.Err(err)
 	}
-	nbits := uint(6 - l)
-	x >>= nbits
 
 	// Store continuation bytes.
-	for i := 0; i < l; i++ {
-		bits := uint64(tx | x&maskx)
+	for i := l - 1; i >= 0; i-- {
+		bits := uint64(tx | (x>>uint(6*i))&maskx)
 		if err := bw.WriteBits(bits, 8); err != nil {
 			return errutil.Err(err)
 		}
-		x >>= 6
 	}
 	return nil
 }
