@@ -1,30 +1,76 @@
 package flac
 
 import (
+	"fmt"
+	"io"
+
+	"github.com/icza/bitio"
 	"github.com/mewkiz/flac/frame"
+	"github.com/mewkiz/flac/internal/hashutil/crc8"
 	"github.com/mewkiz/pkg/errutil"
 )
 
 // Write encodes the audio samples to FLAC frames.
 func (enc *Encoder) Write(samples []int32) error {
+	// Encode frame header.
+	nsamples := len(samples) / int(enc.stream.Info.NChannels)
+	hdr := &frame.Header{
+		// Specifies if the block size is fixed or variable.
+		HasFixedBlockSize: false,
+		// Block size in inter-channel samples, i.e. the number of audio samples in
+		// each subframe.
+		BlockSize: uint16(nsamples),
+		// Sample rate in Hz; a 0 value implies unknown, get sample rate from
+		// StreamInfo.
+		SampleRate: enc.stream.Info.SampleRate,
+		// Specifies the number of channels (subframes) that exist in the frame,
+		// their order and possible inter-channel decorrelation.
+		Channels: frame.ChannelsMono,
+		// Sample size in bits-per-sample; a 0 value implies unknown, get sample size
+		// from StreamInfo.
+		BitsPerSample: enc.stream.Info.BitsPerSample,
+		// Specifies the frame number if the block size is fixed, and the first
+		// sample number in the frame otherwise. When using fixed block size, the
+		// first sample number in the frame can be derived by multiplying the frame
+		// number with the block size (in samples).
+		Num: uint64(enc.curNum),
+	}
+	if hdr.HasFixedBlockSize {
+		enc.curNum++
+	} else {
+		enc.curNum += uint64(nsamples)
+	}
+	if err := enc.encodeFrameHeader(hdr); err != nil {
+		return errutil.Err(err)
+	}
+	// TODO: Encode samples.
 	return nil
 }
 
+// encodeFrameHeader encodes the given frame header to the output stream.
 func (enc *Encoder) encodeFrameHeader(hdr *frame.Header) error {
+	fmt.Println("enc.curNum:", enc.curNum)
+	// Create a new CRC-8 hash writer which adds the data from all write
+	// operations to a running hash.
+	h := crc8.NewATM()
+	hw := io.MultiWriter(h, enc.w)
+	bw := bitio.NewWriter(hw)
+	enc.c = bw
+
 	//  Sync code: 11111111111110
-	if err := enc.bw.WriteBits(0x3FFE, 14); err != nil {
+	if err := bw.WriteBits(0x3FFE, 14); err != nil {
 		return errutil.Err(err)
 	}
 
 	// Reserved: 0
-	if err := enc.bw.WriteBits(0x0, 1); err != nil {
+	if err := bw.WriteBits(0x0, 1); err != nil {
 		return errutil.Err(err)
 	}
 
 	// Blocking strategy:
 	//    0 : fixed-blocksize stream; frame header encodes the frame number
 	//    1 : variable-blocksize stream; frame header encodes the sample number
-	if err := enc.bw.WriteBool(!hdr.HasFixedBlockSize); err != nil {
+	if err := bw.WriteBool(!hdr.HasFixedBlockSize); err != nil {
 		return errutil.Err(err)
 	}
 
@@ -61,7 +107,7 @@ func (enc *Encoder) encodeFrameHeader(hdr *frame.Header) error {
 			nblockSizeSuffixBits = 16
 		}
 	}
-	if err := enc.bw.WriteBits(bits, 4); err != nil {
+	if err := bw.WriteBits(bits, 4); err != nil {
 		return errutil.Err(err)
 	}
 
@@ -146,7 +192,7 @@ func (enc *Encoder) encodeFrameHeader(hdr *frame.Header) error {
 			return errutil.Newf("unable to encode sample rate %v", hdr.SampleRate)
 		}
 	}
-	if err := enc.bw.WriteBits(bits, 4); err != nil {
+	if err := bw.WriteBits(bits, 4); err != nil {
 		return errutil.Err(err)
 	}
 
@@ -222,12 +268,12 @@ func (enc *Encoder) encodeFrameHeader(hdr *frame.Header) error {
 	default:
 		return errutil.Newf("support for sample size %v not yet implemented", hdr.BitsPerSample)
 	}
-	if err := enc.bw.WriteBits(bits, 3); err != nil {
+	if err := bw.WriteBits(bits, 3); err != nil {
 		return errutil.Err(err)
 	}
 
 	// Reserved: 0
-	if err := enc.bw.WriteBits(0x0, 1); err != nil {
+	if err := bw.WriteBits(0x0, 1); err != nil {
 		return errutil.Err(err)
 	}
 
@@ -235,27 +281,35 @@ func (enc *Encoder) encodeFrameHeader(hdr *frame.Header) error {
 	//       <8-56>:"UTF-8" coded sample number (decoded number is 36 bits)
 	//    else
 	//       <8-48>:"UTF-8" coded frame number (decoded number is 31 bits)
-	if err := encodeUTF8(enc.bw, hdr.Num); err != nil {
+	if err := encodeUTF8(bw, hdr.Num); err != nil {
 		return errutil.Err(err)
 	}
 
 	// Write block size after the frame header (used for uncommon block sizes).
 	if nblockSizeSuffixBits > 0 {
-		if err := enc.bw.WriteBits(uint64(hdr.BlockSize), nblockSizeSuffixBits); err != nil {
+		if err := bw.WriteBits(uint64(hdr.BlockSize), nblockSizeSuffixBits); err != nil {
 			return errutil.Err(err)
 		}
 	}
 
 	// Write sample rate after the frame header (used for uncommon sample rates).
 	if nblockSizeSuffixBits > 0 {
-		if err := enc.bw.WriteBits(sampleRateSuffixBits, nsampleRateSuffixBits); err != nil {
+		if err := bw.WriteBits(sampleRateSuffixBits, nsampleRateSuffixBits); err != nil {
 			return errutil.Err(err)
 		}
 	}
 
+	// Flush pending writes.
+	if _, err := bw.Align(); err != nil {
+		return errutil.Err(err)
+	}
+
 	// CRC-8 (polynomial = x^8 + x^2 + x^1 + x^0, initialized with 0) of
 	// everything before the crc, including the sync code.
-	// TODO: add CRC-8.
+	crc := h.Sum8()
+	if err := bw.WriteBits(uint64(crc), 8); err != nil {
+		return errutil.Err(err)
+	}
 
 	return nil
 }

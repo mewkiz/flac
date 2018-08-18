@@ -1,7 +1,6 @@
 package flac
 
 import (
-	"bytes"
 	"encoding/binary"
 	"io"
 	"log"
@@ -15,16 +14,25 @@ import (
 type Encoder struct {
 	// FLAC stream of encoder.
 	stream *Stream
-	// Bit writer to the output stream.
-	bw bitio.Writer
+	// Underlying io.Writer to the output stream.
+	w io.Writer
+	// io.Closer to flush bit writer.
+	c io.Closer
+	// Current frame number if block size is fixed, and the first sample number
+	// of the current frame otherwise.
+	curNum uint64
 }
 
 // NewEncoder returns a new FLAC encoder for the given sample rate in Hz, number
 // of channels and bits-per-sample.
 func NewEncoder(w io.Writer, sampleRate, nchannels, bps int) (*Encoder, error) {
 	// Store FLAC signature.
-	enc := &Encoder{bw: bitio.NewWriter(w)}
-	if _, err := enc.bw.Write(flacSignature); err != nil {
+	enc := &Encoder{
+		w: w,
+	}
+	bw := bitio.NewWriter(w)
+	enc.c = bw
+	if _, err := bw.Write(flacSignature); err != nil {
 		return nil, errutil.Err(err)
 	}
 
@@ -48,7 +56,11 @@ func NewEncoder(w io.Writer, sampleRate, nchannels, bps int) (*Encoder, error) {
 		//Length: 0, // Length is calculated in writeStreamInfo
 		IsLast: true,
 	}
-	if err := enc.writeStreamInfo(infoHdr, stream.Info); err != nil {
+	if err := enc.writeStreamInfo(bw, infoHdr, stream.Info); err != nil {
+		return nil, errutil.Err(err)
+	}
+	// Flush pending bit writes.
+	if _, err := bw.Align(); err != nil {
 		return nil, errutil.Err(err)
 	}
 	// Return encoder to be used for encoding audio samples.
@@ -58,7 +70,7 @@ func NewEncoder(w io.Writer, sampleRate, nchannels, bps int) (*Encoder, error) {
 // Close closes the underlying io.Writer of the encoder and flushes any pending
 // writes.
 func (enc *Encoder) Close() error {
-	return enc.bw.Close()
+	return enc.c.Close()
 }
 
 // TODO: Remove Encode in favour of using NewEncoder.
@@ -66,17 +78,14 @@ func (enc *Encoder) Close() error {
 // Encode writes the FLAC audio stream to w.
 func Encode(w io.Writer, stream *Stream) error {
 	// Create a bit writer to the output stream.
-
-	// TODO: Remove buf when me manage to find a way to flush bits without
-	// closing the underlying writer.
-
-	// Use a temporary buffer to avoid closing the underlying writer when calling
-	// `Close` on the bit writer to flushing pending bits.
-	buf := new(bytes.Buffer)
-	enc := &Encoder{bw: bitio.NewWriter(buf)}
+	bw := bitio.NewWriter(w)
+	enc := &Encoder{
+		w: w,
+		c: bw,
+	}
 
 	// Store FLAC signature.
-	if _, err := enc.bw.Write(flacSignature); err != nil {
+	if _, err := bw.Write(flacSignature); err != nil {
 		return errutil.Err(err)
 	}
 
@@ -85,7 +94,7 @@ func Encode(w io.Writer, stream *Stream) error {
 		IsLast: len(stream.Blocks) == 0,
 		Type:   meta.TypeStreamInfo,
 	}
-	if err := enc.writeStreamInfo(infoHdr, stream.Info); err != nil {
+	if err := enc.writeStreamInfo(bw, infoHdr, stream.Info); err != nil {
 		return errutil.Err(err)
 	}
 
@@ -102,17 +111,17 @@ func Encode(w io.Writer, stream *Stream) error {
 		hdr.IsLast = i == len(stream.Blocks)-1
 		switch body := block.Body.(type) {
 		case *meta.Application:
-			err = enc.writeApplication(hdr, body)
+			err = enc.writeApplication(bw, hdr, body)
 		case *meta.SeekTable:
-			err = enc.writeSeekTable(hdr, body)
+			err = enc.writeSeekTable(bw, hdr, body)
 		case *meta.VorbisComment:
-			err = enc.writeVorbisComment(hdr, body)
+			err = enc.writeVorbisComment(bw, hdr, body)
 		case *meta.CueSheet:
-			err = enc.writeCueSheet(hdr, body)
+			err = enc.writeCueSheet(bw, hdr, body)
 		case *meta.Picture:
-			err = enc.writePicture(hdr, body)
+			err = enc.writePicture(bw, hdr, body)
 		default:
-			err = enc.writePadding(hdr)
+			err = enc.writePadding(bw, hdr)
 		}
 		if err != nil {
 			return errutil.Err(err)
@@ -120,12 +129,7 @@ func Encode(w io.Writer, stream *Stream) error {
 	}
 
 	// Flush pending bit writes.
-	if err := enc.bw.Close(); err != nil {
-		return errutil.Err(err)
-	}
-
-	// Copy buffer to output stream.
-	if _, err := io.Copy(w, buf); err != nil {
+	if _, err := bw.Align(); err != nil {
 		return errutil.Err(err)
 	}
 
@@ -139,23 +143,23 @@ func Encode(w io.Writer, stream *Stream) error {
 }
 
 // writeBlockHeader writes the header of a metadata block.
-func (enc *Encoder) writeBlockHeader(hdr meta.Header) error {
+func (enc *Encoder) writeBlockHeader(bw bitio.Writer, hdr meta.Header) error {
 	// 1 bit: IsLast.
 	x := uint64(0)
 	if hdr.IsLast {
 		x = 1
 	}
-	if err := enc.bw.WriteBits(x, 1); err != nil {
+	if err := bw.WriteBits(x, 1); err != nil {
 		return errutil.Err(err)
 	}
 
 	// 7 bits: Type.
-	if err := enc.bw.WriteBits(uint64(hdr.Type), 7); err != nil {
+	if err := bw.WriteBits(uint64(hdr.Type), 7); err != nil {
 		return errutil.Err(err)
 	}
 
 	// 24 bits: Length.
-	if err := enc.bw.WriteBits(uint64(hdr.Length), 24); err != nil {
+	if err := bw.WriteBits(uint64(hdr.Length), 24); err != nil {
 		return errutil.Err(err)
 	}
 
@@ -163,7 +167,7 @@ func (enc *Encoder) writeBlockHeader(hdr meta.Header) error {
 }
 
 // writeStreamInfo stores the body of a StreamInfo metadata block.
-func (enc *Encoder) writeStreamInfo(hdr meta.Header, si *meta.StreamInfo) error {
+func (enc *Encoder) writeStreamInfo(bw bitio.Writer, hdr meta.Header, si *meta.StreamInfo) error {
 	// Store metadata block header.
 	const (
 		BlockSizeMinBits  = 16
@@ -180,53 +184,53 @@ func (enc *Encoder) writeStreamInfo(hdr meta.Header, si *meta.StreamInfo) error 
 		FrameSizeMaxBits + SampleRateBits + NChannelsBits + BitsPerSampleBits +
 		NSamplesBits + MD5sumBits)
 	hdr.Length = nbits / 8
-	if err := enc.writeBlockHeader(hdr); err != nil {
+	if err := enc.writeBlockHeader(bw, hdr); err != nil {
 		return errutil.Err(err)
 	}
 
 	// Store metadata block body.
 	// 16 bits: BlockSizeMin.
-	if err := enc.bw.WriteBits(uint64(si.BlockSizeMin), 16); err != nil {
+	if err := bw.WriteBits(uint64(si.BlockSizeMin), 16); err != nil {
 		return errutil.Err(err)
 	}
 
 	// 16 bits: BlockSizeMax.
-	if err := enc.bw.WriteBits(uint64(si.BlockSizeMax), 16); err != nil {
+	if err := bw.WriteBits(uint64(si.BlockSizeMax), 16); err != nil {
 		return errutil.Err(err)
 	}
 
 	// 24 bits: FrameSizeMin.
-	if err := enc.bw.WriteBits(uint64(si.FrameSizeMin), 24); err != nil {
+	if err := bw.WriteBits(uint64(si.FrameSizeMin), 24); err != nil {
 		return errutil.Err(err)
 	}
 
 	// 24 bits: FrameSizeMax.
-	if err := enc.bw.WriteBits(uint64(si.FrameSizeMax), 24); err != nil {
+	if err := bw.WriteBits(uint64(si.FrameSizeMax), 24); err != nil {
 		return errutil.Err(err)
 	}
 
 	// 20 bits: SampleRate.
-	if err := enc.bw.WriteBits(uint64(si.SampleRate), 20); err != nil {
+	if err := bw.WriteBits(uint64(si.SampleRate), 20); err != nil {
 		return errutil.Err(err)
 	}
 
 	// 3 bits: NChannels; stored as (number of channels) - 1.
-	if err := enc.bw.WriteBits(uint64(si.NChannels-1), 3); err != nil {
+	if err := bw.WriteBits(uint64(si.NChannels-1), 3); err != nil {
 		return errutil.Err(err)
 	}
 
 	// 5 bits: BitsPerSample; stored as (bits-per-sample) - 1.
-	if err := enc.bw.WriteBits(uint64(si.BitsPerSample-1), 5); err != nil {
+	if err := bw.WriteBits(uint64(si.BitsPerSample-1), 5); err != nil {
 		return errutil.Err(err)
 	}
 
 	// 36 bits: NSamples.
-	if err := enc.bw.WriteBits(si.NSamples, 36); err != nil {
+	if err := bw.WriteBits(si.NSamples, 36); err != nil {
 		return errutil.Err(err)
 	}
 
 	// 16 bytes: MD5sum.
-	if _, err := enc.bw.Write(si.MD5sum[:]); err != nil {
+	if _, err := bw.Write(si.MD5sum[:]); err != nil {
 		return errutil.Err(err)
 	}
 
@@ -234,15 +238,15 @@ func (enc *Encoder) writeStreamInfo(hdr meta.Header, si *meta.StreamInfo) error 
 }
 
 // writePadding writes the body of a Padding metadata block.
-func (enc *Encoder) writePadding(hdr meta.Header) error {
+func (enc *Encoder) writePadding(bw bitio.Writer, hdr meta.Header) error {
 	// Store metadata block header.
-	if err := enc.writeBlockHeader(hdr); err != nil {
+	if err := enc.writeBlockHeader(bw, hdr); err != nil {
 		return errutil.Err(err)
 	}
 
 	// Store metadata block body.
 	for i := 0; i < int(hdr.Length); i++ {
-		if err := enc.bw.WriteByte(0); err != nil {
+		if err := bw.WriteByte(0); err != nil {
 			return errutil.Err(err)
 		}
 	}
@@ -250,25 +254,25 @@ func (enc *Encoder) writePadding(hdr meta.Header) error {
 }
 
 // writeApplication writes the body of an Application metadata block.
-func (enc *Encoder) writeApplication(hdr meta.Header, app *meta.Application) error {
+func (enc *Encoder) writeApplication(bw bitio.Writer, hdr meta.Header, app *meta.Application) error {
 	// Store metadata block header.
 	const (
 		IDBits = 32
 	)
 	nbits := int64(IDBits + 8*len(app.Data))
 	hdr.Length = nbits / 8
-	if err := enc.writeBlockHeader(hdr); err != nil {
+	if err := enc.writeBlockHeader(bw, hdr); err != nil {
 		return errutil.Err(err)
 	}
 
 	// Store metadata block body.
 	// 32 bits: ID.
-	if err := enc.bw.WriteBits(uint64(app.ID), 32); err != nil {
+	if err := bw.WriteBits(uint64(app.ID), 32); err != nil {
 		return errutil.Err(err)
 	}
 
 	// Check if the Application block only contains an ID.
-	if _, err := enc.bw.Write(app.Data); err != nil {
+	if _, err := bw.Write(app.Data); err != nil {
 		return errutil.Err(err)
 	}
 
@@ -276,7 +280,7 @@ func (enc *Encoder) writeApplication(hdr meta.Header, app *meta.Application) err
 }
 
 // writeSeekTable writes the body of a SeekTable metadata block.
-func (enc *Encoder) writeSeekTable(hdr meta.Header, table *meta.SeekTable) error {
+func (enc *Encoder) writeSeekTable(bw bitio.Writer, hdr meta.Header, table *meta.SeekTable) error {
 	// Store metadata block header.
 	const (
 		SampleNumBits = 64
@@ -286,13 +290,13 @@ func (enc *Encoder) writeSeekTable(hdr meta.Header, table *meta.SeekTable) error
 	)
 	nbits := int64(PointBits * len(table.Points))
 	hdr.Length = nbits / 8
-	if err := enc.writeBlockHeader(hdr); err != nil {
+	if err := enc.writeBlockHeader(bw, hdr); err != nil {
 		return errutil.Err(err)
 	}
 
 	// Store metadata block body.
 	for _, point := range table.Points {
-		if err := binary.Write(enc.bw, binary.BigEndian, point); err != nil {
+		if err := binary.Write(bw, binary.BigEndian, point); err != nil {
 			return errutil.Err(err)
 		}
 	}
@@ -300,7 +304,7 @@ func (enc *Encoder) writeSeekTable(hdr meta.Header, table *meta.SeekTable) error
 }
 
 // writeVorbisComment writes the body of a VorbisComment metadata block.
-func (enc *Encoder) writeVorbisComment(hdr meta.Header, comment *meta.VorbisComment) error {
+func (enc *Encoder) writeVorbisComment(bw bitio.Writer, hdr meta.Header, comment *meta.VorbisComment) error {
 	// Store metadata block header.
 	const (
 		VendorLenBits = 32
@@ -315,26 +319,26 @@ func (enc *Encoder) writeVorbisComment(hdr meta.Header, comment *meta.VorbisComm
 		nbits += int64(VectorLenBits + 8*len(tag[0]) + EqualBits + 8*len(tag[1]))
 	}
 	hdr.Length = nbits / 8
-	if err := enc.writeBlockHeader(hdr); err != nil {
+	if err := enc.writeBlockHeader(bw, hdr); err != nil {
 		return errutil.Err(err)
 	}
 
 	// Store metadata block body.
 	// 32 bits: vendor length.
 	x := uint32(len(comment.Vendor))
-	if err := binary.Write(enc.bw, binary.LittleEndian, x); err != nil {
+	if err := binary.Write(bw, binary.LittleEndian, x); err != nil {
 		return errutil.Err(err)
 	}
 
 	// (vendor length) bits: Vendor.
-	if _, err := enc.bw.Write([]byte(comment.Vendor)); err != nil {
+	if _, err := bw.Write([]byte(comment.Vendor)); err != nil {
 		return errutil.Err(err)
 	}
 
 	// Store tags.
 	// 32 bits: number of tags.
 	x = uint32(len(comment.Tags))
-	if err := binary.Write(enc.bw, binary.LittleEndian, x); err != nil {
+	if err := binary.Write(bw, binary.LittleEndian, x); err != nil {
 		return errutil.Err(err)
 	}
 	for _, tag := range comment.Tags {
@@ -344,12 +348,12 @@ func (enc *Encoder) writeVorbisComment(hdr meta.Header, comment *meta.VorbisComm
 
 		// 32 bits: vector length
 		x = uint32(len(buf))
-		if err := binary.Write(enc.bw, binary.LittleEndian, x); err != nil {
+		if err := binary.Write(bw, binary.LittleEndian, x); err != nil {
 			return errutil.Err(err)
 		}
 
 		// (vector length): vector.
-		if _, err := enc.bw.Write(buf); err != nil {
+		if _, err := bw.Write(buf); err != nil {
 			return errutil.Err(err)
 		}
 	}
@@ -358,7 +362,7 @@ func (enc *Encoder) writeVorbisComment(hdr meta.Header, comment *meta.VorbisComm
 }
 
 // writeCueSheet writes the body of a CueSheet metadata block.
-func (enc *Encoder) writeCueSheet(hdr meta.Header, cs *meta.CueSheet) error {
+func (enc *Encoder) writeCueSheet(bw bitio.Writer, hdr meta.Header, cs *meta.CueSheet) error {
 	// Store metadata block header.
 	const (
 		MCNBits            = 8 * 128
@@ -390,7 +394,7 @@ func (enc *Encoder) writeCueSheet(hdr meta.Header, cs *meta.CueSheet) error {
 		}
 	}
 	hdr.Length = nbits / 8
-	if err := enc.writeBlockHeader(hdr); err != nil {
+	if err := enc.writeBlockHeader(bw, hdr); err != nil {
 		return errutil.Err(err)
 	}
 
@@ -399,12 +403,12 @@ func (enc *Encoder) writeCueSheet(hdr meta.Header, cs *meta.CueSheet) error {
 	// 128 bytes: MCN.
 	mcn := make([]byte, 128)
 	copy(mcn, cs.MCN)
-	if _, err := enc.bw.Write(mcn); err != nil {
+	if _, err := bw.Write(mcn); err != nil {
 		return errutil.Err(err)
 	}
 
 	// 64 bits: NLeadInSamples.
-	if err := enc.bw.WriteBits(cs.NLeadInSamples, 64); err != nil {
+	if err := bw.WriteBits(cs.NLeadInSamples, 64); err != nil {
 		return errutil.Err(err)
 	}
 
@@ -413,41 +417,41 @@ func (enc *Encoder) writeCueSheet(hdr meta.Header, cs *meta.CueSheet) error {
 	if cs.IsCompactDisc {
 		x = 1
 	}
-	if err := enc.bw.WriteBits(x, 1); err != nil {
+	if err := bw.WriteBits(x, 1); err != nil {
 		return errutil.Err(err)
 	}
 
 	// 7 bits and 258 bytes: reserved.
-	if err := enc.bw.WriteBits(0, 7); err != nil {
+	if err := bw.WriteBits(0, 7); err != nil {
 		return errutil.Err(err)
 	}
 	// TODO: Remove unnecessary allocation.
 	padding := make([]byte, 258)
-	if _, err := enc.bw.Write(padding); err != nil {
+	if _, err := bw.Write(padding); err != nil {
 		return errutil.Err(err)
 	}
 
 	// Parse cue sheet tracks.
 	// 8 bits: (number of tracks)
 	x = uint64(len(cs.Tracks))
-	if err := enc.bw.WriteBits(x, 8); err != nil {
+	if err := bw.WriteBits(x, 8); err != nil {
 		return errutil.Err(err)
 	}
 	for _, track := range cs.Tracks {
 		// 64 bits: Offset.
-		if err := enc.bw.WriteBits(track.Offset, 64); err != nil {
+		if err := bw.WriteBits(track.Offset, 64); err != nil {
 			return errutil.Err(err)
 		}
 
 		// 8 bits: Num.
-		if err := enc.bw.WriteBits(uint64(track.Num), 8); err != nil {
+		if err := bw.WriteBits(uint64(track.Num), 8); err != nil {
 			return errutil.Err(err)
 		}
 
 		// 12 bytes: ISRC.
 		isrc := make([]byte, 12)
 		copy(isrc, track.ISRC)
-		if _, err := enc.bw.Write(isrc); err != nil {
+		if _, err := bw.Write(isrc); err != nil {
 			return errutil.Err(err)
 		}
 
@@ -456,7 +460,7 @@ func (enc *Encoder) writeCueSheet(hdr meta.Header, cs *meta.CueSheet) error {
 		if !track.IsAudio {
 			x = 1
 		}
-		if err := enc.bw.WriteBits(x, 1); err != nil {
+		if err := bw.WriteBits(x, 1); err != nil {
 			return errutil.Err(err)
 		}
 
@@ -466,42 +470,42 @@ func (enc *Encoder) writeCueSheet(hdr meta.Header, cs *meta.CueSheet) error {
 		if track.HasPreEmphasis {
 			x = 1
 		}
-		if err := enc.bw.WriteBits(x, 1); err != nil {
+		if err := bw.WriteBits(x, 1); err != nil {
 			return errutil.Err(err)
 		}
 
 		// 6 bits and 13 bytes: reserved.
 		// mask = 00111111
-		if err := enc.bw.WriteBits(0, 6); err != nil {
+		if err := bw.WriteBits(0, 6); err != nil {
 			return errutil.Err(err)
 		}
 		// TODO: Remove unnecessary allocation.
 		padding := make([]byte, 13)
-		if _, err := enc.bw.Write(padding); err != nil {
+		if _, err := bw.Write(padding); err != nil {
 			return errutil.Err(err)
 		}
 
 		// Parse indicies.
 		// 8 bits: (number of indicies)
 		x = uint64(len(track.Indicies))
-		if err := enc.bw.WriteBits(x, 8); err != nil {
+		if err := bw.WriteBits(x, 8); err != nil {
 			return errutil.Err(err)
 		}
 		for _, index := range track.Indicies {
 			// 64 bits: Offset.
-			if err := enc.bw.WriteBits(index.Offset, 64); err != nil {
+			if err := bw.WriteBits(index.Offset, 64); err != nil {
 				return errutil.Err(err)
 			}
 
 			// 8 bits: Num.
-			if err := enc.bw.WriteBits(uint64(index.Num), 8); err != nil {
+			if err := bw.WriteBits(uint64(index.Num), 8); err != nil {
 				return errutil.Err(err)
 			}
 
 			// 3 bytes: reserved.
 			// TODO: Remove unnecessary allocation.
 			padding := make([]byte, 3)
-			if _, err := enc.bw.Write(padding); err != nil {
+			if _, err := bw.Write(padding); err != nil {
 				return errutil.Err(err)
 			}
 		}
@@ -511,7 +515,7 @@ func (enc *Encoder) writeCueSheet(hdr meta.Header, cs *meta.CueSheet) error {
 }
 
 // writePicture writes the body of a Picture metadata block.
-func (enc *Encoder) writePicture(hdr meta.Header, pic *meta.Picture) error {
+func (enc *Encoder) writePicture(bw bitio.Writer, hdr meta.Header, pic *meta.Picture) error {
 	// Store metadata block header.
 	const (
 		TypeBits       = 32
@@ -527,66 +531,66 @@ func (enc *Encoder) writePicture(hdr meta.Header, pic *meta.Picture) error {
 		8*len(pic.Desc) + WidthBits + HeightBits + DepthBits + NPalColorsBits +
 		DataLenBits + 8*len(pic.Data))
 	hdr.Length = nbits / 8
-	if err := enc.writeBlockHeader(hdr); err != nil {
+	if err := enc.writeBlockHeader(bw, hdr); err != nil {
 		return errutil.Err(err)
 	}
 
 	// Store metadata block body.
 	// 32 bits: Type.
-	if err := enc.bw.WriteBits(uint64(pic.Type), 32); err != nil {
+	if err := bw.WriteBits(uint64(pic.Type), 32); err != nil {
 		return errutil.Err(err)
 	}
 
 	// 32 bits: (MIME type length).
 	x := uint64(len(pic.MIME))
-	if err := enc.bw.WriteBits(x, 32); err != nil {
+	if err := bw.WriteBits(x, 32); err != nil {
 		return errutil.Err(err)
 	}
 
 	// (MIME type length) bytes: MIME.
-	if _, err := enc.bw.Write([]byte(pic.MIME)); err != nil {
+	if _, err := bw.Write([]byte(pic.MIME)); err != nil {
 		return errutil.Err(err)
 	}
 
 	// 32 bits: (description length).
 	x = uint64(len(pic.Desc))
-	if err := enc.bw.WriteBits(x, 32); err != nil {
+	if err := bw.WriteBits(x, 32); err != nil {
 		return errutil.Err(err)
 	}
 
 	// (description length) bytes: Desc.
-	if _, err := enc.bw.Write([]byte(pic.Desc)); err != nil {
+	if _, err := bw.Write([]byte(pic.Desc)); err != nil {
 		return errutil.Err(err)
 	}
 
 	// 32 bits: Width.
-	if err := enc.bw.WriteBits(uint64(pic.Width), 32); err != nil {
+	if err := bw.WriteBits(uint64(pic.Width), 32); err != nil {
 		return errutil.Err(err)
 	}
 
 	// 32 bits: Height.
-	if err := enc.bw.WriteBits(uint64(pic.Height), 32); err != nil {
+	if err := bw.WriteBits(uint64(pic.Height), 32); err != nil {
 		return errutil.Err(err)
 	}
 
 	// 32 bits: Depth.
-	if err := enc.bw.WriteBits(uint64(pic.Depth), 32); err != nil {
+	if err := bw.WriteBits(uint64(pic.Depth), 32); err != nil {
 		return errutil.Err(err)
 	}
 
 	// 32 bits: NPalColors.
-	if err := enc.bw.WriteBits(uint64(pic.NPalColors), 32); err != nil {
+	if err := bw.WriteBits(uint64(pic.NPalColors), 32); err != nil {
 		return errutil.Err(err)
 	}
 
 	// 32 bits: (data length).
 	x = uint64(len(pic.Data))
-	if err := enc.bw.WriteBits(x, 32); err != nil {
+	if err := bw.WriteBits(x, 32); err != nil {
 		return errutil.Err(err)
 	}
 
 	// (data length) bytes: Data.
-	if _, err := enc.bw.Write(pic.Data); err != nil {
+	if _, err := bw.Write(pic.Data); err != nil {
 		return errutil.Err(err)
 	}
 

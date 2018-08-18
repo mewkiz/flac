@@ -61,7 +61,7 @@ func wav2flac(wavPath string, force bool) error {
 	if err := dec.FwdToPCM(); err != nil {
 		return errors.WithStack(err)
 	}
-	const bufferSize = 10 * 1024 * 1024
+	bufferSize := nchannels * 65535
 	buf := &audio.IntBuffer{
 		Format: &audio.Format{
 			NumChannels: nchannels,
@@ -83,7 +83,8 @@ func wav2flac(wavPath string, force bool) error {
 		for i, sample := range buf.Data[:n] {
 			data[i] = int32(sample)
 		}
-		fmt.Println("data:", data)
+		//fmt.Println("data:", data)
+		fmt.Println("foo")
 		if err := enc.Write(data); err != nil {
 			return errors.WithStack(err)
 		}
