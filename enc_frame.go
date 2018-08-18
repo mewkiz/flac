@@ -1,7 +1,6 @@
 package flac
 
 import (
-	"fmt"
 	"io"
 
 	"github.com/icza/bitio"
@@ -49,7 +48,6 @@ func (enc *Encoder) Write(samples []int32) error {
 
 // encodeFrameHeader encodes the given frame header to the output stream.
 func (enc *Encoder) encodeFrameHeader(hdr *frame.Header) error {
-	fmt.Println("enc.curNum:", enc.curNum)
 	// Create a new CRC-8 hash writer which adds the data from all write
 	// operations to a running hash.
 	h := crc8.NewATM()
@@ -236,6 +234,9 @@ func (enc *Encoder) encodeFrameHeader(hdr *frame.Header) error {
 	default:
 		return errutil.Newf("support for channel assignment %v not yet implemented", hdr.Channels)
 	}
+	if err := bw.WriteBits(bits, 4); err != nil {
+		return errutil.Err(err)
+	}
 
 	// Sample size in bits:
 	//    000 : get from STREAMINFO metadata block
@@ -287,13 +288,15 @@ func (enc *Encoder) encodeFrameHeader(hdr *frame.Header) error {
 
 	// Write block size after the frame header (used for uncommon block sizes).
 	if nblockSizeSuffixBits > 0 {
-		if err := bw.WriteBits(uint64(hdr.BlockSize), nblockSizeSuffixBits); err != nil {
+		// 0110 : get 8 bit (blocksize-1) from end of header
+		// 0111 : get 16 bit (blocksize-1) from end of header
+		if err := bw.WriteBits(uint64(hdr.BlockSize-1), nblockSizeSuffixBits); err != nil {
 			return errutil.Err(err)
 		}
 	}
 
 	// Write sample rate after the frame header (used for uncommon sample rates).
-	if nblockSizeSuffixBits > 0 {
+	if nsampleRateSuffixBits > 0 {
 		if err := bw.WriteBits(sampleRateSuffixBits, nsampleRateSuffixBits); err != nil {
 			return errutil.Err(err)
 		}
@@ -307,9 +310,23 @@ func (enc *Encoder) encodeFrameHeader(hdr *frame.Header) error {
 	// CRC-8 (polynomial = x^8 + x^2 + x^1 + x^0, initialized with 0) of
 	// everything before the crc, including the sync code.
 	crc := h.Sum8()
-	if err := bw.WriteBits(uint64(crc), 8); err != nil {
+	if err := writeByte(enc.w, crc); err != nil {
 		return errutil.Err(err)
 	}
 
+	return nil
+}
+
+// writeByte writes the given byte to w.
+func writeByte(w io.Writer, b byte) error {
+	var buf [1]byte
+	buf[0] = b
+	n, err := w.Write(buf[:])
+	if err != nil {
+		return errutil.Err(err)
+	}
+	if n != 1 {
+		return errutil.Newf("unable to write byte 0x%02X to io.Writer", b)
+	}
 	return nil
 }

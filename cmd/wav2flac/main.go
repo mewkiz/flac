@@ -71,7 +71,7 @@ func wav2flac(wavPath string, force bool) error {
 		SourceBitDepth: bps,
 	}
 	data := make([]int32, bufferSize)
-	for !dec.EOF() {
+	for i := 0; !dec.EOF(); i++ {
 		n, err := dec.PCMBuffer(buf)
 		if err != nil {
 			return errors.WithStack(err)
@@ -84,7 +84,7 @@ func wav2flac(wavPath string, force bool) error {
 			data[i] = int32(sample)
 		}
 		//fmt.Println("data:", data)
-		fmt.Println("foo")
+		fmt.Println("i:", i)
 		if err := enc.Write(data); err != nil {
 			return errors.WithStack(err)
 		}
