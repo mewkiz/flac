@@ -77,7 +77,7 @@ func wav2flac(wavPath string, force bool) error {
 	for i := range samples {
 		samples[i] = make([]int32, nsamplesPerChannel)
 	}
-	for i := 0; !dec.EOF(); i++ {
+	for j := 0; !dec.EOF(); j++ {
 		n, err := dec.PCMBuffer(buf)
 		if err != nil {
 			return errors.WithStack(err)
@@ -88,7 +88,7 @@ func wav2flac(wavPath string, force bool) error {
 		for i, sample := range buf.Data {
 			samples[i%nchannels][i/nchannels] = int32(sample)
 		}
-		fmt.Println("i:", i)
+		fmt.Println("j:", j)
 		//pretty.Println("samples:", samples)
 		if err := enc.Write(samples); err != nil {
 			return errors.WithStack(err)
