@@ -11,6 +11,58 @@ import (
 	"github.com/mewkiz/pkg/errutil"
 )
 
+// An Encoder represents a FLAC encoder.
+type Encoder struct {
+	// FLAC stream of encoder.
+	stream *Stream
+	// Bit writer to the output stream.
+	bw bitio.Writer
+}
+
+// NewEncoder returns a new FLAC encoder for the given sample rate in Hz, number
+// of channels and bits-per-sample.
+func NewEncoder(w io.Writer, sampleRate, nchannels, bps int) (*Encoder, error) {
+	// Store FLAC signature.
+	enc := &Encoder{bw: bitio.NewWriter(w)}
+	if _, err := enc.bw.Write(flacSignature); err != nil {
+		return nil, errutil.Err(err)
+	}
+
+	// Store the StreamInfo metadata block.
+	stream := &Stream{
+		Info: &meta.StreamInfo{
+			BlockSizeMin: 16, // TODO: set closer limit of BlockSize min and max, based on encoded frames.
+			BlockSizeMax: 65535,
+			//FrameSizeMin:  0, // TODO: set closer limit of FrameSize min and max, based on encoded frames.
+			//FrameSizeMax:  0,
+			SampleRate:    uint32(sampleRate),
+			NChannels:     uint8(nchannels),
+			BitsPerSample: uint8(bps),
+			//NSamples:      0, // TODO: set NSamples, based on unencoded audio samples.
+			//MD5sum:        0, // TODO: set MD5sum, based on unencoded audio samples.
+		},
+	}
+	enc.stream = stream
+	infoHdr := meta.Header{
+		Type: meta.TypeStreamInfo,
+		//Length: 0, // Length is calculated in writeStreamInfo
+		IsLast: true,
+	}
+	if err := enc.writeStreamInfo(infoHdr, stream.Info); err != nil {
+		return nil, errutil.Err(err)
+	}
+	// Return encoder to be used for encoding audio samples.
+	return enc, nil
+}
+
+// Close closes the underlying io.Writer of the encoder and flushes any pending
+// writes.
+func (enc *Encoder) Close() error {
+	return enc.bw.Close()
+}
+
+// TODO: Remove Encode in favour of using NewEncoder.
+
 // Encode writes the FLAC audio stream to w.
 func Encode(w io.Writer, stream *Stream) error {
 	// Create a bit writer to the output stream.
@@ -21,7 +73,7 @@ func Encode(w io.Writer, stream *Stream) error {
 	// Use a temporary buffer to avoid closing the underlying writer when calling
 	// `Close` on the bit writer to flushing pending bits.
 	buf := new(bytes.Buffer)
-	enc := &encoder{bw: bitio.NewWriter(buf)}
+	enc := &Encoder{bw: bitio.NewWriter(buf)}
 
 	// Store FLAC signature.
 	if _, err := enc.bw.Write(flacSignature); err != nil {
@@ -86,14 +138,8 @@ func Encode(w io.Writer, stream *Stream) error {
 	return nil
 }
 
-// An encoder represents a FLAC encoder.
-type encoder struct {
-	// Bit writer to the output stream.
-	bw bitio.Writer
-}
-
 // writeBlockHeader writes the header of a metadata block.
-func (enc *encoder) writeBlockHeader(hdr meta.Header) error {
+func (enc *Encoder) writeBlockHeader(hdr meta.Header) error {
 	// 1 bit: IsLast.
 	x := uint64(0)
 	if hdr.IsLast {
@@ -117,7 +163,7 @@ func (enc *encoder) writeBlockHeader(hdr meta.Header) error {
 }
 
 // writeStreamInfo stores the body of a StreamInfo metadata block.
-func (enc *encoder) writeStreamInfo(hdr meta.Header, si *meta.StreamInfo) error {
+func (enc *Encoder) writeStreamInfo(hdr meta.Header, si *meta.StreamInfo) error {
 	// Store metadata block header.
 	const (
 		BlockSizeMinBits  = 16
@@ -188,7 +234,7 @@ func (enc *encoder) writeStreamInfo(hdr meta.Header, si *meta.StreamInfo) error 
 }
 
 // writePadding writes the body of a Padding metadata block.
-func (enc *encoder) writePadding(hdr meta.Header) error {
+func (enc *Encoder) writePadding(hdr meta.Header) error {
 	// Store metadata block header.
 	if err := enc.writeBlockHeader(hdr); err != nil {
 		return errutil.Err(err)
@@ -204,7 +250,7 @@ func (enc *encoder) writePadding(hdr meta.Header) error {
 }
 
 // writeApplication writes the body of an Application metadata block.
-func (enc *encoder) writeApplication(hdr meta.Header, app *meta.Application) error {
+func (enc *Encoder) writeApplication(hdr meta.Header, app *meta.Application) error {
 	// Store metadata block header.
 	const (
 		IDBits = 32
@@ -230,7 +276,7 @@ func (enc *encoder) writeApplication(hdr meta.Header, app *meta.Application) err
 }
 
 // writeSeekTable writes the body of a SeekTable metadata block.
-func (enc *encoder) writeSeekTable(hdr meta.Header, table *meta.SeekTable) error {
+func (enc *Encoder) writeSeekTable(hdr meta.Header, table *meta.SeekTable) error {
 	// Store metadata block header.
 	const (
 		SampleNumBits = 64
@@ -254,7 +300,7 @@ func (enc *encoder) writeSeekTable(hdr meta.Header, table *meta.SeekTable) error
 }
 
 // writeVorbisComment writes the body of a VorbisComment metadata block.
-func (enc *encoder) writeVorbisComment(hdr meta.Header, comment *meta.VorbisComment) error {
+func (enc *Encoder) writeVorbisComment(hdr meta.Header, comment *meta.VorbisComment) error {
 	// Store metadata block header.
 	const (
 		VendorLenBits = 32
@@ -312,7 +358,7 @@ func (enc *encoder) writeVorbisComment(hdr meta.Header, comment *meta.VorbisComm
 }
 
 // writeCueSheet writes the body of a CueSheet metadata block.
-func (enc *encoder) writeCueSheet(hdr meta.Header, cs *meta.CueSheet) error {
+func (enc *Encoder) writeCueSheet(hdr meta.Header, cs *meta.CueSheet) error {
 	// Store metadata block header.
 	const (
 		MCNBits            = 8 * 128
@@ -465,7 +511,7 @@ func (enc *encoder) writeCueSheet(hdr meta.Header, cs *meta.CueSheet) error {
 }
 
 // writePicture writes the body of a Picture metadata block.
-func (enc *encoder) writePicture(hdr meta.Header, pic *meta.Picture) error {
+func (enc *Encoder) writePicture(hdr meta.Header, pic *meta.Picture) error {
 	// Store metadata block header.
 	const (
 		TypeBits       = 32
