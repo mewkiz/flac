@@ -26,7 +26,9 @@
 package frame
 
 import (
+	"bytes"
 	"encoding/binary"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"hash"
@@ -57,6 +59,8 @@ type Frame struct {
 	hr io.Reader
 	// Underlying io.Reader.
 	r io.Reader
+	// TODO: remove buf
+	buf *bytes.Buffer
 }
 
 // New creates a new Frame for accessing the audio samples of r. It reads and
@@ -69,9 +73,11 @@ func New(r io.Reader) (frame *Frame, err error) {
 	// operations to a running hash.
 	crc := crc16.NewIBM()
 	hr := io.TeeReader(r, crc)
+	buf := &bytes.Buffer{}
+	hr = io.TeeReader(hr, buf)
 
 	// Parse frame header.
-	frame = &Frame{crc: crc, hr: hr, r: r}
+	frame = &Frame{crc: crc, hr: hr, r: r, buf: buf}
 	err = frame.parseHeader()
 	return frame, err
 }
@@ -135,9 +141,11 @@ func (frame *Frame) Parse() error {
 	if err = binary.Read(frame.r, binary.BigEndian, &want); err != nil {
 		return unexpected(err)
 	}
+	fmt.Println(hex.Dump(frame.buf.Bytes()))
 	got := frame.crc.Sum16()
+	fmt.Printf("crc16: 0x%04X\n", got)
 	if got != want {
-		log.Printf("frame.Frame.Parse: CRC-16 checksum mismatch; expected 0x%04X, got 0x%04X", want, got)
+		return fmt.Errorf("frame.Frame.Parse: CRC-16 checksum mismatch; expected 0x%04X, got 0x%04X", want, got)
 	}
 
 	return nil
@@ -307,7 +315,7 @@ func (frame *Frame) parseHeader() error {
 	}
 	got := h.Sum8()
 	if want != got {
-		log.Printf("frame.Frame.parseHeader: CRC-8 checksum mismatch; expected 0x%02X, got 0x%02X", want, got)
+		return fmt.Errorf("frame.Frame.parseHeader: CRC-8 checksum mismatch; expected 0x%02X, got 0x%02X", want, got)
 	}
 
 	return nil

@@ -1,57 +1,145 @@
 package flac
 
 import (
+	"bytes"
+	"encoding/binary"
+	"encoding/hex"
+	"fmt"
 	"io"
 
 	"github.com/icza/bitio"
 	"github.com/mewkiz/flac/frame"
+	"github.com/mewkiz/flac/internal/hashutil/crc16"
 	"github.com/mewkiz/flac/internal/hashutil/crc8"
 	"github.com/mewkiz/pkg/errutil"
 )
 
-// Write encodes the audio samples to FLAC frames.
-func (enc *Encoder) Write(samples []int32) error {
+// Write encodes the samples slices (one per channel) to the output stream.
+func (enc *Encoder) Write(samples [][]int32) error {
+	if err := enc.encodeFrame(samples); err != nil {
+		return errutil.Err(err)
+	}
+	return nil
+}
+
+// encodeFrame encodes the given samples slices (one per channel) to a frame of
+// the output stream.
+func (enc *Encoder) encodeFrame(samples [][]int32) error {
+	// Create a new CRC-16 hash writer which adds the data from all write
+	// operations to a running hash.
+	h := crc16.NewIBM()
+	buf := &bytes.Buffer{}
+	hw := io.MultiWriter(buf, h, enc.w)
+
 	// Encode frame header.
-	nsamples := len(samples) / int(enc.stream.Info.NChannels)
+	nchannels := int(enc.stream.Info.NChannels)
+	if len(samples) != nchannels {
+		return errutil.Newf("number of samples slices mismatch; expected %d (one per channel), got %d", nchannels, len(samples))
+	}
+	nsamplesPerChannel := len(samples[0])
+	if !(16 <= nsamplesPerChannel && nsamplesPerChannel <= 65535) {
+		return errutil.Newf("invalid number of samples per channel; expected >= 16 && <= 65535, got %d", nsamplesPerChannel)
+	}
+	for i := range samples {
+		if len(samples[i]) != nsamplesPerChannel {
+			return errutil.Newf("invalid number of samples in channel %d; expected %d, got %d", i, nsamplesPerChannel, len(samples[i]))
+		}
+	}
+	var channels frame.Channels
+	switch nchannels {
+	case 1:
+		// 1 channel: mono.
+		channels = frame.ChannelsMono
+	case 2:
+		// 2 channels: left, right.
+		channels = frame.ChannelsLR
+		//channels = frame.ChannelsLeftSide  // 2 channels: left, side; using inter-channel decorrelation.
+		//channels = frame.ChannelsSideRight // 2 channels: side, right; using inter-channel decorrelation.
+		//channels = frame.ChannelsMidSide   // 2 channels: mid, side; using inter-channel decorrelation.
+	case 3:
+		// 3 channels: left, right, center.
+		channels = frame.ChannelsLRC
+	case 4:
+		// 4 channels: left, right, left surround, right surround.
+		channels = frame.ChannelsLRLsRs
+	case 5:
+		// 5 channels: left, right, center, left surround, right surround.
+		channels = frame.ChannelsLRCLsRs
+	case 6:
+		// 6 channels: left, right, center, LFE, left surround, right surround.
+		channels = frame.ChannelsLRCLfeLsRs
+	case 7:
+		// 7 channels: left, right, center, LFE, center surround, side left, side right.
+		channels = frame.ChannelsLRCLfeCsSlSr
+	case 8:
+		// 8 channels: left, right, center, LFE, left surround, right surround, side left, side right.
+		channels = frame.ChannelsLRCLfeLsRsSlSr
+	default:
+		return errutil.Newf("support for %d number of channels not yet implemented", nchannels)
+	}
 	hdr := &frame.Header{
 		// Specifies if the block size is fixed or variable.
 		HasFixedBlockSize: false,
-		// Block size in inter-channel samples, i.e. the number of audio samples in
-		// each subframe.
-		BlockSize: uint16(nsamples),
+		// Block size in inter-channel samples, i.e. the number of audio samples
+		// in each subframe.
+		BlockSize: uint16(nsamplesPerChannel),
 		// Sample rate in Hz; a 0 value implies unknown, get sample rate from
 		// StreamInfo.
 		SampleRate: enc.stream.Info.SampleRate,
 		// Specifies the number of channels (subframes) that exist in the frame,
 		// their order and possible inter-channel decorrelation.
-		Channels: frame.ChannelsMono,
-		// Sample size in bits-per-sample; a 0 value implies unknown, get sample size
-		// from StreamInfo.
+		Channels: channels,
+		// Sample size in bits-per-sample; a 0 value implies unknown, get sample
+		// size from StreamInfo.
 		BitsPerSample: enc.stream.Info.BitsPerSample,
 		// Specifies the frame number if the block size is fixed, and the first
 		// sample number in the frame otherwise. When using fixed block size, the
-		// first sample number in the frame can be derived by multiplying the frame
-		// number with the block size (in samples).
+		// first sample number in the frame can be derived by multiplying the
+		// frame number with the block size (in samples).
 		Num: uint64(enc.curNum),
 	}
 	if hdr.HasFixedBlockSize {
 		enc.curNum++
 	} else {
-		enc.curNum += uint64(nsamples)
+		enc.curNum += uint64(nsamplesPerChannel)
 	}
-	if err := enc.encodeFrameHeader(hdr); err != nil {
+	if err := enc.encodeFrameHeader(hw, hdr); err != nil {
 		return errutil.Err(err)
 	}
-	// TODO: Encode samples.
+
+	// Encode subframes.
+	bw := bitio.NewWriter(hw)
+	for i := 0; i < nchannels; i++ {
+		if err := enc.encodeSubframe(bw, hdr, samples[i]); err != nil {
+			return errutil.Err(err)
+		}
+	}
+
+	// Zero-padding to byte alignment.
+	// Flush pending writes to subframe.
+	if _, err := bw.Align(); err != nil {
+		return errutil.Err(err)
+	}
+
+	// CRC-16 (polynomial = x^16 + x^15 + x^2 + x^0, initialized with 0) of
+	// everything before the crc, back to and including the frame header sync
+	// code
+	fmt.Println(hex.Dump(buf.Bytes()))
+	crc := h.Sum16()
+	fmt.Printf("crc16: 0x%04X\n", crc)
+	if err := binary.Write(enc.w, binary.BigEndian, crc); err != nil {
+		return errutil.Err(err)
+	}
+
 	return nil
 }
 
 // encodeFrameHeader encodes the given frame header to the output stream.
-func (enc *Encoder) encodeFrameHeader(hdr *frame.Header) error {
+func (enc *Encoder) encodeFrameHeader(w io.Writer, hdr *frame.Header) error {
 	// Create a new CRC-8 hash writer which adds the data from all write
 	// operations to a running hash.
 	h := crc8.NewATM()
-	hw := io.MultiWriter(h, enc.w)
+	hw := io.MultiWriter(h, w)
 	bw := bitio.NewWriter(hw)
 	enc.c = bw
 
@@ -302,7 +390,7 @@ func (enc *Encoder) encodeFrameHeader(hdr *frame.Header) error {
 		}
 	}
 
-	// Flush pending writes.
+	// Flush pending writes to frame header.
 	if _, err := bw.Align(); err != nil {
 		return errutil.Err(err)
 	}
@@ -310,23 +398,9 @@ func (enc *Encoder) encodeFrameHeader(hdr *frame.Header) error {
 	// CRC-8 (polynomial = x^8 + x^2 + x^1 + x^0, initialized with 0) of
 	// everything before the crc, including the sync code.
 	crc := h.Sum8()
-	if err := writeByte(enc.w, crc); err != nil {
+	if err := binary.Write(w, binary.BigEndian, crc); err != nil {
 		return errutil.Err(err)
 	}
 
-	return nil
-}
-
-// writeByte writes the given byte to w.
-func writeByte(w io.Writer, b byte) error {
-	var buf [1]byte
-	buf[0] = b
-	n, err := w.Write(buf[:])
-	if err != nil {
-		return errutil.Err(err)
-	}
-	if n != 1 {
-		return errutil.Newf("unable to write byte 0x%02X to io.Writer", b)
-	}
 	return nil
 }

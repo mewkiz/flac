@@ -61,16 +61,22 @@ func wav2flac(wavPath string, force bool) error {
 	if err := dec.FwdToPCM(); err != nil {
 		return errors.WithStack(err)
 	}
-	bufferSize := nchannels * 65535
+	// Number of samples per channel and block.
+	const nsamplesPerChannel = 16
+	nsamplesPerBlock := nchannels * nsamplesPerChannel
 	buf := &audio.IntBuffer{
 		Format: &audio.Format{
 			NumChannels: nchannels,
 			SampleRate:  sampleRate,
 		},
-		Data:           make([]int, bufferSize),
+		Data:           make([]int, nsamplesPerBlock),
 		SourceBitDepth: bps,
 	}
-	data := make([]int32, bufferSize)
+
+	samples := make([][]int32, nchannels)
+	for i := range samples {
+		samples[i] = make([]int32, nsamplesPerChannel)
+	}
 	for i := 0; !dec.EOF(); i++ {
 		n, err := dec.PCMBuffer(buf)
 		if err != nil {
@@ -79,13 +85,12 @@ func wav2flac(wavPath string, force bool) error {
 		if n == 0 {
 			break
 		}
-		data = data[:n]
-		for i, sample := range buf.Data[:n] {
-			data[i] = int32(sample)
+		for i, sample := range buf.Data {
+			samples[i%nchannels][i/nchannels] = int32(sample)
 		}
-		//fmt.Println("data:", data)
 		fmt.Println("i:", i)
-		if err := enc.Write(data); err != nil {
+		//pretty.Println("samples:", samples)
+		if err := enc.Write(samples); err != nil {
 			return errors.WithStack(err)
 		}
 	}

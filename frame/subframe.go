@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 
+	"github.com/kr/pretty"
 	"github.com/mewkiz/flac/internal/bits"
 )
 
@@ -55,6 +56,8 @@ func (frame *Frame) parseSubframe(br *bits.Reader, bps uint) (subframe *Subframe
 	for i, sample := range subframe.Samples {
 		subframe.Samples[i] = sample << subframe.Wasted
 	}
+
+	pretty.Println(subframe.SubHeader)
 
 	return subframe, err
 }
@@ -223,6 +226,7 @@ func (subframe *Subframe) decodeConstant(br *bits.Reader, bps uint) error {
 // ref: https://www.xiph.org/flac/format.html#subframe_verbatim
 func (subframe *Subframe) decodeVerbatim(br *bits.Reader, bps uint) error {
 	// Parse the unencoded audio samples of the subframe.
+	fmt.Println("verbatim")
 	for i := 0; i < subframe.NSamples; i++ {
 		// (bits-per-sample) bits: Unencoded constant value of the subblock.
 		x, err := br.Read(bps)
@@ -230,6 +234,7 @@ func (subframe *Subframe) decodeVerbatim(br *bits.Reader, bps uint) error {
 			return unexpected(err)
 		}
 		sample := signExtend(x, bps)
+		fmt.Println("   sample:", sample)
 		subframe.Samples = append(subframe.Samples, sample)
 	}
 	return nil
