@@ -137,7 +137,7 @@ func (frame *Frame) Parse() error {
 	}
 	got := frame.crc.Sum16()
 	if got != want {
-		return fmt.Errorf("frame.Frame.Parse: CRC-16 checksum mismatch; expected %v, got %v", want, got)
+		log.Printf("frame.Frame.Parse: CRC-16 checksum mismatch; expected 0x%04X, got 0x%04X", want, got)
 	}
 
 	return nil
@@ -307,7 +307,7 @@ func (frame *Frame) parseHeader() error {
 	}
 	got := h.Sum8()
 	if want != got {
-		return fmt.Errorf("frame.Frame.parseHeader: CRC-8 checksum mismatch; expected %v, got %v", want, got)
+		log.Printf("frame.Frame.parseHeader: CRC-8 checksum mismatch; expected 0x%02X, got 0x%02X", want, got)
 	}
 
 	return nil
