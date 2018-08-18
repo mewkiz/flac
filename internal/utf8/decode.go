@@ -1,9 +1,12 @@
-package frame
+// Package utf8 implements encoding and decoding of UTF-8 coded numbers.
+package utf8
 
 import (
 	"errors"
 	"fmt"
 	"io"
+
+	"github.com/mewkiz/flac/internal/ioutilx"
 )
 
 const (
@@ -29,9 +32,10 @@ const (
 	rune4Max = 1<<21 - 1
 	rune5Max = 1<<26 - 1
 	rune6Max = 1<<31 - 1
+	rune7Max = 1<<36 - 1
 )
 
-// decodeUTF8Int decodes a "UTF-8" coded number and returns it.
+// Decode decodes a "UTF-8" coded number and returns it.
 //
 // ref: http://permalink.gmane.org/gmane.comp.audio.compression.flac.devel/3033
 //
@@ -54,8 +58,8 @@ const (
 //         - if B does not match 10xxxxxx, the encoding is invalid
 //         - set R = R or <the lower 6 bits from B>
 //    - the read value is R
-func decodeUTF8Int(r io.Reader) (n uint64, err error) {
-	c0, err := readByte(r)
+func Decode(r io.Reader) (x uint64, err error) {
+	c0, err := ioutilx.ReadByte(r)
 	if err != nil {
 		return 0, err
 	}
@@ -80,38 +84,38 @@ func decodeUTF8Int(r io.Reader) (n uint64, err error) {
 		// if c0 == 110xxxxx
 		// total: 11 bits (5 + 6)
 		l = 1
-		n = uint64(c0 & mask2)
+		x = uint64(c0 & mask2)
 	case c0 < t4:
 		// if c0 == 1110xxxx
 		// total: 16 bits (4 + 6 + 6)
 		l = 2
-		n = uint64(c0 & mask3)
+		x = uint64(c0 & mask3)
 	case c0 < t5:
 		// if c0 == 11110xxx
 		// total: 21 bits (3 + 6 + 6 + 6)
 		l = 3
-		n = uint64(c0 & mask4)
+		x = uint64(c0 & mask4)
 	case c0 < t6:
 		// if c0 == 111110xx
 		// total: 26 bits (2 + 6 + 6 + 6 + 6)
 		l = 4
-		n = uint64(c0 & mask5)
+		x = uint64(c0 & mask5)
 	case c0 < t7:
 		// if c0 == 1111110x
 		// total: 31 bits (1 + 6 + 6 + 6 + 6 + 6)
 		l = 5
-		n = uint64(c0 & mask6)
+		x = uint64(c0 & mask6)
 	case c0 < t8:
 		// if c0 == 11111110
 		// total: 36 bits (0 + 6 + 6 + 6 + 6 + 6 + 6)
 		l = 6
-		n = 0
+		x = 0
 	}
 
 	// store bits from continuation bytes.
 	for i := 0; i < l; i++ {
-		n <<= 6
-		c, err := readByte(r)
+		x <<= 6
+		c, err := ioutilx.ReadByte(r)
 		if err != nil {
 			if err == io.EOF {
 				return 0, io.ErrUnexpectedEOF
@@ -122,46 +126,35 @@ func decodeUTF8Int(r io.Reader) (n uint64, err error) {
 			// if c != 10xxxxxx
 			return 0, errors.New("frame.decodeUTF8Int: expected continuation byte")
 		}
-		n |= uint64(c & maskx)
+		x |= uint64(c & maskx)
 	}
 
 	// check if number representation is larger than necessary.
 	switch l {
 	case 1:
-		if n <= rune1Max {
-			return 0, fmt.Errorf("frame.decodeUTF8Int: larger number representation than necessary; n (%d) stored in %d bytes, could be stored in %d bytes", n, l+1, l)
+		if x <= rune1Max {
+			return 0, fmt.Errorf("frame.decodeUTF8Int: larger number representation than necessary; x (%d) stored in %d bytes, could be stored in %d bytes", x, l+1, l)
 		}
 	case 2:
-		if n <= rune2Max {
-			return 0, fmt.Errorf("frame.decodeUTF8Int: larger number representation than necessary; n (%d) stored in %d bytes, could be stored in %d bytes", n, l+1, l)
+		if x <= rune2Max {
+			return 0, fmt.Errorf("frame.decodeUTF8Int: larger number representation than necessary; x (%d) stored in %d bytes, could be stored in %d bytes", x, l+1, l)
 		}
 	case 3:
-		if n <= rune3Max {
-			return 0, fmt.Errorf("frame.decodeUTF8Int: larger number representation than necessary; n (%d) stored in %d bytes, could be stored in %d bytes", n, l+1, l)
+		if x <= rune3Max {
+			return 0, fmt.Errorf("frame.decodeUTF8Int: larger number representation than necessary; x (%d) stored in %d bytes, could be stored in %d bytes", x, l+1, l)
 		}
 	case 4:
-		if n <= rune4Max {
-			return 0, fmt.Errorf("frame.decodeUTF8Int: larger number representation than necessary; n (%d) stored in %d bytes, could be stored in %d bytes", n, l+1, l)
+		if x <= rune4Max {
+			return 0, fmt.Errorf("frame.decodeUTF8Int: larger number representation than necessary; x (%d) stored in %d bytes, could be stored in %d bytes", x, l+1, l)
 		}
 	case 5:
-		if n <= rune5Max {
-			return 0, fmt.Errorf("frame.decodeUTF8Int: larger number representation than necessary; n (%d) stored in %d bytes, could be stored in %d bytes", n, l+1, l)
+		if x <= rune5Max {
+			return 0, fmt.Errorf("frame.decodeUTF8Int: larger number representation than necessary; x (%d) stored in %d bytes, could be stored in %d bytes", x, l+1, l)
 		}
 	case 6:
-		if n <= rune6Max {
-			return 0, fmt.Errorf("frame.decodeUTF8Int: larger number representation than necessary; n (%d) stored in %d bytes, could be stored in %d bytes", n, l+1, l)
+		if x <= rune6Max {
+			return 0, fmt.Errorf("frame.decodeUTF8Int: larger number representation than necessary; x (%d) stored in %d bytes, could be stored in %d bytes", x, l+1, l)
 		}
 	}
-
-	return n, nil
-}
-
-// readByte reads and returns the next byte from the provided io.Reader.
-func readByte(r io.Reader) (c byte, err error) {
-	buf := make([]byte, 1)
-	_, err = io.ReadFull(r, buf)
-	if err != nil {
-		return 0, err
-	}
-	return buf[0], nil
+	return x, nil
 }

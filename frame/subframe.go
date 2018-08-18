@@ -55,7 +55,6 @@ func (frame *Frame) parseSubframe(br *bits.Reader, bps uint) (subframe *Subframe
 	for i, sample := range subframe.Samples {
 		subframe.Samples[i] = sample << subframe.Wasted
 	}
-
 	return subframe, err
 }
 
@@ -460,6 +459,9 @@ func (subframe *Subframe) decodeLPC(coeffs []int32, shift int32) error {
 	}
 	if shift < 0 {
 		return fmt.Errorf("frame.Subframe.decodeLPC: invalid negative shift")
+	}
+	if subframe.NSamples != len(subframe.Samples) {
+		return fmt.Errorf("frame.Subframe.decodeLPC: subframe sample count mismatch; expected %d, got %d", subframe.NSamples, len(subframe.Samples))
 	}
 	for i := subframe.Order; i < subframe.NSamples; i++ {
 		var sample int64

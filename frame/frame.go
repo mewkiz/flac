@@ -37,6 +37,7 @@ import (
 	"github.com/mewkiz/flac/internal/hashutil"
 	"github.com/mewkiz/flac/internal/hashutil/crc16"
 	"github.com/mewkiz/flac/internal/hashutil/crc8"
+	"github.com/mewkiz/flac/internal/utf8"
 )
 
 // A Frame contains the header and subframes of an audio frame. It holds the
@@ -137,7 +138,7 @@ func (frame *Frame) Parse() error {
 	}
 	got := frame.crc.Sum16()
 	if got != want {
-		log.Printf("frame.Frame.Parse: CRC-16 checksum mismatch; expected 0x%04X, got 0x%04X", want, got)
+		return fmt.Errorf("frame.Frame.Parse: CRC-16 checksum mismatch; expected 0x%04X, got 0x%04X", want, got)
 	}
 
 	return nil
@@ -285,7 +286,7 @@ func (frame *Frame) parseHeader() error {
 	//    1-6 bytes: UTF-8 encoded frame number.
 	// else
 	//    1-7 bytes: UTF-8 encoded sample number.
-	frame.Num, err = decodeUTF8Int(hr)
+	frame.Num, err = utf8.Decode(hr)
 	if err != nil {
 		return unexpected(err)
 	}
@@ -307,7 +308,7 @@ func (frame *Frame) parseHeader() error {
 	}
 	got := h.Sum8()
 	if want != got {
-		log.Printf("frame.Frame.parseHeader: CRC-8 checksum mismatch; expected 0x%02X, got 0x%02X", want, got)
+		return fmt.Errorf("frame.Frame.parseHeader: CRC-8 checksum mismatch; expected 0x%02X, got 0x%02X", want, got)
 	}
 
 	return nil
