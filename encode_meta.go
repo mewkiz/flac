@@ -107,28 +107,6 @@ func encodeStreamInfo(bw bitio.Writer, info *meta.StreamInfo, last bool) error {
 	return nil
 }
 
-// --- [ Padding ] -------------------------------------------------------------
-
-// encodePadding encodes the Padding metadata block, writing to bw.
-func encodePadding(bw bitio.Writer, length int64, last bool) error {
-	// Store metadata block header.
-	nbits := 8 * length
-	hdr := &meta.Header{
-		IsLast: last,
-		Type:   meta.TypePadding,
-		Length: nbits / 8,
-	}
-	if err := encodeBlockHeader(bw, hdr); err != nil {
-		return errutil.Err(err)
-	}
-
-	// Store metadata block body.
-	if _, err := io.CopyN(bw, ioutilx.Zero, length); err != nil {
-		return errutil.Err(err)
-	}
-	return nil
-}
-
 // --- [ Application ] ---------------------------------------------------------
 
 // encodeApplication encodes the Application metadata block, writing to bw.
