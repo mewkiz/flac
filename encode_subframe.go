@@ -18,20 +18,20 @@ func encodeSubframe(bw bitio.Writer, hdr frame.Header, subframe *frame.Subframe)
 
 	// Encode audio samples.
 	switch subframe.Pred {
-	//case frame.PredConstant:
-	//	if err := encodeConstantSamples(bw, samples); err != nil {
-	//		return errutil.Err(err)
-	//	}
+	case frame.PredConstant:
+		if err := encodeConstantSamples(bw, hdr.BitsPerSample, subframe.Samples); err != nil {
+			return errutil.Err(err)
+		}
 	case frame.PredVerbatim:
 		if err := encodeVerbatimSamples(bw, hdr, subframe.Samples); err != nil {
 			return errutil.Err(err)
 		}
 	//case frame.PredFixed:
-	//	if err := encodeFixedSamples(bw, samples, subframe.Order); err != nil {
+	//	if err := encodeFixedSamples(bw, hdr, subframe.Samples, subframe.Order); err != nil {
 	//		return errutil.Err(err)
 	//	}
 	//case frame.PredFIR:
-	//	if err := encodeFIRSamples(bw, samples, subframe.Order); err != nil {
+	//	if err := encodeFIRSamples(bw, hdr, subframe.Samples, subframe.Order); err != nil {
 	//		return errutil.Err(err)
 	//	}
 	default:
@@ -88,6 +88,23 @@ func encodeSubframeHeader(bw bitio.Writer, hdr frame.SubHeader) error {
 		if err := iobits.WriteUnary(bw, uint64(hdr.Wasted)); err != nil {
 			return errutil.Err(err)
 		}
+	}
+	return nil
+}
+
+// --- [ Constant samples ] ----------------------------------------------------
+
+// encodeConstantSamples stores the given constant sample, writing to bw.
+func encodeConstantSamples(bw bitio.Writer, bps byte, samples []int32) error {
+	sample := samples[0]
+	for _, s := range samples[1:] {
+		if sample != s {
+			return errutil.Newf("constant sample mismatch; expected %v, got %v", sample, s)
+		}
+	}
+	// Unencoded constant value of the subblock, n = frame's bits-per-sample.
+	if err := bw.WriteBits(uint64(sample), bps); err != nil {
+		return errutil.Err(err)
 	}
 	return nil
 }

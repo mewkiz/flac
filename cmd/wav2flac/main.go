@@ -100,23 +100,14 @@ func wav2flac(wavPath string, force bool) error {
 	}
 
 	subframes := make([]*frame.Subframe, nchannels)
-	subHdr := frame.SubHeader{
-		// Specifies the prediction method used to encode the audio sample of the
-		// subframe.
-		Pred: frame.PredVerbatim,
-		// Prediction order used by fixed and FIR linear prediction decoding.
-		Order: 0,
-		// Wasted bits-per-sample.
-		Wasted: 0,
-	}
 	for i := range subframes {
 		subframe := &frame.Subframe{
-			SubHeader: subHdr,
-			Samples:   make([]int32, nsamplesPerChannel),
+			Samples: make([]int32, nsamplesPerChannel),
 		}
 		subframes[i] = subframe
 	}
-	for j := 0; !dec.EOF(); j++ {
+	for frameNum := 0; !dec.EOF(); frameNum++ {
+		fmt.Println("frame number:", frameNum)
 		// Decode WAV samples.
 		n, err := dec.PCMBuffer(buf)
 		if err != nil {
@@ -126,6 +117,16 @@ func wav2flac(wavPath string, force bool) error {
 			break
 		}
 		for _, subframe := range subframes {
+			subHdr := frame.SubHeader{
+				// Specifies the prediction method used to encode the audio sample of the
+				// subframe.
+				Pred: frame.PredVerbatim,
+				// Prediction order used by fixed and FIR linear prediction decoding.
+				Order: 0,
+				// Wasted bits-per-sample.
+				Wasted: 0,
+			}
+			subframe.SubHeader = subHdr
 			subframe.NSamples = n / nchannels
 			subframe.Samples = subframe.Samples[:subframe.NSamples]
 		}
@@ -133,7 +134,21 @@ func wav2flac(wavPath string, force bool) error {
 			subframe := subframes[i%nchannels]
 			subframe.Samples[i/nchannels] = int32(sample)
 		}
-		fmt.Println("j:", j)
+		// Check if the subframe may be encoded as constant; when all samples are
+		// the same.
+		for _, subframe := range subframes {
+			sample := subframe.Samples[0]
+			constant := true
+			for _, s := range subframe.Samples[1:] {
+				if sample != s {
+					constant = false
+				}
+			}
+			if constant {
+				fmt.Println("constant method")
+				subframe.SubHeader.Pred = frame.PredConstant
+			}
+		}
 
 		// Encode FLAC frame.
 		channels, err := getChannels(nchannels)
