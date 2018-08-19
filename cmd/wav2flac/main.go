@@ -9,6 +9,8 @@ import (
 	"github.com/go-audio/audio"
 	"github.com/go-audio/wav"
 	"github.com/mewkiz/flac"
+	"github.com/mewkiz/flac/frame"
+	"github.com/mewkiz/flac/meta"
 	"github.com/mewkiz/pkg/osutil"
 	"github.com/mewkiz/pkg/pathutil"
 	"github.com/pkg/errors"
@@ -51,7 +53,31 @@ func wav2flac(wavPath string, force bool) error {
 	if err != nil {
 		return errors.WithStack(err)
 	}
-	enc, err := flac.NewEncoder(w, sampleRate, nchannels, bps)
+	info := &meta.StreamInfo{
+		// Minimum block size (in samples) used in the stream; between 16 and
+		// 65535 samples.
+		BlockSizeMin: 16, // adjusted by encoder.
+		// Maximum block size (in samples) used in the stream; between 16 and
+		// 65535 samples.
+		BlockSizeMax: 65535, // adjusted by encoder.
+		// Minimum frame size in bytes; a 0 value implies unknown.
+		//FrameSizeMin // set by encoder.
+		// Maximum frame size in bytes; a 0 value implies unknown.
+		//FrameSizeMax // set by encoder.
+		// Sample rate in Hz; between 1 and 655350 Hz.
+		SampleRate: uint32(sampleRate),
+		// Number of channels; between 1 and 8 channels.
+		NChannels: uint8(nchannels),
+		// Sample size in bits-per-sample; between 4 and 32 bits.
+		BitsPerSample: uint8(bps),
+		// Total number of inter-channel samples in the stream. One second of
+		// 44.1 KHz audio will have 44100 samples regardless of the number of
+		// channels. A 0 value implies unknown.
+		//NSamples // set by encoder.
+		// MD5 checksum of the unencoded audio data.
+		//MD5sum // set by encoder.
+	}
+	enc, err := flac.NewEncoder(w, info)
 	if err != nil {
 		return errors.WithStack(err)
 	}
@@ -73,11 +99,25 @@ func wav2flac(wavPath string, force bool) error {
 		SourceBitDepth: bps,
 	}
 
-	samples := make([][]int32, nchannels)
-	for i := range samples {
-		samples[i] = make([]int32, nsamplesPerChannel)
+	subframes := make([]*frame.Subframe, nchannels)
+	subHdr := frame.SubHeader{
+		// Specifies the prediction method used to encode the audio sample of the
+		// subframe.
+		Pred: frame.PredVerbatim,
+		// Prediction order used by fixed and FIR linear prediction decoding.
+		Order: 0,
+		// Wasted bits-per-sample.
+		Wasted: 0,
+	}
+	for i := range subframes {
+		subframe := &frame.Subframe{
+			SubHeader: subHdr,
+			Samples:   make([]int32, nsamplesPerChannel),
+		}
+		subframes[i] = subframe
 	}
 	for j := 0; !dec.EOF(); j++ {
+		// Decode WAV samples.
 		n, err := dec.PCMBuffer(buf)
 		if err != nil {
 			return errors.WithStack(err)
@@ -85,14 +125,85 @@ func wav2flac(wavPath string, force bool) error {
 		if n == 0 {
 			break
 		}
+		for _, subframe := range subframes {
+			subframe.NSamples = n / nchannels
+			subframe.Samples = subframe.Samples[:subframe.NSamples]
+		}
 		for i, sample := range buf.Data {
-			samples[i%nchannels][i/nchannels] = int32(sample)
+			subframe := subframes[i%nchannels]
+			subframe.Samples[i/nchannels] = int32(sample)
 		}
 		fmt.Println("j:", j)
-		//pretty.Println("samples:", samples)
-		if err := enc.Write(samples); err != nil {
+
+		// Encode FLAC frame.
+		channels, err := getChannels(nchannels)
+		if err != nil {
+			return errors.WithStack(err)
+		}
+		hdr := frame.Header{
+			// Specifies if the block size is fixed or variable.
+			HasFixedBlockSize: false,
+			// Block size in inter-channel samples, i.e. the number of audio samples
+			// in each subframe.
+			BlockSize: uint16(nsamplesPerChannel),
+			// Sample rate in Hz; a 0 value implies unknown, get sample rate from
+			// StreamInfo.
+			SampleRate: uint32(sampleRate),
+			// Specifies the number of channels (subframes) that exist in the frame,
+			// their order and possible inter-channel decorrelation.
+			Channels: channels,
+			// Sample size in bits-per-sample; a 0 value implies unknown, get sample
+			// size from StreamInfo.
+			BitsPerSample: uint8(bps),
+			// Specifies the frame number if the block size is fixed, and the first
+			// sample number in the frame otherwise. When using fixed block size, the
+			// first sample number in the frame can be derived by multiplying the
+			// frame number with the block size (in samples).
+			//Num // set by encoder.
+		}
+		f := &frame.Frame{
+			Header:    hdr,
+			Subframes: subframes,
+		}
+		if err := enc.WriteFrame(f); err != nil {
 			return errors.WithStack(err)
 		}
 	}
 	return nil
+}
+
+// getChannels returns the channels assignment matching the given number of
+// channels.
+func getChannels(nchannels int) (frame.Channels, error) {
+	switch nchannels {
+	case 1:
+		// 1 channel: mono.
+		return frame.ChannelsMono, nil
+	case 2:
+		// 2 channels: left, right.
+		return frame.ChannelsLR, nil
+		//return frame.ChannelsLeftSide, nil  // 2 channels: left, side; using inter-channel decorrelation.
+		//return frame.ChannelsSideRight, nil // 2 channels: side, right; using inter-channel decorrelation.
+		//return frame.ChannelsMidSide, nil   // 2 channels: mid, side; using inter-channel decorrelation.
+	case 3:
+		// 3 channels: left, right, center.
+		return frame.ChannelsLRC, nil
+	case 4:
+		// 4 channels: left, right, left surround, right surround.
+		return frame.ChannelsLRLsRs, nil
+	case 5:
+		// 5 channels: left, right, center, left surround, right surround.
+		return frame.ChannelsLRCLsRs, nil
+	case 6:
+		// 6 channels: left, right, center, LFE, left surround, right surround.
+		return frame.ChannelsLRCLfeLsRs, nil
+	case 7:
+		// 7 channels: left, right, center, LFE, center surround, side left, side right.
+		return frame.ChannelsLRCLfeCsSlSr, nil
+	case 8:
+		// 8 channels: left, right, center, LFE, left surround, right surround, side left, side right.
+		return frame.ChannelsLRCLfeLsRsSlSr, nil
+	default:
+		return 0, errors.Errorf("support for %d number of channels not yet implemented", nchannels)
+	}
 }

@@ -1,3 +1,5 @@
+//+build ignore
+
 package flac_test
 
 import (

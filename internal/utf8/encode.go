@@ -1,43 +1,17 @@
-// TODO: merge with frame/utf8.go, perhaps creating a internal/utf8 package.
-
-package flac
+package utf8
 
 import (
-	"github.com/icza/bitio"
+	"io"
+
+	"github.com/mewkiz/flac/internal/ioutilx"
 	"github.com/mewkiz/pkg/errutil"
 )
 
-const (
-	tx = 0x80 // 1000 0000
-	t2 = 0xC0 // 1100 0000
-	t3 = 0xE0 // 1110 0000
-	t4 = 0xF0 // 1111 0000
-	t5 = 0xF8 // 1111 1000
-	t6 = 0xFC // 1111 1100
-	t7 = 0xFE // 1111 1110
-	t8 = 0xFF // 1111 1111
-
-	maskx = 0x3F // 0011 1111
-	mask2 = 0x1F // 0001 1111
-	mask3 = 0x0F // 0000 1111
-	mask4 = 0x07 // 0000 0111
-	mask5 = 0x03 // 0000 0011
-	mask6 = 0x01 // 0000 0001
-
-	rune1Max = 1<<7 - 1
-	rune2Max = 1<<11 - 1
-	rune3Max = 1<<16 - 1
-	rune4Max = 1<<21 - 1
-	rune5Max = 1<<26 - 1
-	rune6Max = 1<<31 - 1
-	rune7Max = 1<<36 - 1
-)
-
-// encodeUTF8 encodes x as a "UTF-8" coded number.
-func encodeUTF8(bw bitio.Writer, x uint64) error {
+// Encode encodes x as a "UTF-8" coded number.
+func Encode(w io.Writer, x uint64) error {
 	// 1-byte, 7-bit sequence?
 	if x <= rune1Max {
-		if err := bw.WriteBits(x, 8); err != nil {
+		if err := ioutilx.WriteByte(w, byte(x)); err != nil {
 			return errutil.Err(err)
 		}
 		return nil
@@ -83,14 +57,14 @@ func encodeUTF8(bw bitio.Writer, x uint64) error {
 		bits = 0
 	}
 	// Store bits of c0.
-	if err := bw.WriteBits(bits, 8); err != nil {
+	if err := ioutilx.WriteByte(w, byte(bits)); err != nil {
 		return errutil.Err(err)
 	}
 
 	// Store continuation bytes.
 	for i := l - 1; i >= 0; i-- {
 		bits := uint64(tx | (x>>uint(6*i))&maskx)
-		if err := bw.WriteBits(bits, 8); err != nil {
+		if err := ioutilx.WriteByte(w, byte(bits)); err != nil {
 			return errutil.Err(err)
 		}
 	}

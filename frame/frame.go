@@ -37,6 +37,7 @@ import (
 	"github.com/mewkiz/flac/internal/hashutil"
 	"github.com/mewkiz/flac/internal/hashutil/crc16"
 	"github.com/mewkiz/flac/internal/hashutil/crc8"
+	"github.com/mewkiz/flac/internal/utf8"
 )
 
 // A Frame contains the header and subframes of an audio frame. It holds the
@@ -285,7 +286,7 @@ func (frame *Frame) parseHeader() error {
 	//    1-6 bytes: UTF-8 encoded frame number.
 	// else
 	//    1-7 bytes: UTF-8 encoded sample number.
-	frame.Num, err = decodeUTF8Int(hr)
+	frame.Num, err = utf8.Decode(hr)
 	if err != nil {
 		return unexpected(err)
 	}
