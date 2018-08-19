@@ -102,7 +102,7 @@ func encodeVerbatimSamples(bw bitio.Writer, hdr frame.Header, samples []int32) e
 		return errutil.Newf("block size and sample count mismatch; expected %d, got %d", hdr.BlockSize, len(samples))
 	}
 	for _, sample := range samples {
-		if err := bw.WriteBits(uint64(sample), byte(hdr.BitsPerSample)); err != nil {
+		if err := bw.WriteBits(uint64(sample), hdr.BitsPerSample); err != nil {
 			return errutil.Err(err)
 		}
 	}
