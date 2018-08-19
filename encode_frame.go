@@ -14,7 +14,8 @@ import (
 
 // --- [ Frame ] ---------------------------------------------------------------
 
-// WriteFrame encodes the given audio frame to the output stream.
+// WriteFrame encodes the given audio frame to the output stream. The Num field
+// of the frame header is calculated by the encoder.
 func (enc *Encoder) WriteFrame(f *frame.Frame) error {
 	// Sanity checks.
 	nchannels := int(enc.Info.NChannels)
