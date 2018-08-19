@@ -44,6 +44,18 @@ func (enc *Encoder) WriteFrame(f *frame.Frame) error {
 	} else {
 		enc.curNum += uint64(nsamplesPerChannel)
 	}
+	enc.nsamples += uint64(nsamplesPerChannel)
+	blockSize := uint16(nsamplesPerChannel)
+	if enc.blockSizeMin == 0 || blockSize < enc.blockSizeMin {
+		enc.blockSizeMin = blockSize
+	}
+	if enc.blockSizeMax == 0 || blockSize > enc.blockSizeMax {
+		enc.blockSizeMax = blockSize
+	}
+	// TODO: track number of bytes written to hw, to update values of
+	// frameSizeMin and frameSizeMax.
+	// Add unencoded audio samples to running MD5 hash.
+	f.Hash(enc.md5sum)
 	if err := enc.encodeFrameHeader(hw, f.Header); err != nil {
 		return errutil.Err(err)
 	}
