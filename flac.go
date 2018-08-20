@@ -4,6 +4,8 @@
 // reused in between calls to Next and ParseNext. This should reduce GC
 // pressure.
 
+// TODO: Remove note about encoder API.
+
 // Package flac provides access to FLAC (Free Lossless Audio Codec) streams.
 //
 // A brief introduction of the FLAC stream format [1] follows. Each FLAC stream
@@ -19,6 +21,9 @@
 //    [1]: https://www.xiph.org/flac/format.html#stream
 //    [2]: https://godoc.org/github.com/mewkiz/flac/meta
 //    [3]: https://godoc.org/github.com/mewkiz/flac/frame
+//
+// Note: the Encoder API is experimental until the 1.1.x release. As such, it's
+// API is expected to change.
 package flac
 
 import (
