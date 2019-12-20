@@ -22,6 +22,14 @@ Documentation provided by GoDoc.
 
 ## Changes
 
+* Version 1.0.6 (2019-12-20)
+    - Add experimental Encoder API to encode audio samples and metadata blocks (see [#32](https://github.com/mewkiz/flac/pull/32)).
+    - Use go.mod.
+    - Skip ID3v2 data prepended to flac files when parsing (see [36cc17e](https://github.com/mewkiz/flac/commit/36cc17efed51a9bae283d6a3a7a10997492945e7)).
+        - Remove dependency on encodebytes. Thanks to [Mikey Dickerson](https://github.com/mdickers47).
+    - Add 16kHz test case. Thanks to [Chewxy](https://github.com/chewxy).
+    - Fix lint issues (see [#25](https://github.com/mewkiz/flac/issues/25)).
+
 * Version 1.0.5 (2016-05-06)
     - Simplify import paths. Drop use of gopkg.in, and rely on vendoring instead (see [azul3d/engine#1](https://github.com/azul3d/engine/issues/1)).
     - Add FLAC decoding benchmark (see [d675e0a](https://github.com/mewkiz/flac/blob/d675e0aaccf2e43055f56b9b3feeddfdeed402e2/frame/frame_test.go#L60))
