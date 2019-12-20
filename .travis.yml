@@ -1,31 +1,26 @@
 language: go
+
 go:
-  - stable
+  - "1.12"
+  - tip
 
 notifications:
   email: false
 
 env:
   global:
+    # Coveralls.io token.
     - secure: "JtfIj2ItU0o6/wxnwaCULmPnWO1fQHrX3hGbWey56hPzybA3pQEs5YOZt16nQU5GS8p3Z3OIILUP4LGebqsLU5dyWA/GxnZv45MoZ8TS8lB7aie7l5Y6yYvq0ZBJoMWxXSY6sZJ1sKJG1F7NlQoknZToxvlkfF4nP9N5RQpL8iU="
-    - PATH=$HOME/gopath/bin:$PATH
-
-before_install:
-  - go get -u golang.org/x/tools/cmd/cover
-  - go get -u golang.org/x/tools/cmd/goimports
-  - go get -u github.com/golang/lint/golint
-  - go get -u github.com/mattn/goveralls
-  - go get -u github.com/golangci/golangci-lint/cmd/golangci-lint
 
 install:
-  - go get ./...
+  - go get -t ./...
 
 before_script:
-  - wget https://gist.github.com/mewmew/379014c9a2e6885e238d/raw/goclean.sh
-  - chmod +x goclean.sh
+  - wget https://github.com/mewmew/ci/raw/master/get_tools.sh
+  - chmod +x get_tools.sh
+  - ./get_tools.sh
+  - wget https://github.com/mewmew/ci/raw/master/ci_checks.sh
+  - chmod +x ci_checks.sh
 
 script:
-  - ./goclean.sh
-  - golangci-lint run --enable-all --disable maligned,lll,dupl --exclude "(G501:|G401:|Error return value of .md5sum\.Write. is not checked)"
-
-# skip G501: Import blacklist: crypto/md5
+  - ./ci_checks.sh
