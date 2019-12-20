@@ -10,7 +10,7 @@ import (
 // --- [ Subframe ] ------------------------------------------------------------
 
 // encodeSubframe encodes the given subframe, writing to bw.
-func encodeSubframe(bw bitio.Writer, hdr frame.Header, subframe *frame.Subframe) error {
+func encodeSubframe(bw *bitio.Writer, hdr frame.Header, subframe *frame.Subframe) error {
 	// Encode subframe header.
 	if err := encodeSubframeHeader(bw, subframe.SubHeader); err != nil {
 		return errutil.Err(err)
@@ -43,7 +43,7 @@ func encodeSubframe(bw bitio.Writer, hdr frame.Header, subframe *frame.Subframe)
 // --- [ Subframe header ] -----------------------------------------------------
 
 // encodeSubframeHeader encodes the given subframe header, writing to bw.
-func encodeSubframeHeader(bw bitio.Writer, hdr frame.SubHeader) error {
+func encodeSubframeHeader(bw *bitio.Writer, hdr frame.SubHeader) error {
 	// Zero bit padding, to prevent sync-fooling string of 1s.
 	if err := bw.WriteBits(0x0, 1); err != nil {
 		return errutil.Err(err)
@@ -95,7 +95,7 @@ func encodeSubframeHeader(bw bitio.Writer, hdr frame.SubHeader) error {
 // --- [ Constant samples ] ----------------------------------------------------
 
 // encodeConstantSamples stores the given constant sample, writing to bw.
-func encodeConstantSamples(bw bitio.Writer, bps byte, samples []int32) error {
+func encodeConstantSamples(bw *bitio.Writer, bps byte, samples []int32) error {
 	sample := samples[0]
 	for _, s := range samples[1:] {
 		if sample != s {
@@ -113,7 +113,7 @@ func encodeConstantSamples(bw bitio.Writer, bps byte, samples []int32) error {
 
 // encodeVerbatimSamples stores the given samples verbatim (uncompressed),
 // writing to bw.
-func encodeVerbatimSamples(bw bitio.Writer, hdr frame.Header, samples []int32) error {
+func encodeVerbatimSamples(bw *bitio.Writer, hdr frame.Header, samples []int32) error {
 	// Unencoded subblock; n = frame's bits-per-sample, i = frame's blocksize.
 	if int(hdr.BlockSize) != len(samples) {
 		return errutil.Newf("block size and sample count mismatch; expected %d, got %d", hdr.BlockSize, len(samples))

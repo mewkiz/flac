@@ -187,7 +187,7 @@ func (enc *Encoder) encodeFrameHeader(w io.Writer, hdr frame.Header) error {
 // encodeFrameHeaderBlockSize encodes the block size of the frame header,
 // writing to bw. It returns the number of bits used to store block size after
 // the frame header.
-func encodeFrameHeaderBlockSize(bw bitio.Writer, blockSize uint16) (nblockSizeSuffixBits byte, err error) {
+func encodeFrameHeaderBlockSize(bw *bitio.Writer, blockSize uint16) (nblockSizeSuffixBits byte, err error) {
 	// Block size in inter-channel samples:
 	//    0000 : reserved
 	//    0001 : 192 samples
@@ -228,7 +228,7 @@ func encodeFrameHeaderBlockSize(bw bitio.Writer, blockSize uint16) (nblockSizeSu
 // encodeFrameHeaderSampleRate encodes the sample rate of the frame header,
 // writing to bw. It returns the bits and the number of bits used to store
 // sample rate after the frame header.
-func encodeFrameHeaderSampleRate(bw bitio.Writer, sampleRate uint32) (sampleRateSuffixBits uint64, nsampleRateSuffixBits byte, err error) {
+func encodeFrameHeaderSampleRate(bw *bitio.Writer, sampleRate uint32) (sampleRateSuffixBits uint64, nsampleRateSuffixBits byte, err error) {
 	// Sample rate:
 	//    0000 : get from STREAMINFO metadata block
 	//    0001 : 88.2kHz
@@ -315,7 +315,7 @@ func encodeFrameHeaderSampleRate(bw bitio.Writer, sampleRate uint32) (sampleRate
 
 // encodeFrameHeaderChannels encodes the channels assignment of the frame
 // header, writing to bw.
-func encodeFrameHeaderChannels(bw bitio.Writer, channels frame.Channels) error {
+func encodeFrameHeaderChannels(bw *bitio.Writer, channels frame.Channels) error {
 	// Channel assignment.
 	//    0000-0111 : (number of independent channels)-1. Where defined, the channel order follows SMPTE/ITU-R recommendations. The assignments are as follows:
 	//        1 channel: mono
@@ -367,7 +367,7 @@ func encodeFrameHeaderChannels(bw bitio.Writer, channels frame.Channels) error {
 
 // encodeFrameHeaderBitsPerSample encodes the bits-per-sample of the frame
 // header, writing to bw.
-func encodeFrameHeaderBitsPerSample(bw bitio.Writer, bps uint8) error {
+func encodeFrameHeaderBitsPerSample(bw *bitio.Writer, bps uint8) error {
 	// Sample size in bits:
 	//    000 : get from STREAMINFO metadata block
 	//    001 : 8 bits per sample

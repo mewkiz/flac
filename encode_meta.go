@@ -14,7 +14,7 @@ import (
 // --- [ Metadata block ] ------------------------------------------------------
 
 // encodeBlock encodes the metadata block, writing to bw.
-func encodeBlock(bw bitio.Writer, body interface{}, last bool) error {
+func encodeBlock(bw *bitio.Writer, body interface{}, last bool) error {
 	switch body := body.(type) {
 	case *meta.StreamInfo:
 		return encodeStreamInfo(bw, body, last)
@@ -36,7 +36,7 @@ func encodeBlock(bw bitio.Writer, body interface{}, last bool) error {
 // --- [ Metadata block header ] -----------------------------------------------
 
 // encodeBlockHeader encodes the metadata block header, writing to bw.
-func encodeBlockHeader(bw bitio.Writer, hdr *meta.Header) error {
+func encodeBlockHeader(bw *bitio.Writer, hdr *meta.Header) error {
 	// 1 bit: IsLast.
 	if err := bw.WriteBool(hdr.IsLast); err != nil {
 		return errutil.Err(err)
@@ -55,7 +55,7 @@ func encodeBlockHeader(bw bitio.Writer, hdr *meta.Header) error {
 // --- [ StreamInfo ] ----------------------------------------------------------
 
 // encodeStreamInfo encodes the StreamInfo metadata block, writing to bw.
-func encodeStreamInfo(bw bitio.Writer, info *meta.StreamInfo, last bool) error {
+func encodeStreamInfo(bw *bitio.Writer, info *meta.StreamInfo, last bool) error {
 	// Store metadata block header.
 	const nbits = 16 + 16 + 24 + 24 + 20 + 3 + 5 + 36 + 8*16
 	hdr := &meta.Header{
@@ -110,7 +110,7 @@ func encodeStreamInfo(bw bitio.Writer, info *meta.StreamInfo, last bool) error {
 // --- [ Application ] ---------------------------------------------------------
 
 // encodeApplication encodes the Application metadata block, writing to bw.
-func encodeApplication(bw bitio.Writer, app *meta.Application, last bool) error {
+func encodeApplication(bw *bitio.Writer, app *meta.Application, last bool) error {
 	// Store metadata block header.
 	nbits := int64(32 + 8*len(app.Data))
 	hdr := &meta.Header{
@@ -137,7 +137,7 @@ func encodeApplication(bw bitio.Writer, app *meta.Application, last bool) error 
 // --- [ SeekTable ] -----------------------------------------------------------
 
 // encodeSeekTable encodes the SeekTable metadata block, writing to bw.
-func encodeSeekTable(bw bitio.Writer, table *meta.SeekTable, last bool) error {
+func encodeSeekTable(bw *bitio.Writer, table *meta.SeekTable, last bool) error {
 	// Store metadata block header.
 	nbits := int64((64 + 64 + 16) * len(table.Points))
 	hdr := &meta.Header{
@@ -161,7 +161,7 @@ func encodeSeekTable(bw bitio.Writer, table *meta.SeekTable, last bool) error {
 // --- [ VorbisComment ] -------------------------------------------------------
 
 // encodeVorbisComment encodes the VorbisComment metadata block, writing to bw.
-func encodeVorbisComment(bw bitio.Writer, comment *meta.VorbisComment, last bool) error {
+func encodeVorbisComment(bw *bitio.Writer, comment *meta.VorbisComment, last bool) error {
 	// Store metadata block header.
 	nbits := int64(32 + 8*len(comment.Vendor) + 32)
 	for _, tag := range comment.Tags {
@@ -211,7 +211,7 @@ func encodeVorbisComment(bw bitio.Writer, comment *meta.VorbisComment, last bool
 // --- [ CueSheet ] ------------------------------------------------------------
 
 // encodeCueSheet encodes the CueSheet metadata block, writing to bw.
-func encodeCueSheet(bw bitio.Writer, cs *meta.CueSheet, last bool) error {
+func encodeCueSheet(bw *bitio.Writer, cs *meta.CueSheet, last bool) error {
 	// Store metadata block header.
 	nbits := int64(8*128 + 64 + 1 + 7 + 8*258 + 8)
 	for _, track := range cs.Tracks {
@@ -315,7 +315,7 @@ func encodeCueSheet(bw bitio.Writer, cs *meta.CueSheet, last bool) error {
 // --- [ Picture ] -------------------------------------------------------------
 
 // encodePicture encodes the Picture metadata block, writing to bw.
-func encodePicture(bw bitio.Writer, pic *meta.Picture, last bool) error {
+func encodePicture(bw *bitio.Writer, pic *meta.Picture, last bool) error {
 	// Store metadata block header.
 	nbits := int64(32 + 32 + 8*len(pic.MIME) + 32 + 8*len(pic.Desc) + 32 + 32 + 32 + 32 + 32 + 8*len(pic.Data))
 	hdr := &meta.Header{
