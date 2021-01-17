@@ -275,7 +275,8 @@ func (stream *Stream) ParseNext() (f *frame.Frame, err error) {
 	return frame.Parse(stream.r)
 }
 
-// Seek is not implement yet.
+// Seek to offset where offset represents the sample number in the flac file
+// TODO: support io.SeekCurrent and io.SeekEnd
 func (stream *Stream) Seek(offset int64, whence int) (read int64, err error) {
 	if stream.seekTable == nil {
 		return 0, nil
@@ -320,7 +321,7 @@ func (stream *Stream) makeSeekTable() (err error) {
 		points = append(points, meta.SeekPoint{
 			SampleNum: f.Num * uint64(f.BlockSize),
 			Offset:    uint64(o - stream.start),
-			NSamples:  f.BlockSize,
+			NSamples:  f.BlockSize * uint16(len(f.Subframes)),
 		})
 	}
 
