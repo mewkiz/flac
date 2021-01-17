@@ -31,7 +31,6 @@ import (
 	"bytes"
 	"fmt"
 	"io"
-	"log"
 	"os"
 
 	"github.com/mewkiz/flac/frame"
@@ -291,19 +290,19 @@ func (stream *Stream) Seek(offset int64, whence int) (read int64, err error) {
 	}
 
 	r := stream.r.(io.ReadSeeker)
-	return r.Seek(stream.start+int64(pos.Offset), whence)
+	_, err = r.Seek(stream.start+int64(pos.Offset), whence)
+	return int64(pos.SampleNum), err
 }
 
 func (stream *Stream) makeSeekTable() (err error) {
-	log.Printf("make seek table")
-
 	r := stream.r.(io.ReadSeeker)
 
+	var i int
+	var sampleNum uint64
 	var points []meta.SeekPoint
 	// TODO:  make a sane number of seek points
 	for {
 		f, err := stream.ParseNext()
-		log.Printf("frame: %+v, err: %v", f, err)
 
 		if err == io.EOF {
 			break
@@ -318,11 +317,15 @@ func (stream *Stream) makeSeekTable() (err error) {
 			return err
 		}
 
-		points = append(points, meta.SeekPoint{
-			SampleNum: f.Num * uint64(f.BlockSize),
-			Offset:    uint64(o - stream.start),
-			NSamples:  f.BlockSize * uint16(len(f.Subframes)),
-		})
+		nSamples := f.BlockSize
+		if i%10 == 0 {
+			points = append(points, meta.SeekPoint{
+				SampleNum: sampleNum,
+				Offset:    uint64(o - stream.start),
+				NSamples:  nSamples,
+			})
+		}
+		sampleNum += uint64(nSamples)
 	}
 
 	stream.seekTable = &meta.SeekTable{Points: points}
