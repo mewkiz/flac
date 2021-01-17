@@ -181,7 +181,7 @@ func (stream *Stream) skipID3v2() error {
 //
 // Call Stream.Next to parse the frame header of the next audio frame, and call
 // Stream.ParseNext to parse the entire next frame including audio samples.
-func Parse(r io.ReadSeeker) (stream *Stream, err error) {
+func Parse(r io.Reader) (stream *Stream, err error) {
 	// Verify FLAC signature and parse the StreamInfo metadata block.
 	stream = &Stream{r: r}
 	block, err := stream.parseStreamInfo()
