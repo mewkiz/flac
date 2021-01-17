@@ -50,7 +50,8 @@ type Stream struct {
 	// Underlying io.Reader.
 
 	seekTable *meta.SeekTable
-	start     int64
+	// offset where the music data begins since SeekTable.Offset seems to be relative to this position
+	start int64
 
 	r io.Reader
 	// Underlying io.Closer of file if opened with Open and ParseFile, and nil
@@ -300,7 +301,6 @@ func (stream *Stream) makeSeekTable() (err error) {
 	var i int
 	var sampleNum uint64
 	var points []meta.SeekPoint
-	// TODO:  make a sane number of seek points
 	for {
 		f, err := stream.ParseNext()
 
@@ -312,20 +312,20 @@ func (stream *Stream) makeSeekTable() (err error) {
 			return err
 		}
 
-		o, err := r.Seek(0, io.SeekCurrent)
-		if err != nil {
-			return err
-		}
-
-		nSamples := f.BlockSize
 		if i%10 == 0 {
+			o, err := r.Seek(0, io.SeekCurrent)
+			if err != nil {
+				return err
+			}
+
 			points = append(points, meta.SeekPoint{
 				SampleNum: sampleNum,
 				Offset:    uint64(o - stream.start),
-				NSamples:  nSamples,
+				NSamples:  f.BlockSize,
 			})
 		}
-		sampleNum += uint64(nSamples)
+		sampleNum += uint64(f.BlockSize)
+		i++
 	}
 
 	stream.seekTable = &meta.SeekTable{Points: points}
