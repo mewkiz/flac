@@ -31,6 +31,7 @@ import (
 	"bytes"
 	"fmt"
 	"io"
+	"log"
 	"os"
 
 	"github.com/mewkiz/flac/frame"
@@ -48,6 +49,10 @@ type Stream struct {
 	// Zero or more metadata blocks.
 	Blocks []*meta.Block
 	// Underlying io.Reader.
+
+	seekTable *meta.SeekTable
+	start     int64
+
 	r io.Reader
 	// Underlying io.Closer of file if opened with Open and ParseFile, and nil
 	// otherwise.
@@ -62,23 +67,42 @@ type Stream struct {
 // Stream.ParseNext to parse the entire next frame including audio samples.
 func New(r io.Reader) (stream *Stream, err error) {
 	// Verify FLAC signature and parse the StreamInfo metadata block.
-	br := bufio.NewReader(r)
-	stream = &Stream{r: br}
-	isLast, err := stream.parseStreamInfo()
+	//br := bufio.NewReader(r)
+	stream = &Stream{r: r}
+	block, err := stream.parseStreamInfo()
 	if err != nil {
 		return nil, err
 	}
 
-	// Skip the remaining metadata blocks.
-	for !isLast {
-		block, err := meta.New(br)
+	rs, seeker := r.(io.ReadSeeker)
+
+	// Parse the remaining metadata blocks.
+	for !block.IsLast {
+		block, err = meta.New(r)
 		if err != nil && err != meta.ErrReservedType {
 			return stream, err
 		}
-		if err = block.Skip(); err != nil {
-			return stream, err
+
+		if seeker {
+			if err = block.Parse(); err != nil {
+				return stream, err
+			}
+			if seeker && block.Header.Type == meta.TypeSeekTable {
+				stream.seekTable = block.Body.(*meta.SeekTable)
+			}
+		} else {
+			if err = block.Skip(); err != nil {
+				return stream, err
+			}
 		}
-		isLast = block.IsLast
+	}
+
+	if rs != nil {
+		stream.start, _ = rs.Seek(0, io.SeekCurrent)
+	}
+
+	if seeker && stream.seekTable == nil {
+		return stream, stream.makeSeekTable()
 	}
 
 	return stream, nil
@@ -94,41 +118,41 @@ var id3Signature = []byte("ID3")
 // stream, and parses the StreamInfo metadata block. It returns a boolean value
 // which specifies if the StreamInfo block was the last metadata block of the
 // FLAC stream.
-func (stream *Stream) parseStreamInfo() (isLast bool, err error) {
+func (stream *Stream) parseStreamInfo() (block *meta.Block, err error) {
 	// Verify FLAC signature.
 	r := stream.r
 	var buf [4]byte
 	if _, err = io.ReadFull(r, buf[:]); err != nil {
-		return false, err
+		return block, err
 	}
 
 	// Skip prepended ID3v2 data.
 	if bytes.Equal(buf[:3], id3Signature) {
 		if err := stream.skipID3v2(); err != nil {
-			return false, err
+			return block, err
 		}
 
 		// Second attempt at verifying signature.
 		if _, err = io.ReadFull(r, buf[:]); err != nil {
-			return false, err
+			return block, err
 		}
 	}
 
 	if !bytes.Equal(buf[:], flacSignature) {
-		return false, fmt.Errorf("flac.parseStreamInfo: invalid FLAC signature; expected %q, got %q", flacSignature, buf)
+		return block, fmt.Errorf("flac.parseStreamInfo: invalid FLAC signature; expected %q, got %q", flacSignature, buf)
 	}
 
 	// Parse StreamInfo metadata block.
-	block, err := meta.Parse(r)
+	block, err = meta.Parse(r)
 	if err != nil {
-		return false, err
+		return block, err
 	}
 	si, ok := block.Body.(*meta.StreamInfo)
 	if !ok {
-		return false, fmt.Errorf("flac.parseStreamInfo: incorrect type of first metadata block; expected *meta.StreamInfo, got %T", si)
+		return block, fmt.Errorf("flac.parseStreamInfo: incorrect type of first metadata block; expected *meta.StreamInfo, got %T", si)
 	}
 	stream.Info = si
-	return block.IsLast, nil
+	return block, nil
 }
 
 // skipID3v2 skips ID3v2 data prepended to flac files.
@@ -157,18 +181,17 @@ func (stream *Stream) skipID3v2() error {
 //
 // Call Stream.Next to parse the frame header of the next audio frame, and call
 // Stream.ParseNext to parse the entire next frame including audio samples.
-func Parse(r io.Reader) (stream *Stream, err error) {
+func Parse(r io.ReadSeeker) (stream *Stream, err error) {
 	// Verify FLAC signature and parse the StreamInfo metadata block.
-	br := bufio.NewReader(r)
-	stream = &Stream{r: br}
-	isLast, err := stream.parseStreamInfo()
+	stream = &Stream{r: r}
+	block, err := stream.parseStreamInfo()
 	if err != nil {
 		return nil, err
 	}
 
 	// Parse the remaining metadata blocks.
-	for !isLast {
-		block, err := meta.Parse(br)
+	for !block.IsLast {
+		block, err = meta.Parse(r)
 		if err != nil {
 			if err != meta.ErrReservedType {
 				return stream, err
@@ -182,7 +205,6 @@ func Parse(r io.Reader) (stream *Stream, err error) {
 			}
 		}
 		stream.Blocks = append(stream.Blocks, block)
-		isLast = block.IsLast
 	}
 
 	return stream, nil
@@ -255,5 +277,55 @@ func (stream *Stream) ParseNext() (f *frame.Frame, err error) {
 
 // Seek is not implement yet.
 func (stream *Stream) Seek(offset int64, whence int) (read int64, err error) {
-	return 0, nil
+	if stream.seekTable == nil {
+		return 0, nil
+	}
+
+	var pos meta.SeekPoint
+	for _, p := range stream.seekTable.Points {
+		if p.SampleNum >= uint64(offset) {
+			pos = p
+			break
+		}
+	}
+
+	r := stream.r.(io.ReadSeeker)
+	return r.Seek(stream.start+int64(pos.Offset), whence)
+}
+
+func (stream *Stream) makeSeekTable() (err error) {
+	log.Printf("make seek table")
+
+	r := stream.r.(io.ReadSeeker)
+
+	var points []meta.SeekPoint
+	// TODO:  make a sane number of seek points
+	for {
+		f, err := stream.ParseNext()
+		log.Printf("frame: %+v, err: %v", f, err)
+
+		if err == io.EOF {
+			break
+		}
+
+		if err != nil {
+			return err
+		}
+
+		o, err := r.Seek(0, io.SeekCurrent)
+		if err != nil {
+			return err
+		}
+
+		points = append(points, meta.SeekPoint{
+			SampleNum: f.Num * uint64(f.BlockSize),
+			Offset:    uint64(o - stream.start),
+			NSamples:  f.BlockSize,
+		})
+	}
+
+	stream.seekTable = &meta.SeekTable{Points: points}
+
+	_, err = r.Seek(stream.start, io.SeekStart)
+	return err
 }
