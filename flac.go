@@ -305,6 +305,8 @@ func (stream *Stream) Seek(sample int64, whence int) (read int64, err error) {
 		point = stream.searchFromCurrent(sample, o)
 	case io.SeekEnd:
 		point = stream.searchFromEnd(sample)
+	default:
+		return 0, fmt.Errorf("invalid whence %d, must one of %d, %d or %d", whence, io.SeekStart, io.SeekCurrent, io.SeekEnd)
 	}
 
 	_, err = r.Seek(stream.start+int64(point.Offset), io.SeekStart)
