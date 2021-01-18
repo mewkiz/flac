@@ -98,7 +98,10 @@ func New(r io.Reader) (stream *Stream, err error) {
 	}
 
 	if seeker {
-		stream.start, _ = rs.Seek(0, io.SeekCurrent)
+		stream.start, err = rs.Seek(0, io.SeekCurrent)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	if seeker && stream.seekTable == nil {
