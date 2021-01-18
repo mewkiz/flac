@@ -97,7 +97,7 @@ func New(r io.Reader) (stream *Stream, err error) {
 		}
 	}
 
-	if rs != nil {
+	if seeker {
 		stream.start, _ = rs.Seek(0, io.SeekCurrent)
 	}
 
@@ -276,23 +276,59 @@ func (stream *Stream) ParseNext() (f *frame.Frame, err error) {
 }
 
 // Seek to offset where offset represents the sample number in the flac file
-// TODO: support io.SeekCurrent and io.SeekEnd
-func (stream *Stream) Seek(offset int64, whence int) (read int64, err error) {
+//
+// TODO: return an error if sample is invalid?  Do nothing?
+//
+// sample could be invalid if:
+// whence == io.SeekEnd && sample is not negative
+// whence == io.SeekStart && sample is negative
+// whence == io.SeekCurrent and sample + current sample < 0 or > stream.Info.NSamples
+func (stream *Stream) Seek(sample int64, whence int) (read int64, err error) {
 	if stream.seekTable == nil {
 		return 0, nil
 	}
 
-	var pos meta.SeekPoint
-	for _, p := range stream.seekTable.Points {
-		if p.SampleNum >= uint64(offset) {
-			pos = p
-			break
+	r := stream.r.(io.ReadSeeker)
+
+	var point meta.SeekPoint
+	switch whence {
+	case io.SeekStart:
+		point = stream.searchFromStart(sample)
+	case io.SeekCurrent:
+		o, err := r.Seek(0, io.SeekCurrent)
+		if err != nil {
+			return 0, err
 		}
+		point = stream.searchFromCurrent(sample, o)
+	case io.SeekEnd:
+		point = stream.searchFromEnd(sample)
 	}
 
-	r := stream.r.(io.ReadSeeker)
-	_, err = r.Seek(stream.start+int64(pos.Offset), whence)
-	return int64(pos.SampleNum), err
+	_, err = r.Seek(stream.start+int64(point.Offset), io.SeekStart)
+	return int64(point.SampleNum), err
+}
+
+func (stream *Stream) searchFromCurrent(sample, offset int64) (p meta.SeekPoint) {
+	for _, sp := range stream.seekTable.Points {
+		if int64(sp.Offset) >= offset {
+			return stream.searchFromStart(int64(sp.SampleNum) + sample)
+		}
+	}
+	return p
+}
+
+func (stream *Stream) searchFromEnd(sample int64) (p meta.SeekPoint) {
+	p = stream.seekTable.Points[len(stream.seekTable.Points)-1]
+	return stream.searchFromStart(int64(p.SampleNum) + sample)
+}
+
+func (stream *Stream) searchFromStart(sample int64) (p meta.SeekPoint) {
+	for _, p = range stream.seekTable.Points {
+		if p.SampleNum >= uint64(sample) {
+			return p
+		}
+	}
+	return p
 }
 
 func (stream *Stream) makeSeekTable() (err error) {
@@ -303,7 +339,6 @@ func (stream *Stream) makeSeekTable() (err error) {
 	var points []meta.SeekPoint
 	for {
 		f, err := stream.ParseNext()
-
 		if err == io.EOF {
 			break
 		}
@@ -324,6 +359,7 @@ func (stream *Stream) makeSeekTable() (err error) {
 				NSamples:  f.BlockSize,
 			})
 		}
+
 		sampleNum += uint64(f.BlockSize)
 		i++
 	}
