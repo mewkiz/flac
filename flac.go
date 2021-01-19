@@ -299,7 +299,7 @@ func (stream *Stream) ParseNext() (f *frame.Frame, err error) {
 	return frame.Parse(stream.r)
 }
 
-// Seek to offset where offset represents the sample number in the flac file.
+// Seek to a specific sample number in the flac stream.
 //
 // TODO: return an error if sample is invalid?  Do nothing?
 //
