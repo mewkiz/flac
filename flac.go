@@ -340,9 +340,9 @@ func (stream *Stream) Seek(sample int64, whence int) (read int64, err error) {
 }
 
 func (stream *Stream) searchFromCurrent(sample, offset int64) (p meta.SeekPoint) {
-	for _, sp := range stream.seekTable.Points {
-		if int64(sp.Offset) >= offset {
-			return stream.searchFromStart(int64(sp.SampleNum) + sample)
+	for _, p = range stream.seekTable.Points {
+		if int64(p.Offset) >= offset {
+			return stream.searchFromStart(int64(p.SampleNum) + sample)
 		}
 	}
 	return p
