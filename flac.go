@@ -203,6 +203,8 @@ func Parse(r io.Reader) (stream *Stream, err error) {
 		return nil, err
 	}
 
+	_, seeker := r.(io.ReadSeeker)
+
 	// Parse the remaining metadata blocks.
 	for !block.IsLast {
 		block, err = meta.Parse(r)
@@ -217,6 +219,10 @@ func Parse(r io.Reader) (stream *Stream, err error) {
 			if err = block.Skip(); err != nil {
 				return stream, err
 			}
+		}
+
+		if seeker && block.Header.Type == meta.TypeSeekTable {
+			stream.seekTable = block.Body.(*meta.SeekTable)
 		}
 		stream.Blocks = append(stream.Blocks, block)
 	}
