@@ -349,8 +349,7 @@ func (stream *Stream) searchFromCurrent(sample, offset int64) (p meta.SeekPoint)
 }
 
 func (stream *Stream) searchFromEnd(sample int64) (p meta.SeekPoint) {
-	p = stream.seekTable.Points[len(stream.seekTable.Points)-1]
-	return stream.searchFromStart(int64(p.SampleNum) + sample)
+	return stream.searchFromStart(int64(stream.Info.NSamples) + sample)
 }
 
 func (stream *Stream) searchFromStart(sample int64) (p meta.SeekPoint) {
