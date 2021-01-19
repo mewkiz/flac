@@ -48,12 +48,13 @@ type Stream struct {
 	Info *meta.StreamInfo
 	// Zero or more metadata blocks.
 	Blocks []*meta.Block
-	// Underlying io.Reader.
 
+	// seekTable contains one or more pre-calculated audio frame seek points of the stream; nil if uninitialized.
 	seekTable *meta.SeekTable
 	// Offset where the music data begins since SeekTable.Offset seems to be relative to this position.
 	dataStart int64
 
+	// Underlying io.Reader.
 	r io.Reader
 	// Underlying io.Closer of file if opened with Open and ParseFile, and nil
 	// otherwise.
