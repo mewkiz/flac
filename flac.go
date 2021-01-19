@@ -114,10 +114,6 @@ func New(r io.Reader) (stream *Stream, err error) {
 	return stream, nil
 }
 
-// func EnsureSeekTable(stream *Stream) error {
-// 	rs, seeker := stream.r.(io.ReadSeeker)
-// }
-
 var (
 	// flacSignature marks the beginning of a FLAC stream.
 	flacSignature = []byte("fLaC")
