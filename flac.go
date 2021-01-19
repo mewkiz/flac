@@ -345,6 +345,8 @@ func (stream *Stream) searchFromCurrent(sample, offset int64) (p meta.SeekPoint)
 	return p
 }
 
+// searchFromEnd expects sample to be negative.
+// If it is positive, it's ok, the last seek point will be returned.
 func (stream *Stream) searchFromEnd(sample int64) (p meta.SeekPoint) {
 	return stream.searchFromStart(int64(stream.Info.NSamples) + sample)
 }
