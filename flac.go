@@ -197,13 +197,20 @@ func (stream *Stream) skipID3v2() error {
 // Stream.ParseNext to parse the entire next frame including audio samples.
 func Parse(r io.Reader) (stream *Stream, err error) {
 	// Verify FLAC signature and parse the StreamInfo metadata block.
-	stream = &Stream{r: r}
+	stream = &Stream{}
+
+	_, seeker := r.(io.ReadSeeker)
+
+	if seeker {
+		stream.r = r
+	} else {
+		stream.r = bufio.NewReader(r)
+	}
+
 	block, err := stream.parseStreamInfo()
 	if err != nil {
 		return nil, err
 	}
-
-	_, seeker := r.(io.ReadSeeker)
 
 	// Parse the remaining metadata blocks.
 	for !block.IsLast {
