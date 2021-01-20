@@ -90,10 +90,11 @@ func TestDecode(t *testing.T) {
 	for _, path := range paths {
 		for k, opt := range opts {
 			t.Run(fmt.Sprintf("%s/%s", k, path), func(t *testing.T) {
-				_, err := flac.Open(path, opt)
+				s, err := flac.Open(path, opt)
 				if err != nil {
 					t.Fatal(err)
 				}
+				s.Close()
 			})
 		}
 	}
