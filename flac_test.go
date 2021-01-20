@@ -19,12 +19,39 @@ func TestSkipping(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	pos, err := stream.Seek(400000, io.SeekStart)
+	pos, err := stream.Seek(0, io.SeekStart)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if pos != 0 {
+		t.Fatalf("pos %d does not equal %d", pos, 0)
+	}
+
+	pos, err = stream.Seek(400000, io.SeekStart)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	if pos != 438272 {
 		t.Fatalf("pos %d does not equal %d", pos, 438272)
+	}
+
+	pos, err = stream.Seek(0, io.SeekStart)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if pos != 0 {
+		t.Fatalf("pos %d does not equal %d", pos, 0)
+	}
+
+	pos, err = stream.Seek(0, io.SeekEnd)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if pos != 8818688 {
+		t.Fatalf("pos %d does not equal %d", pos, 8818688)
 	}
 }
