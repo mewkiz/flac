@@ -156,7 +156,7 @@ func EnableSeek(stream *Stream, r io.Reader) error {
 	return err
 }
 
-func SeekTableResolution(i int) Option {
+func SeekTableSize(i int) Option {
 	return func(stream *Stream, r io.Reader) error {
 		stream.seekTableSize = i
 		return nil
