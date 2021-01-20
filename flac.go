@@ -246,7 +246,8 @@ func Parse(r io.Reader) (stream *Stream, err error) {
 	// Verify FLAC signature and parse the StreamInfo metadata block.
 	stream = &Stream{}
 
-	_, seeker := r.(io.ReadSeeker)
+	//_, seeker := r.(io.ReadSeeker)
+	seeker := false
 
 	if seeker {
 		stream.r = r
@@ -255,13 +256,17 @@ func Parse(r io.Reader) (stream *Stream, err error) {
 	}
 
 	block, err := stream.parseStreamInfo()
+	fmt.Println(block, err)
 	if err != nil {
 		return nil, err
 	}
 
+	stream.Blocks = append(stream.Blocks, block)
+
 	// Parse the remaining metadata blocks.
 	for !block.IsLast {
-		block, err = meta.Parse(r)
+		block, err = meta.Parse(stream.r)
+		fmt.Println(block, err)
 		if err != nil {
 			if err != meta.ErrReservedType {
 				return stream, err
