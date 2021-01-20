@@ -12,7 +12,7 @@ import (
 
 func ExampleParseFile() {
 	// Parse metadata of love.flac
-	stream, err := flac.ParseFile("testdata/love.flac")
+	stream, err := flac.Open("testdata/love.flac", flac.BufferedParse)
 	if err != nil {
 		log.Fatal(err)
 	}

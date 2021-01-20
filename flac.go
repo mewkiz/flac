@@ -92,6 +92,29 @@ func New(r io.Reader, opts ...Option) (stream *Stream, err error) {
 }
 
 func Buffered(stream *Stream, r io.Reader) error {
+	return buffered(stream, r, false)
+}
+
+func BufferedParse(stream *Stream, r io.Reader) error {
+	return buffered(stream, r, true)
+}
+
+func EnableSeek(stream *Stream, r io.Reader) error {
+	return enableSeek(stream, r, false)
+}
+
+func EnableSeekParse(stream *Stream, r io.Reader) error {
+	return enableSeek(stream, r, true)
+}
+
+func SeekTableSize(i int) Option {
+	return func(stream *Stream, r io.Reader) error {
+		stream.seekTableSize = i
+		return nil
+	}
+}
+
+func buffered(stream *Stream, r io.Reader, parse bool) error {
 	if stream.r != nil {
 		// The initial parsing has already happened
 		return ErrInvalidOption
@@ -107,19 +130,31 @@ func Buffered(stream *Stream, r io.Reader) error {
 
 	for !block.IsLast {
 		block, err = meta.New(stream.r)
-		if err != nil && err != meta.ErrReservedType {
-			return err
+		if err != nil {
+			if err != meta.ErrReservedType {
+				return err
+			}
+			if err = block.Skip(); err != nil {
+				return err
+			}
 		}
 
-		if err = block.Skip(); err != nil {
-			return err
+		if parse {
+			if err := block.Parse(); err != nil {
+				return err
+			}
+			stream.Blocks = append(stream.Blocks, block)
+		} else {
+			if err = block.Skip(); err != nil {
+				return err
+			}
 		}
 	}
 
 	return nil
 }
 
-func EnableSeek(stream *Stream, r io.Reader) error {
+func enableSeek(stream *Stream, r io.Reader, parse bool) error {
 	if stream.r != nil {
 		// The initial parsing has already happened
 		return ErrInvalidOption
@@ -139,28 +174,27 @@ func EnableSeek(stream *Stream, r io.Reader) error {
 	}
 
 	for !block.IsLast {
-		block, err = meta.New(stream.r)
-		if err != nil && err != meta.ErrReservedType {
-			return err
+		block, err = meta.Parse(stream.r)
+		if err != nil {
+			if err != meta.ErrReservedType {
+				return err
+			} else {
+				if err = block.Skip(); err != nil {
+					return err
+				}
+			}
 		}
 
-		if err = block.Parse(); err != nil {
-			return err
-		}
 		if block.Header.Type == meta.TypeSeekTable {
 			stream.seekTable = block.Body.(*meta.SeekTable)
+		}
+		if parse {
+			stream.Blocks = append(stream.Blocks, block)
 		}
 	}
 
 	stream.dataStart, err = rs.Seek(0, io.SeekCurrent)
 	return err
-}
-
-func SeekTableSize(i int) Option {
-	return func(stream *Stream, r io.Reader) error {
-		stream.seekTableSize = i
-		return nil
-	}
 }
 
 var (
@@ -218,10 +252,10 @@ func (stream *Stream) parseStreamInfo() (block *meta.Block, err error) {
 
 // skipID3v2 skips ID3v2 data prepended to flac files.
 func (stream *Stream) skipID3v2() error {
-	r := bufio.NewReader(stream.r)
-
 	// Discard unnecessary data from the ID3v2 header.
-	if _, err := r.Discard(2); err != nil {
+	r := stream.r
+	var buf [2]byte
+	if _, err := io.ReadFull(r, buf[:]); err != nil {
 		return err
 	}
 
@@ -233,60 +267,9 @@ func (stream *Stream) skipID3v2() error {
 	// The size is encoded as a synchsafe integer.
 	size := int(sizeBuf[0])<<21 | int(sizeBuf[1])<<14 | int(sizeBuf[2])<<7 | int(sizeBuf[3])
 
-	_, err := r.Discard(size)
+	disc := make([]byte, size)
+	_, err := io.ReadFull(r, disc)
 	return err
-}
-
-// Parse creates a new Stream for accessing the metadata blocks and audio
-// samples of r. It reads and parses the FLAC signature and all metadata blocks.
-//
-// Call Stream.Next to parse the frame header of the next audio frame, and call
-// Stream.ParseNext to parse the entire next frame including audio samples.
-func Parse(r io.Reader) (stream *Stream, err error) {
-	// Verify FLAC signature and parse the StreamInfo metadata block.
-	stream = &Stream{}
-
-	//_, seeker := r.(io.ReadSeeker)
-	seeker := false
-
-	if seeker {
-		stream.r = r
-	} else {
-		stream.r = bufio.NewReader(r)
-	}
-
-	block, err := stream.parseStreamInfo()
-	fmt.Println(block, err)
-	if err != nil {
-		return nil, err
-	}
-
-	stream.Blocks = append(stream.Blocks, block)
-
-	// Parse the remaining metadata blocks.
-	for !block.IsLast {
-		block, err = meta.Parse(stream.r)
-		fmt.Println(block, err)
-		if err != nil {
-			if err != meta.ErrReservedType {
-				return stream, err
-			}
-			// Skip the body of unknown (reserved) metadata blocks, as stated by
-			// the specification.
-			//
-			// ref: https://www.xiph.org/flac/format.html#format_overview
-			if err = block.Skip(); err != nil {
-				return stream, err
-			}
-		}
-
-		if seeker && block.Header.Type == meta.TypeSeekTable {
-			stream.seekTable = block.Body.(*meta.SeekTable)
-		}
-		stream.Blocks = append(stream.Blocks, block)
-	}
-
-	return stream, nil
 }
 
 // Open creates a new Stream for accessing the audio samples of path. It reads
@@ -297,33 +280,13 @@ func Parse(r io.Reader) (stream *Stream, err error) {
 // Stream.ParseNext to parse the entire next frame including audio samples.
 //
 // Note: The Close method of the stream must be called when finished using it.
-func Open(path string) (stream *Stream, err error) {
+func Open(path string, opts ...Option) (stream *Stream, err error) {
 	f, err := os.Open(path)
 	if err != nil {
 		return nil, err
 	}
-	stream, err = New(f)
-	if err != nil {
-		return nil, err
-	}
-	stream.c = f
-	return stream, err
-}
 
-// ParseFile creates a new Stream for accessing the metadata blocks and audio
-// samples of path. It reads and parses the FLAC signature and all metadata
-// blocks.
-//
-// Call Stream.Next to parse the frame header of the next audio frame, and call
-// Stream.ParseNext to parse the entire next frame including audio samples.
-//
-// Note: The Close method of the stream must be called when finished using it.
-func ParseFile(path string) (stream *Stream, err error) {
-	f, err := os.Open(path)
-	if err != nil {
-		return nil, err
-	}
-	stream, err = Parse(f)
+	stream, err = New(f, opts...)
 	if err != nil {
 		return nil, err
 	}
