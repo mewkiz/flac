@@ -42,24 +42,32 @@ import (
 // of a FLAC stream.
 //
 // ref: https://www.xiph.org/flac/format.html#stream
-type Stream struct {
-	// The StreamInfo metadata block describes the basic properties of the FLAC
-	// audio stream.
-	Info *meta.StreamInfo
-	// Zero or more metadata blocks.
-	Blocks []*meta.Block
+type (
+	Stream struct {
+		// The StreamInfo metadata block describes the basic properties of the FLAC
+		// audio stream.
+		Info *meta.StreamInfo
+		// Zero or more metadata blocks.
+		Blocks []*meta.Block
 
-	// seekTable contains one or more pre-calculated audio frame seek points of the stream; nil if uninitialized.
-	seekTable *meta.SeekTable
-	// dataStart is the offset of the first frame header since SeekPoint.Offset is relative to this position.
-	dataStart int64
+		// seekTable contains one or more pre-calculated audio frame seek points of the stream; nil if uninitialized.
+		seekTable *meta.SeekTable
+		// seekTableSize determines how many seek points the seekTable should have if the flac file does not include one
+		// in the metadata.
+		seekTableSize int
+		// dataStart is the offset of the first frame header since SeekPoint.Offset is relative to this position.
+		dataStart int64
 
-	// Underlying io.Reader.
-	r io.Reader
-	// Underlying io.Closer of file if opened with Open and ParseFile, and nil
-	// otherwise.
-	c io.Closer
-}
+		// Underlying io.Reader.
+		r io.Reader
+		// Underlying io.Closer of file if opened with Open and ParseFile, and nil
+		// otherwise.
+		c io.Closer
+	}
+
+	// Option is a func that modifies Stream and allows details of the Stream's behaivor to be set.
+	Option func(s *Stream, r io.Reader) error
+)
 
 // New creates a new Stream for accessing the audio samples of r. It reads and
 // parses the FLAC signature and the StreamInfo metadata block, but skips all
@@ -67,51 +75,92 @@ type Stream struct {
 //
 // Call Stream.Next to parse the frame header of the next audio frame, and call
 // Stream.ParseNext to parse the entire next frame including audio samples.
-func New(r io.Reader) (stream *Stream, err error) {
-	// Verify FLAC signature and parse the StreamInfo metadata block.
-	stream = &Stream{}
+func New(r io.Reader, opts ...Option) (stream *Stream, err error) {
+	stream = &Stream{seekTableSize: 100}
 
-	rs, seeker := r.(io.ReadSeeker)
-	if seeker {
-		stream.r = r
-	} else {
-		stream.r = bufio.NewReader(r)
-	}
-
-	block, err := stream.parseStreamInfo()
-	if err != nil {
-		return nil, err
-	}
-
-	// Parse the remaining metadata blocks.
-	for !block.IsLast {
-		block, err = meta.New(r)
-		if err != nil && err != meta.ErrReservedType {
-			return stream, err
-		}
-
-		if seeker {
-			if err = block.Parse(); err != nil {
-				return stream, err
-			}
-			if seeker && block.Header.Type == meta.TypeSeekTable {
-				stream.seekTable = block.Body.(*meta.SeekTable)
-			}
-		} else {
-			if err = block.Skip(); err != nil {
-				return stream, err
-			}
-		}
-	}
-
-	if seeker {
-		stream.dataStart, err = rs.Seek(0, io.SeekCurrent)
-		if err != nil {
+	for _, opt := range opts {
+		if err := opt(stream, r); err != nil {
 			return nil, err
 		}
 	}
 
+	if stream.r == nil {
+		Buffered(stream, r)
+	}
+
 	return stream, nil
+}
+
+func Buffered(stream *Stream, r io.Reader) error {
+	if stream.r != nil {
+		// The initial parsing has already happened
+		return ErrInvalidOption
+	}
+
+	stream.r = bufio.NewReader(r)
+
+	// Verify FLAC signature and parse the StreamInfo metadata block.
+	block, err := stream.parseStreamInfo()
+	if err != nil {
+		return err
+	}
+
+	for !block.IsLast {
+		block, err = meta.New(stream.r)
+		if err != nil && err != meta.ErrReservedType {
+			return err
+		}
+
+		if err = block.Skip(); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func EnableSeek(stream *Stream, r io.Reader) error {
+	if stream.r != nil {
+		// The initial parsing has already happened
+		return ErrInvalidOption
+	}
+
+	rs, ok := r.(io.ReadSeeker)
+	if !ok {
+		return ErrNoSeeker
+	}
+
+	stream.r = r
+
+	// Verify FLAC signature and parse the StreamInfo metadata block.
+	block, err := stream.parseStreamInfo()
+	if err != nil {
+		return err
+	}
+
+	for !block.IsLast {
+		block, err = meta.New(stream.r)
+		if err != nil && err != meta.ErrReservedType {
+			return err
+		}
+
+		if err = block.Parse(); err != nil {
+			return err
+		}
+		if block.Header.Type == meta.TypeSeekTable {
+			stream.seekTable = block.Body.(*meta.SeekTable)
+		}
+	}
+
+	stream.dataStart, err = rs.Seek(0, io.SeekCurrent)
+	return err
+}
+
+func SeekTableResolution(i int) Option {
+	return func(stream *Stream, r io.Reader) error {
+		stream.seekTableSize = i
+		return nil
+	}
 }
 
 var (
@@ -121,8 +170,9 @@ var (
 	// id3Signature marks the beginning of an ID3 stream, used to skip over ID3 data.
 	id3Signature = []byte("ID3")
 
-	ErrInvalidSeek = errors.New("stream.Seek: out of stream seek")
-	ErrNoSeeker    = errors.New("stream.Seek: no a Seeker")
+	ErrInvalidSeek   = errors.New("stream.Seek: out of stream seek")
+	ErrNoSeeker      = errors.New("stream.Seek: no a Seeker")
+	ErrInvalidOption = errors.New("stream.New: invalid Option")
 )
 
 // parseStreamInfo verifies the signature which marks the beginning of a FLAC
@@ -378,7 +428,7 @@ func (stream *Stream) makeSeekTable() (err error) {
 
 	var i int
 	var sampleNum uint64
-	var points []meta.SeekPoint
+	var tmp []meta.SeekPoint
 	for {
 		f, err := stream.ParseNext()
 		if err == io.EOF {
@@ -389,21 +439,31 @@ func (stream *Stream) makeSeekTable() (err error) {
 			return err
 		}
 
-		if i%10 == 0 {
-			o, err := r.Seek(0, io.SeekCurrent)
-			if err != nil {
-				return err
-			}
-
-			points = append(points, meta.SeekPoint{
-				SampleNum: sampleNum,
-				Offset:    uint64(o - stream.dataStart),
-				NSamples:  f.BlockSize,
-			})
+		o, err := r.Seek(0, io.SeekCurrent)
+		if err != nil {
+			return err
 		}
+
+		tmp = append(tmp, meta.SeekPoint{
+			SampleNum: sampleNum,
+			Offset:    uint64(o - stream.dataStart),
+			NSamples:  f.BlockSize,
+		})
 
 		sampleNum += uint64(f.BlockSize)
 		i++
+	}
+
+	// reduce the number of seek points down to the specified resolution
+	m := 1
+	if len(tmp) > stream.seekTableSize {
+		m = len(tmp) / stream.seekTableSize
+	}
+	points := make([]meta.SeekPoint, 0, stream.seekTableSize)
+	for i, p := range tmp {
+		if i%m == 0 {
+			points = append(points, p)
+		}
 	}
 
 	stream.seekTable = &meta.SeekTable{Points: points}
