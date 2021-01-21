@@ -97,14 +97,14 @@ func TestDecode(t *testing.T) {
 		"testdata/love.flac",
 	}
 
-	opts := map[string]func(io.Reader) (*flac.Stream, error){
+	funcs := map[string]func(io.Reader) (*flac.Stream, error){
 		"new":     flac.New,
 		"newSeek": flac.NewSeek,
 		"parse":   flac.Parse,
 	}
 
 	for _, path := range paths {
-		for k, f := range opts {
+		for k, f := range funcs {
 			t.Run(fmt.Sprintf("%s/%s", k, path), func(t *testing.T) {
 				file, err := os.Open(path)
 				if err != nil {

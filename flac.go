@@ -426,7 +426,7 @@ func (stream *Stream) makeSeekTable() (err error) {
 	if len(tmp) > stream.seekTableSize {
 		m = len(tmp) / stream.seekTableSize
 	}
-	points := make([]meta.SeekPoint, 0, stream.seekTableSize)
+	points := make([]meta.SeekPoint, 0, stream.seekTableSize+1)
 	for i, p := range tmp {
 		if i%m == 0 {
 			points = append(points, p)
