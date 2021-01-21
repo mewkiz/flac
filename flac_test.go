@@ -23,6 +23,19 @@ func TestSkipping(t *testing.T) {
 
 	defer f.Close()
 
+	//Seek Table:
+	// {SampleNum:0 Offset:8283 NSamples:4096}
+	// {SampleNum:4096 Offset:17777 NSamples:4096}
+	// {SampleNum:8192 Offset:27141 NSamples:4096}
+	// {SampleNum:12288 Offset:36665 NSamples:4096}
+	// {SampleNum:16384 Offset:46179 NSamples:4096}
+	// {SampleNum:20480 Offset:55341 NSamples:4096}
+	// {SampleNum:24576 Offset:64690 NSamples:4096}
+	// {SampleNum:28672 Offset:74269 NSamples:4096}
+	// {SampleNum:32768 Offset:81984 NSamples:4096}
+	// {SampleNum:36864 Offset:86656 NSamples:4096}
+	// {SampleNum:40960 Offset:89596 NSamples:2723}
+
 	testPos := []struct {
 		seek     int64
 		whence   int
@@ -33,13 +46,12 @@ func TestSkipping(t *testing.T) {
 		{seek: 0, whence: io.SeekStart, expected: 0},
 		{seek: -6000, whence: io.SeekEnd, expected: 36864},
 
-		// expected: 40960 seems like the wrong answer, it should be
-		// before 36864 from the previous seek.
+		// Can't get this to pass.
 		// Debugging shows that the file offset at this point is 226,
-		// which is before the first frame position.
+		// which is before the first data frame position.
 		// Maybe there is some buffering I don't understand?
 		// Maybe io.SeekCurrent can't be supported??
-		{seek: -8000, whence: io.SeekCurrent, expected: 40960},
+		{seek: -8000, whence: io.SeekCurrent, expected: 28672},
 		{seek: 0, whence: io.SeekEnd, expected: 40960},
 	}
 

@@ -93,8 +93,9 @@ func New(r io.Reader) (stream *Stream, err error) {
 	return stream, nil
 }
 
-// NewSeek returns a new Stream that has seeking enabled.  The incoming
+// NewSeek returns a Stream that has seeking enabled.  The incoming
 // io.ReadSeeker will not be buffered, which might result in performance issues.
+// Using an in-memory buffer like *bytes.Reader should work well.
 func NewSeek(r io.Reader) (stream *Stream, err error) {
 	rs, ok := r.(io.ReadSeeker)
 	if !ok {
