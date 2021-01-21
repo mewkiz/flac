@@ -45,13 +45,7 @@ func TestSkipping(t *testing.T) {
 		{seek: 9000, whence: io.SeekStart, expected: 8192},
 		{seek: 0, whence: io.SeekStart, expected: 0},
 		{seek: -6000, whence: io.SeekEnd, expected: 36864},
-
-		// Can't get this to pass.
-		// Debugging shows that the file offset at this point is 226,
-		// which is before the first data frame position.
-		// Maybe there is some buffering I don't understand?
-		// Maybe io.SeekCurrent can't be supported??
-		{seek: -8000, whence: io.SeekCurrent, expected: 28672},
+		{seek: -8000, whence: io.SeekCurrent, expected: 32768},
 		{seek: 0, whence: io.SeekEnd, expected: 40960},
 	}
 
@@ -75,7 +69,9 @@ func TestSkipping(t *testing.T) {
 			if err != nil && err != io.EOF {
 				t.Fatal(err)
 			}
+
 		})
+
 	}
 }
 

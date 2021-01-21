@@ -335,7 +335,7 @@ func (stream *Stream) Seek(sample int64, whence int) (read int64, err error) {
 		if err != nil {
 			return 0, err
 		}
-		point = stream.searchFromCurrent(sample, o)
+		point = stream.searchFromCurrent(sample, o-stream.dataStart)
 	case io.SeekEnd:
 		point = stream.searchFromEnd(sample)
 	default:
