@@ -46,7 +46,11 @@ func TestSeek(t *testing.T) {
 		{seek: 0, whence: io.SeekStart, expected: 0},
 		{seek: -6000, whence: io.SeekEnd, expected: 36864},
 		{seek: -8000, whence: io.SeekCurrent, expected: 32768},
+		{seek: 8000, whence: io.SeekCurrent, expected: 40960},
 		{seek: 0, whence: io.SeekEnd, expected: 40960},
+		{seek: 50000, whence: io.SeekStart, expected: 40960},
+		{seek: 100, whence: io.SeekEnd, expected: 40960},
+		{seek: -100, whence: io.SeekStart, expected: 0},
 	}
 
 	stream, err := flac.NewSeek(f)

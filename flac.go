@@ -365,11 +365,10 @@ func (stream *Stream) searchFromStart(sample int64) (p meta.SeekPoint) {
 	var last meta.SeekPoint
 	var i int
 	for i, p = range stream.seekTable.Points {
-		if p.SampleNum >= uint64(sample) {
+		if int64(p.SampleNum) >= sample {
 			if i > 0 {
 				return last
 			}
-
 			return p
 		}
 		last = p
