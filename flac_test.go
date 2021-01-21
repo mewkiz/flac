@@ -15,7 +15,7 @@ func TestSkipID3v2(t *testing.T) {
 	}
 }
 
-func TestSkipping(t *testing.T) {
+func TestSeek(t *testing.T) {
 	f, err := os.Open("testdata/172960.flac")
 	if err != nil {
 		t.Fatal(err)
@@ -69,7 +69,6 @@ func TestSkipping(t *testing.T) {
 			if err != nil && err != io.EOF {
 				t.Fatal(err)
 			}
-
 		})
 
 	}
