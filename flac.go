@@ -127,6 +127,7 @@ func NewSeek(r io.Reader) (stream *Stream, err error) {
 		}
 	}
 
+	// Record file offset of the first frame header.
 	stream.dataStart, err = rs.Seek(0, io.SeekCurrent)
 	return stream, err
 }
