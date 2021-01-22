@@ -140,7 +140,7 @@ var (
 	id3Signature = []byte("ID3")
 
 	ErrInvalidSeek   = errors.New("stream.Seek: out of stream seek")
-	ErrNoSeeker      = errors.New("stream.Seek: no a Seeker")
+	ErrNoSeeker      = errors.New("stream.Seek: not a Seeker")
 	ErrInvalidOption = errors.New("stream.New: invalid Option")
 )
 
