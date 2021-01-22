@@ -331,28 +331,34 @@ func (stream *Stream) Seek(sample int64, whence int) (read int64, err error) {
 	case io.SeekStart:
 		point = stream.searchFromStart(sample)
 	case io.SeekCurrent:
-		o, err := rs.Seek(0, io.SeekCurrent)
-		if err != nil {
-			return 0, err
-		}
-		point = stream.searchFromCurrent(sample, o-stream.dataStart)
+		point, err = stream.searchFromCurrent(sample, rs)
 	case io.SeekEnd:
 		point = stream.searchFromEnd(sample)
 	default:
 		return 0, ErrInvalidSeek
 	}
 
+	if err != nil {
+		return 0, err
+	}
+
 	_, err = rs.Seek(stream.dataStart+int64(point.Offset), io.SeekStart)
 	return int64(point.SampleNum), err
 }
 
-func (stream *Stream) searchFromCurrent(sample, offset int64) (p meta.SeekPoint) {
+func (stream *Stream) searchFromCurrent(sample int64, rs io.ReadSeeker) (p meta.SeekPoint, err error) {
+	o, err := rs.Seek(0, io.SeekCurrent)
+	if err != nil {
+		return p, err
+	}
+
+	offset := o - stream.dataStart
 	for _, p = range stream.seekTable.Points {
 		if int64(p.Offset) >= offset {
-			return stream.searchFromStart(int64(p.SampleNum) + sample)
+			return stream.searchFromStart(int64(p.SampleNum) + sample), nil
 		}
 	}
-	return p
+	return p, nil
 }
 
 // searchFromEnd expects sample to be negative.
@@ -366,10 +372,10 @@ func (stream *Stream) searchFromStart(sample int64) (p meta.SeekPoint) {
 	var i int
 	for i, p = range stream.seekTable.Points {
 		if int64(p.SampleNum) >= sample {
-			if i > 0 {
-				return last
+			if i == 0 {
+				return p
 			}
-			return p
+			return last
 		}
 		last = p
 	}
