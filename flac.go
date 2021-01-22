@@ -309,9 +309,9 @@ func (stream *Stream) ParseNext() (f *frame.Frame, err error) {
 
 // Seek to a specific sample number in the flac stream.
 //
-// sample is invalid if:
-// whence == io.SeekEnd && sample is negative
-// whence == io.SeekStart && sample is positive
+// sample is valid if:
+// whence == io.SeekEnd and sample is negative
+// whence == io.SeekStart and sample is positive
 // whence == io.SeekCurrent and sample + current sample > 0 and < stream.Info.NSamples
 //
 // If sample does not match one of the above conditions then the result will
