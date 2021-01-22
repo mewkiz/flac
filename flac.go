@@ -139,9 +139,8 @@ var (
 	// id3Signature marks the beginning of an ID3 stream, used to skip over ID3 data.
 	id3Signature = []byte("ID3")
 
-	ErrInvalidSeek   = errors.New("stream.Seek: out of stream seek")
-	ErrNoSeeker      = errors.New("stream.Seek: not a Seeker")
-	ErrInvalidOption = errors.New("stream.New: invalid Option")
+	ErrInvalidSeek = errors.New("stream.Seek: out of stream seek")
+	ErrNoSeeker    = errors.New("stream.Seek: not a Seeker")
 )
 
 const (
