@@ -102,7 +102,7 @@ func NewSeek(r io.Reader) (stream *Stream, err error) {
 		return stream, ErrNoSeeker
 	}
 
-	stream = &Stream{r: r, seekTableSize: 100}
+	stream = &Stream{r: rs, seekTableSize: defaultSeekTableSize}
 
 	// Verify FLAC signature and parse the StreamInfo metadata block.
 	block, err := stream.parseStreamInfo()
@@ -141,6 +141,10 @@ var (
 	ErrInvalidSeek   = errors.New("stream.Seek: out of stream seek")
 	ErrNoSeeker      = errors.New("stream.Seek: no a Seeker")
 	ErrInvalidOption = errors.New("stream.New: invalid Option")
+)
+
+const (
+	defaultSeekTableSize = 100
 )
 
 // parseStreamInfo verifies the signature which marks the beginning of a FLAC
@@ -186,10 +190,10 @@ func (stream *Stream) parseStreamInfo() (block *meta.Block, err error) {
 
 // skipID3v2 skips ID3v2 data prepended to flac files.
 func (stream *Stream) skipID3v2() error {
+	r := bufio.NewReader(stream.r)
+
 	// Discard unnecessary data from the ID3v2 header.
-	r := stream.r
-	var buf [2]byte
-	if _, err := io.ReadFull(r, buf[:]); err != nil {
+	if _, err := r.Discard(2); err != nil {
 		return err
 	}
 
@@ -201,8 +205,7 @@ func (stream *Stream) skipID3v2() error {
 	// The size is encoded as a synchsafe integer.
 	size := int(sizeBuf[0])<<21 | int(sizeBuf[1])<<14 | int(sizeBuf[2])<<7 | int(sizeBuf[3])
 
-	disc := make([]byte, size)
-	_, err := io.ReadFull(r, disc)
+	_, err := r.Discard(size)
 	return err
 }
 
@@ -317,7 +320,10 @@ func (stream *Stream) ParseNext() (f *frame.Frame, err error) {
 // If sample does not match one of the above conditions then the result will
 // probably be seeking to the beginning or very end of the data and no error
 // will be returned.
-func (stream *Stream) Seek(sample int64, whence int) (read int64, err error) {
+//
+// The returned value, read, represents the flac sample number from the nearest value
+// to the requested sample in the seek table.
+func (stream *Stream) Seek(sampleNum int64, whence int) (read int64, err error) {
 	if stream.seekTable == nil && stream.seekTableSize > 0 {
 		if err := stream.makeSeekTable(); err != nil {
 			return 0, err
@@ -329,11 +335,11 @@ func (stream *Stream) Seek(sample int64, whence int) (read int64, err error) {
 	var point meta.SeekPoint
 	switch whence {
 	case io.SeekStart:
-		point = stream.searchFromStart(sample)
+		point = stream.searchFromStart(sampleNum)
 	case io.SeekCurrent:
-		point, err = stream.searchFromCurrent(sample, rs)
+		point, err = stream.searchFromCurrent(sampleNum, rs)
 	case io.SeekEnd:
-		point = stream.searchFromEnd(sample)
+		point = stream.searchFromEnd(sampleNum)
 	default:
 		return 0, ErrInvalidSeek
 	}
@@ -383,17 +389,17 @@ func (stream *Stream) searchFromStart(sample int64) (p meta.SeekPoint) {
 }
 
 func (stream *Stream) makeSeekTable() (err error) {
-	r, ok := stream.r.(io.ReadSeeker)
+	rs, ok := stream.r.(io.ReadSeeker)
 	if !ok {
 		return ErrNoSeeker
 	}
 
-	pos, err := r.Seek(0, io.SeekCurrent)
+	pos, err := rs.Seek(0, io.SeekCurrent)
 	if err != nil {
 		return err
 	}
 
-	_, err = r.Seek(stream.dataStart, io.SeekStart)
+	_, err = rs.Seek(stream.dataStart, io.SeekStart)
 	if err != nil {
 		return err
 	}
@@ -411,7 +417,7 @@ func (stream *Stream) makeSeekTable() (err error) {
 			return err
 		}
 
-		o, err := r.Seek(0, io.SeekCurrent)
+		o, err := rs.Seek(0, io.SeekCurrent)
 		if err != nil {
 			return err
 		}
@@ -440,6 +446,6 @@ func (stream *Stream) makeSeekTable() (err error) {
 
 	stream.seekTable = &meta.SeekTable{Points: points}
 
-	_, err = r.Seek(pos, io.SeekStart)
+	_, err = rs.Seek(pos, io.SeekStart)
 	return err
 }
