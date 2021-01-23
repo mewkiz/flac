@@ -96,12 +96,7 @@ func New(r io.Reader) (stream *Stream, err error) {
 // NewSeek returns a Stream that has seeking enabled.  The incoming
 // io.ReadSeeker will not be buffered, which might result in performance issues.
 // Using an in-memory buffer like *bytes.Reader should work well.
-func NewSeek(r io.Reader) (stream *Stream, err error) {
-	rs, ok := r.(io.ReadSeeker)
-	if !ok {
-		return stream, ErrNoSeeker
-	}
-
+func NewSeek(rs io.ReadSeeker) (stream *Stream, err error) {
 	stream = &Stream{r: rs, seekTableSize: defaultSeekTableSize}
 
 	// Verify FLAC signature and parse the StreamInfo metadata block.
@@ -139,8 +134,8 @@ var (
 	// id3Signature marks the beginning of an ID3 stream, used to skip over ID3 data.
 	id3Signature = []byte("ID3")
 
-	ErrInvalidSeek = errors.New("stream.Seek: out of stream seek")
-	ErrNoSeeker    = errors.New("stream.Seek: not a Seeker")
+	ErrInvalidSeek = errors.New("stream.Seek: invalid seek out of stream")
+	ErrNoSeeker    = errors.New("stream.Seek: reader does not implement io.Seeker")
 )
 
 const (

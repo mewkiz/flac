@@ -197,7 +197,7 @@ func listStreamInfo(si *meta.StreamInfo) {
 //      data contents:
 //    Medieval CUE Splitter (www.medieval.it)
 func listApplication(app *meta.Application) {
-	fmt.Printf("  application ID: %x\n", string(app.ID))
+	fmt.Printf("  application ID: %d\n", app.ID)
 	fmt.Println("  data contents:")
 	if len(app.Data) > 0 {
 		fmt.Println(string(app.Data))

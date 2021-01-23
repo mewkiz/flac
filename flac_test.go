@@ -103,7 +103,7 @@ func TestDecode(t *testing.T) {
 
 	funcs := map[string]func(io.Reader) (*flac.Stream, error){
 		"new":     flac.New,
-		"newSeek": flac.NewSeek,
+		"newSeek": func(r io.Reader) (*flac.Stream, error) { return flac.NewSeek(r.(io.ReadSeeker)) },
 		"parse":   flac.Parse,
 	}
 
