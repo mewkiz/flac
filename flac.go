@@ -321,10 +321,9 @@ func (stream *Stream) ParseNext() (f *frame.Frame, err error) {
 // probably be seeking to the beginning or very end of the data and no error
 // will be returned.
 //
-// The returned value, read, represents the actual flac sampleNum of the seek.  It may
-// be different than the requested sampleNum because the seek table does not typically
-// contain all samples in the file.
-func (stream *Stream) Seek(sampleNum int64, whence int) (read int64, err error) {
+// The returned value, result, represents the closest match to sampleNum from the seek table.
+// Note that result will always be >= sampleNum
+func (stream *Stream) Seek(sampleNum int64, whence int) (result int64, err error) {
 	if stream.seekTable == nil && stream.seekTableSize > 0 {
 		if err := stream.makeSeekTable(); err != nil {
 			return 0, err
