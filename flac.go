@@ -134,7 +134,6 @@ var (
 	// id3Signature marks the beginning of an ID3 stream, used to skip over ID3 data.
 	id3Signature = []byte("ID3")
 
-	ErrInvalidSeek = errors.New("stream.Seek: invalid seek out of stream")
 	ErrNoSeeker    = errors.New("stream.Seek: reader does not implement io.Seeker")
 )
 
@@ -305,20 +304,8 @@ func (stream *Stream) ParseNext() (f *frame.Frame, err error) {
 	return frame.Parse(stream.r)
 }
 
-// Seek to a specific sample number in the flac stream.
-//
-// sample is valid if:
-// whence == io.SeekEnd and sample is negative
-// whence == io.SeekStart and sample is positive
-// whence == io.SeekCurrent and sample + current sample > 0 and < stream.Info.NSamples
-//
-// If sample does not match one of the above conditions then the result will
-// probably be seeking to the beginning or very end of the data and no error
-// will be returned.
-//
-// The returned value, result, represents the closest match to sampleNum from the seek table.
-// Note that result will always be >= sampleNum
-func (stream *Stream) Seek(sampleNum int64, whence int) (result int64, err error) {
+// Seek seeks to the specified sample number.
+func (stream *Stream) Seek(sampleNum uint64) (uint64, error) {
 	if stream.seekTable == nil && stream.seekTableSize > 0 {
 		if err := stream.makeSeekTable(); err != nil {
 			return 0, err
@@ -327,60 +314,44 @@ func (stream *Stream) Seek(sampleNum int64, whence int) (result int64, err error
 
 	rs := stream.r.(io.ReadSeeker)
 
-	var point meta.SeekPoint
-	switch whence {
-	case io.SeekStart:
-		point = stream.searchFromStart(sampleNum)
-	case io.SeekCurrent:
-		point, err = stream.searchFromCurrent(sampleNum, rs)
-	case io.SeekEnd:
-		point = stream.searchFromEnd(sampleNum)
-	default:
-		return 0, ErrInvalidSeek
+	isBiggerThanStream := stream.Info.NSamples != 0 && stream.Info.NSamples < sampleNum
+	if isBiggerThanStream || sampleNum < 0 {
+		return 0, fmt.Errorf("unable to seek to sample number %d", sampleNum)
 	}
+	point := stream.searchFromStart(sampleNum)
 
+	_, err := rs.Seek(stream.dataStart+int64(point.Offset), io.SeekStart)
 	if err != nil {
 		return 0, err
 	}
-
-	_, err = rs.Seek(stream.dataStart+int64(point.Offset), io.SeekStart)
-	return int64(point.SampleNum), err
-}
-
-func (stream *Stream) searchFromCurrent(sample int64, rs io.ReadSeeker) (p meta.SeekPoint, err error) {
-	o, err := rs.Seek(0, io.SeekCurrent)
-	if err != nil {
-		return p, err
-	}
-
-	offset := o - stream.dataStart
-	for _, p = range stream.seekTable.Points {
-		if int64(p.Offset) >= offset {
-			return stream.searchFromStart(int64(p.SampleNum) + sample), nil
+	for {
+		offset, err := rs.Seek(0, io.SeekCurrent)
+		if err != nil {
+			return 0, err
+		}
+		frame, err := stream.ParseNext()
+		if err != nil {
+			return 0, err
+		}
+		if frame.SampleNumber()+uint64(frame.BlockSize) >= sampleNum {
+			_, err := rs.Seek(offset, io.SeekStart)
+			return frame.SampleNumber(), err
 		}
 	}
-	return p, nil
 }
 
-// searchFromEnd expects sample to be negative.
-// If it is positive, it's ok, the last seek point will be returned.
-func (stream *Stream) searchFromEnd(sample int64) (p meta.SeekPoint) {
-	return stream.searchFromStart(int64(stream.Info.NSamples) + sample)
-}
-
-func (stream *Stream) searchFromStart(sample int64) (p meta.SeekPoint) {
-	var last meta.SeekPoint
-	var i int
-	for i, p = range stream.seekTable.Points {
-		if int64(p.SampleNum) >= sample {
-			if i == 0 {
-				return p
-			}
-			return last
-		}
-		last = p
+func (stream *Stream) searchFromStart(sample uint64) meta.SeekPoint {
+	if len(stream.seekTable.Points) == 0 {
+		panic("do not reach this lol")
 	}
-	return p
+	prev := stream.seekTable.Points[0]
+	for _, p := range stream.seekTable.Points {
+		if p.SampleNum+uint64(p.NSamples) >= sample {
+			return prev
+		}
+		prev = p
+	}
+	panic("unreachable")
 }
 
 func (stream *Stream) makeSeekTable() (err error) {
@@ -403,20 +374,17 @@ func (stream *Stream) makeSeekTable() (err error) {
 	var sampleNum uint64
 	var tmp []meta.SeekPoint
 	for {
-		f, err := stream.ParseNext()
-		if err == io.EOF {
-			break
-		}
-
-		if err != nil {
-			return err
-		}
-
 		o, err := rs.Seek(0, io.SeekCurrent)
 		if err != nil {
 			return err
 		}
-
+		f, err := stream.ParseNext()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			return err
+		}
 		tmp = append(tmp, meta.SeekPoint{
 			SampleNum: sampleNum,
 			Offset:    uint64(o - stream.dataStart),
@@ -427,19 +395,7 @@ func (stream *Stream) makeSeekTable() (err error) {
 		i++
 	}
 
-	// reduce the number of seek points down to the specified resolution
-	m := 1
-	if len(tmp) > stream.seekTableSize {
-		m = len(tmp) / stream.seekTableSize
-	}
-	points := make([]meta.SeekPoint, 0, stream.seekTableSize+1)
-	for i, p := range tmp {
-		if i%m == 0 {
-			points = append(points, p)
-		}
-	}
-
-	stream.seekTable = &meta.SeekTable{Points: points}
+	stream.seekTable = &meta.SeekTable{Points: tmp}
 
 	_, err = rs.Seek(pos, io.SeekStart)
 	return err
