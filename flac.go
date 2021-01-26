@@ -304,7 +304,9 @@ func (stream *Stream) ParseNext() (f *frame.Frame, err error) {
 	return frame.Parse(stream.r)
 }
 
-// Seek seeks to the specified sample number.
+// Seek seeks to the frame containing the given absolute sample number. The
+// return value specifies the first sample number of the frame containing
+// sampleNum.
 func (stream *Stream) Seek(sampleNum uint64) (uint64, error) {
 	if stream.seekTable == nil && stream.seekTableSize > 0 {
 		if err := stream.makeSeekTable(); err != nil {
