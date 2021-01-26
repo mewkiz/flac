@@ -133,9 +133,13 @@ var (
 	// id3Signature marks the beginning of an ID3 stream, used to skip over ID3 data.
 	id3Signature = []byte("ID3")
 
-	// ErrNoSeeker tells you if the Reader you passed to New/Parse is not
-	// a `io.ReadSeeker`, and thus does not allow for seeking.
+	// ErrNoSeeker reports that flac.NewSeek was called with an io.Reader not
+	// implementing io.Seeker, and thus does not allow for seeking.
 	ErrNoSeeker = errors.New("stream.Seek: reader does not implement io.Seeker")
+
+	// ErrNoSeektable reports that no seektable has been generated. Therefore,
+	// it is not possible to seek in the stream.
+	ErrNoSeektable = errors.New("stream.searchFromStart: no seektable exists")
 )
 
 const (
@@ -321,7 +325,10 @@ func (stream *Stream) Seek(sampleNum uint64) (uint64, error) {
 	if isBiggerThanStream || sampleNum < 0 {
 		return 0, fmt.Errorf("unable to seek to sample number %d", sampleNum)
 	}
-	point := stream.searchFromStart(sampleNum)
+	point, err := stream.searchFromStart(sampleNum)
+	if err != nil {
+		return 0, err
+	}
 
 	if _, err := rs.Seek(stream.dataStart+int64(point.Offset), io.SeekStart); err != nil {
 		return 0, err
@@ -345,14 +352,16 @@ func (stream *Stream) Seek(sampleNum uint64) (uint64, error) {
 }
 
 // TODO(_): Utilize binary search.
-func (stream *Stream) searchFromStart(sample uint64) meta.SeekPoint {
+
+//
+func (stream *Stream) searchFromStart(sample uint64) (meta.SeekPoint, error) {
 	if len(stream.seekTable.Points) == 0 {
-		panic("do not reach this lol")
+		return meta.SeekPoint{}, ErrNoSeektable
 	}
 	prev := stream.seekTable.Points[0]
 	for _, p := range stream.seekTable.Points {
 		if p.SampleNum+uint64(p.NSamples) >= sample {
-			return prev
+			return prev, nil
 		}
 		prev = p
 	}
