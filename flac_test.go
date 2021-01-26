@@ -61,7 +61,6 @@ func TestSeek(t *testing.T) {
 			if err != nil {
 				if err.Error() != pos.err {
 					t.Fatal(err)
-					continue
 				}
 			}
 

@@ -110,10 +110,9 @@ func NewSeek(rs io.ReadSeeker) (stream *Stream, err error) {
 		if err != nil {
 			if err != meta.ErrReservedType {
 				return stream, err
-			} else {
-				if err = block.Skip(); err != nil {
-					return stream, err
-				}
+			}
+			if err = block.Skip(); err != nil {
+				return stream, err
 			}
 		}
 
@@ -134,6 +133,8 @@ var (
 	// id3Signature marks the beginning of an ID3 stream, used to skip over ID3 data.
 	id3Signature = []byte("ID3")
 
+	// ErrNoSeeker tells you if the Reader you passed to New/Parse is not
+	// a `io.ReadSeeker`, and thus does not allow for seeking.
 	ErrNoSeeker = errors.New("stream.Seek: reader does not implement io.Seeker")
 )
 
