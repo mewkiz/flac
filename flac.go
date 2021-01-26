@@ -134,7 +134,7 @@ var (
 	// id3Signature marks the beginning of an ID3 stream, used to skip over ID3 data.
 	id3Signature = []byte("ID3")
 
-	ErrNoSeeker    = errors.New("stream.Seek: reader does not implement io.Seeker")
+	ErrNoSeeker = errors.New("stream.Seek: reader does not implement io.Seeker")
 )
 
 const (
@@ -322,8 +322,7 @@ func (stream *Stream) Seek(sampleNum uint64) (uint64, error) {
 	}
 	point := stream.searchFromStart(sampleNum)
 
-	_, err := rs.Seek(stream.dataStart+int64(point.Offset), io.SeekStart)
-	if err != nil {
+	if _, err := rs.Seek(stream.dataStart+int64(point.Offset), io.SeekStart); err != nil {
 		return 0, err
 	}
 	for {
@@ -344,6 +343,7 @@ func (stream *Stream) Seek(sampleNum uint64) (uint64, error) {
 	}
 }
 
+// TODO(_): Utilize binary search.
 func (stream *Stream) searchFromStart(sample uint64) meta.SeekPoint {
 	if len(stream.seekTable.Points) == 0 {
 		panic("do not reach this lol")
@@ -358,6 +358,7 @@ func (stream *Stream) searchFromStart(sample uint64) meta.SeekPoint {
 	panic("unreachable")
 }
 
+// makeSeekTable creates a seek table with seek points to each frame of the FLAC stream.
 func (stream *Stream) makeSeekTable() (err error) {
 	rs, ok := stream.r.(io.ReadSeeker)
 	if !ok {
@@ -376,20 +377,20 @@ func (stream *Stream) makeSeekTable() (err error) {
 
 	var i int
 	var sampleNum uint64
-	var tmp []meta.SeekPoint
+	var points []meta.SeekPoint
 	for {
 		o, err := rs.Seek(0, io.SeekCurrent)
 		if err != nil {
 			return err
 		}
 		f, err := stream.ParseNext()
-		if err == io.EOF {
-			break
-		}
 		if err != nil {
+			if err == io.EOF {
+				break
+			}
 			return err
 		}
-		tmp = append(tmp, meta.SeekPoint{
+		points = append(points, meta.SeekPoint{
 			SampleNum: sampleNum,
 			Offset:    uint64(o - stream.dataStart),
 			NSamples:  f.BlockSize,
@@ -399,7 +400,7 @@ func (stream *Stream) makeSeekTable() (err error) {
 		i++
 	}
 
-	stream.seekTable = &meta.SeekTable{Points: tmp}
+	stream.seekTable = &meta.SeekTable{Points: points}
 
 	_, err = rs.Seek(pos, io.SeekStart)
 	return err

@@ -627,7 +627,7 @@ func (frame *Frame) correlate() {
 // SampleNumber returns the first sample number contained within the frame.
 func (frame *Frame) SampleNumber() uint64 {
 	if frame.HasFixedBlockSize {
-		return frame.Num*uint64(frame.BlockSize)
+		return frame.Num * uint64(frame.BlockSize)
 	}
 	return frame.Num
 }
