@@ -327,6 +327,7 @@ func (stream *Stream) Seek(sampleNum uint64) (uint64, error) {
 		return 0, err
 	}
 	for {
+		// Record seek offset to start of frame.
 		offset, err := rs.Seek(0, io.SeekCurrent)
 		if err != nil {
 			return 0, err
