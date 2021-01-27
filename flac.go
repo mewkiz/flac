@@ -389,6 +389,7 @@ func (stream *Stream) makeSeekTable() (err error) {
 	var sampleNum uint64
 	var points []meta.SeekPoint
 	for {
+		// Record seek offset to start of frame.
 		o, err := rs.Seek(0, io.SeekCurrent)
 		if err != nil {
 			return err
