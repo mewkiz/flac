@@ -49,12 +49,14 @@ type Stream struct {
 	// Zero or more metadata blocks.
 	Blocks []*meta.Block
 
-	// seekTable contains one or more pre-calculated audio frame seek points of the stream; nil if uninitialized.
+	// seekTable contains one or more pre-calculated audio frame seek points of
+	// the stream; nil if uninitialized.
 	seekTable *meta.SeekTable
-	// seekTableSize determines how many seek points the seekTable should have if the flac file does not include one
-	// in the metadata.
+	// seekTableSize determines how many seek points the seekTable should have if
+	// the flac file does not include one in the metadata.
 	seekTableSize int
-	// dataStart is the offset of the first frame header since SeekPoint.Offset is relative to this position.
+	// dataStart is the offset of the first frame header since SeekPoint.Offset
+	// is relative to this position.
 	dataStart int64
 
 	// Underlying io.Reader.
@@ -93,9 +95,9 @@ func New(r io.Reader) (stream *Stream, err error) {
 	return stream, nil
 }
 
-// NewSeek returns a Stream that has seeking enabled.  The incoming
-// io.ReadSeeker will not be buffered, which might result in performance issues.
-// Using an in-memory buffer like *bytes.Reader should work well.
+// NewSeek returns a Stream that has seeking enabled. The incoming io.ReadSeeker
+// will not be buffered, which might result in performance issues. Using an
+// in-memory buffer like *bytes.Reader should work well.
 func NewSeek(rs io.ReadSeeker) (stream *Stream, err error) {
 	stream = &Stream{r: rs, seekTableSize: defaultSeekTableSize}
 
@@ -130,7 +132,8 @@ var (
 	// flacSignature marks the beginning of a FLAC stream.
 	flacSignature = []byte("fLaC")
 
-	// id3Signature marks the beginning of an ID3 stream, used to skip over ID3 data.
+	// id3Signature marks the beginning of an ID3 stream, used to skip over ID3
+	// data.
 	id3Signature = []byte("ID3")
 
 	// ErrNoSeeker reports that flac.NewSeek was called with an io.Reader not
@@ -344,31 +347,37 @@ func (stream *Stream) Seek(sampleNum uint64) (uint64, error) {
 			return 0, err
 		}
 		if frame.SampleNumber()+uint64(frame.BlockSize) >= sampleNum {
-			// Restore seek offset to the start of the frame containing the specified sample number.
+			// Restore seek offset to the start of the frame containing the
+			// specified sample number.
 			_, err := rs.Seek(offset, io.SeekStart)
 			return frame.SampleNumber(), err
 		}
 	}
 }
 
-// TODO(_): Utilize binary search.
+// TODO(_): Utilize binary search in searchFromStart.
 
-//
-func (stream *Stream) searchFromStart(sample uint64) (meta.SeekPoint, error) {
+// searchFromStart searches for the given sample number from the start of the
+// seek table and returns the last seek point containing the sample number. If
+// no seek point contains the sample number, the last seek point preceding the
+// sample number is returned. If the sample number is lower than the first seek
+// point, the first seek point is returned.
+func (stream *Stream) searchFromStart(sampleNum uint64) (meta.SeekPoint, error) {
 	if len(stream.seekTable.Points) == 0 {
 		return meta.SeekPoint{}, ErrNoSeektable
 	}
 	prev := stream.seekTable.Points[0]
 	for _, p := range stream.seekTable.Points {
-		if p.SampleNum+uint64(p.NSamples) >= sample {
+		if p.SampleNum+uint64(p.NSamples) >= sampleNum {
 			return prev, nil
 		}
 		prev = p
 	}
-	return prev
+	return prev, nil
 }
 
-// makeSeekTable creates a seek table with seek points to each frame of the FLAC stream.
+// makeSeekTable creates a seek table with seek points to each frame of the FLAC
+// stream.
 func (stream *Stream) makeSeekTable() (err error) {
 	rs, ok := stream.r.(io.ReadSeeker)
 	if !ok {
@@ -390,7 +399,7 @@ func (stream *Stream) makeSeekTable() (err error) {
 	var points []meta.SeekPoint
 	for {
 		// Record seek offset to start of frame.
-		o, err := rs.Seek(0, io.SeekCurrent)
+		off, err := rs.Seek(0, io.SeekCurrent)
 		if err != nil {
 			return err
 		}
@@ -403,7 +412,7 @@ func (stream *Stream) makeSeekTable() (err error) {
 		}
 		points = append(points, meta.SeekPoint{
 			SampleNum: sampleNum,
-			Offset:    uint64(o - stream.dataStart),
+			Offset:    uint64(off - stream.dataStart),
 			NSamples:  f.BlockSize,
 		})
 
