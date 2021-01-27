@@ -37,20 +37,17 @@ func TestSeek(t *testing.T) {
 	// {SampleNum:40960 Offset:89596 NSamples:2723}
 
 	testPos := []struct {
-		seek     int64
-		whence   int
-		expected int64
+		seek     uint64
+		expected uint64
+		err      string
 	}{
-		{seek: 0, whence: io.SeekStart, expected: 0},
-		{seek: 9000, whence: io.SeekStart, expected: 8192},
-		{seek: 0, whence: io.SeekStart, expected: 0},
-		{seek: -6000, whence: io.SeekEnd, expected: 36864},
-		{seek: -8000, whence: io.SeekCurrent, expected: 32768},
-		{seek: 8000, whence: io.SeekCurrent, expected: 40960},
-		{seek: 0, whence: io.SeekEnd, expected: 40960},
-		{seek: 50000, whence: io.SeekStart, expected: 40960},
-		{seek: 100, whence: io.SeekEnd, expected: 40960},
-		{seek: -100, whence: io.SeekStart, expected: 0},
+		{seek: 0, expected: 0},
+		{seek: 9000, expected: 8192},
+		{seek: 0, expected: 0},
+		{seek: 8000, expected: 4096},
+		{seek: 0, expected: 0},
+		{seek: 50000, expected: 0, err: "unable to seek to sample number 50000"},
+		{seek: 100, expected: 0},
 	}
 
 	stream, err := flac.NewSeek(f)
@@ -60,9 +57,11 @@ func TestSeek(t *testing.T) {
 
 	for i, pos := range testPos {
 		t.Run(fmt.Sprintf("%02d", i), func(t *testing.T) {
-			p, err := stream.Seek(pos.seek, pos.whence)
+			p, err := stream.Seek(pos.seek)
 			if err != nil {
-				t.Fatal(err)
+				if err.Error() != pos.err {
+					t.Fatal(err)
+				}
 			}
 
 			if p != pos.expected {

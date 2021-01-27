@@ -624,6 +624,14 @@ func (frame *Frame) correlate() {
 	}
 }
 
+// SampleNumber returns the first sample number contained within the frame.
+func (frame *Frame) SampleNumber() uint64 {
+	if frame.HasFixedBlockSize {
+		return frame.Num * uint64(frame.BlockSize)
+	}
+	return frame.Num
+}
+
 // unexpected returns io.ErrUnexpectedEOF if err is io.EOF, and returns err
 // otherwise.
 func unexpected(err error) error {
