@@ -365,7 +365,7 @@ func (stream *Stream) searchFromStart(sample uint64) (meta.SeekPoint, error) {
 		}
 		prev = p
 	}
-	panic("unreachable")
+	return prev
 }
 
 // makeSeekTable creates a seek table with seek points to each frame of the FLAC stream.
