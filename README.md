@@ -22,8 +22,8 @@ Documentation provided by GoDoc.
 
 ## Changes
 
-* Version 1.0.7 (2021-01-23)
-    - Add seek API (see [#44](https://github.com/mewkiz/flac/issues/44)). Thanks to [Craig Swank](https://github.com/cswank).
+* Version 1.0.7 (2021-01-28)
+    - Add seek API (see [#44](https://github.com/mewkiz/flac/pull/44) and [#46](https://github.com/mewkiz/flac/pull/46)). Thanks to [Craig Swank](https://github.com/cswank).
 
 * Version 1.0.6 (2019-12-20)
     - Add experimental Encoder API to encode audio samples and metadata blocks (see [#32](https://github.com/mewkiz/flac/pull/32)).
