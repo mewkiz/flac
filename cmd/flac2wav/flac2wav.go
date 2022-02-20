@@ -81,7 +81,18 @@ func flac2wav(path string, force bool) error {
 		data = data[:0]
 		for i := 0; i < frame.Subframes[0].NSamples; i++ {
 			for _, subframe := range frame.Subframes {
-				data = append(data, int(subframe.Samples[i]))
+				sample := int(subframe.Samples[i])
+				if frame.BitsPerSample == 8 {
+					// WAV files with 8 bit-per-sample are stored with unsigned
+					// values, WAV files with more than 8 bit-per-sample are stored
+					// as signed values (ref page 59-60 of [1]).
+					//
+					// [1]: http://www-mmsp.ece.mcgill.ca/Documents/AudioFormats/WAVE/Docs/riffmci.pdf
+					// ref: https://github.com/mewkiz/flac/issues/51#issuecomment-1046183409
+					const midpointValue = 0x80
+					sample += midpointValue
+				}
+				data = append(data, sample)
 			}
 		}
 		buf := &audio.IntBuffer{
