@@ -2,7 +2,7 @@
 
 [![Build Status](https://travis-ci.org/mewkiz/flac.svg?branch=master)](https://travis-ci.org/mewkiz/flac)
 [![Coverage Status](https://img.shields.io/coveralls/mewkiz/flac.svg)](https://coveralls.io/r/mewkiz/flac?branch=master)
-[![GoDoc](https://godoc.org/github.com/mewkiz/flac?status.svg)](https://godoc.org/github.com/mewkiz/flac)
+[![GoDoc](https://pkg.go.dev/badge/github.com/mewkiz/flac)](https://pkg.go.dev/github.com/mewkiz/flac)
 
 This package provides access to [FLAC][1] (Free Lossless Audio Codec) streams.
 
@@ -16,9 +16,9 @@ Documentation provided by GoDoc.
     - [frame][flac/frame]: implements access to FLAC audio frames.
     - [meta][flac/meta]: implements access to FLAC metadata blocks.
 
-[flac]: http://godoc.org/github.com/mewkiz/flac
-[flac/frame]: http://godoc.org/github.com/mewkiz/flac/frame
-[flac/meta]: http://godoc.org/github.com/mewkiz/flac/meta
+[flac]: http://pkg.go.dev/github.com/mewkiz/flac
+[flac/frame]: http://pkg.go.dev/github.com/mewkiz/flac/frame
+[flac/meta]: http://pkg.go.dev/github.com/mewkiz/flac/meta
 
 ## Changes
 
