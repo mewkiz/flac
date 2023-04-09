@@ -22,6 +22,11 @@ Documentation provided by GoDoc.
 
 ## Changes
 
+* Version 1.0.8 (TBD)
+    - Fix race condition when reading meta data (see [#56](https://github.com/mewkiz/flac/pull/56)). Thanks to [Zach Orosz](https://github.com/zachorosz).
+    - Fix encoding of 8-bps WAV audio samples (see [#52](https://github.com/mewkiz/flac/pull/52)). Thanks to [Martijn van Beurden](https://github.com/ktmf01).
+    - Fix StreamInfo block type error message (see [#49](https://github.com/mewkiz/flac/pull/49)).
+
 * Version 1.0.7 (2021-01-28)
     - Add seek API (see [#44](https://github.com/mewkiz/flac/pull/44) and [#46](https://github.com/mewkiz/flac/pull/46)). Thanks to [Craig Swank](https://github.com/cswank).
 
