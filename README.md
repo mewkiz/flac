@@ -22,7 +22,7 @@ Documentation provided by GoDoc.
 
 ## Changes
 
-* Version 1.0.8 (TBD)
+* Version 1.0.8 (2023-04-09)
     - Fix race condition when reading meta data (see [#56](https://github.com/mewkiz/flac/pull/56)). Thanks to [Zach Orosz](https://github.com/zachorosz).
     - Fix encoding of 8-bps WAV audio samples (see [#52](https://github.com/mewkiz/flac/pull/52)). Thanks to [Martijn van Beurden](https://github.com/ktmf01).
     - Fix StreamInfo block type error message (see [#49](https://github.com/mewkiz/flac/pull/49)).
