@@ -14,25 +14,25 @@ import (
 
 func TestEncode(t *testing.T) {
 	paths := []string{
-		"meta/testdata/input-SCPAP.flac",
-		"meta/testdata/input-SCVA.flac",
-		"meta/testdata/input-SCVPAP.flac",
-		"meta/testdata/input-VA.flac",
-		"meta/testdata/silence.flac",
-		"testdata/19875.flac",
-		"testdata/44127.flac",
-		"testdata/59996.flac",
-		"testdata/80574.flac",
-		"testdata/172960.flac",
-		"testdata/189983.flac",
-		"testdata/191885.flac",
-		"testdata/212768.flac",
-		"testdata/220014.flac",
-		"testdata/243749.flac",
-		"testdata/256529.flac",
-		"testdata/257344.flac",
-		"testdata/8297-275156-0011.flac",
-		"testdata/love.flac",
+		"../testdata/input-SCPAP.flac",
+		"../testdata/input-SCVA.flac",
+		"../testdata/input-SCVPAP.flac",
+		"../testdata/input-VA.flac",
+		"../testdata/silence.flac",
+		"../testdata/19875.flac",
+		"../testdata/44127.flac",
+		"../testdata/59996.flac",
+		"../testdata/80574.flac",
+		"../testdata/172960.flac",
+		"../testdata/189983.flac",
+		"../testdata/191885.flac",
+		"../testdata/212768.flac",
+		"../testdata/220014.flac",
+		"../testdata/243749.flac",
+		"../testdata/256529.flac",
+		"../testdata/257344.flac",
+		"../testdata/8297-275156-0011.flac",
+		"../testdata/love.flac",
 	}
 	for _, path := range paths {
 		// Decode source file.
@@ -66,7 +66,7 @@ func TestEncode(t *testing.T) {
 
 func TestEncodeComment(t *testing.T) {
 	// Decode FLAC file.
-	src, err := flac.ParseFile("testdata/love.flac")
+	src, err := flac.ParseFile("../testdata/love.flac")
 	if err != nil {
 		t.Fatalf("unable to parse input FLAC file; %v", err)
 	}

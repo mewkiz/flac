@@ -53,7 +53,7 @@ var golden = []struct {
 
 	// i=3
 	{
-		name: "testdata/input-SCPAP.flac",
+		name: "../testdata/input-SCPAP.flac",
 		info: &meta.StreamInfo{BlockSizeMin: 0x1200, BlockSizeMax: 0x1200, FrameSizeMin: 0xe, FrameSizeMax: 0x10, SampleRate: 0xac44, NChannels: 0x2, BitsPerSample: 0x10, NSamples: 0x16f8, MD5sum: [16]uint8{0x74, 0xff, 0xd4, 0x73, 0x7e, 0xb5, 0x48, 0x8d, 0x51, 0x2b, 0xe4, 0xaf, 0x58, 0x94, 0x33, 0x62}},
 		blocks: []*meta.Block{
 			{
@@ -81,7 +81,7 @@ var golden = []struct {
 
 	// i=4
 	{
-		name: "testdata/input-SCVA.flac",
+		name: "../testdata/input-SCVA.flac",
 		info: &meta.StreamInfo{BlockSizeMin: 0x1200, BlockSizeMax: 0x1200, FrameSizeMin: 0xe, FrameSizeMax: 0x10, SampleRate: 0xac44, NChannels: 0x2, BitsPerSample: 0x10, NSamples: 0x16f8, MD5sum: [16]uint8{0x74, 0xff, 0xd4, 0x73, 0x7e, 0xb5, 0x48, 0x8d, 0x51, 0x2b, 0xe4, 0xaf, 0x58, 0x94, 0x33, 0x62}},
 		blocks: []*meta.Block{
 			{
@@ -105,7 +105,7 @@ var golden = []struct {
 
 	// i=5
 	{
-		name: "testdata/input-SCVAUP.flac",
+		name: "../testdata/input-SCVAUP.flac",
 		info: &meta.StreamInfo{BlockSizeMin: 0x1200, BlockSizeMax: 0x1200, FrameSizeMin: 0xe, FrameSizeMax: 0x10, SampleRate: 0xac44, NChannels: 0x2, BitsPerSample: 0x10, NSamples: 0x16f8, MD5sum: [16]uint8{0x74, 0xff, 0xd4, 0x73, 0x7e, 0xb5, 0x48, 0x8d, 0x51, 0x2b, 0xe4, 0xaf, 0x58, 0x94, 0x33, 0x62}},
 		blocks: []*meta.Block{
 			{
@@ -136,7 +136,7 @@ var golden = []struct {
 	},
 	// i=6
 	{
-		name: "testdata/input-SCVPAP.flac",
+		name: "../testdata/input-SCVPAP.flac",
 		info: &meta.StreamInfo{BlockSizeMin: 0x1200, BlockSizeMax: 0x1200, FrameSizeMin: 0xe, FrameSizeMax: 0x10, SampleRate: 0xac44, NChannels: 0x2, BitsPerSample: 0x10, NSamples: 0x16f8, MD5sum: [16]uint8{0x74, 0xff, 0xd4, 0x73, 0x7e, 0xb5, 0x48, 0x8d, 0x51, 0x2b, 0xe4, 0xaf, 0x58, 0x94, 0x33, 0x62}},
 		blocks: []*meta.Block{
 			{
@@ -168,7 +168,7 @@ var golden = []struct {
 
 	// i=7
 	{
-		name: "testdata/input-SVAUP.flac",
+		name: "../testdata/input-SVAUP.flac",
 		info: &meta.StreamInfo{BlockSizeMin: 0x1200, BlockSizeMax: 0x1200, FrameSizeMin: 0xe, FrameSizeMax: 0x10, SampleRate: 0xac44, NChannels: 0x2, BitsPerSample: 0x10, NSamples: 0x16f8, MD5sum: [16]uint8{0x74, 0xff, 0xd4, 0x73, 0x7e, 0xb5, 0x48, 0x8d, 0x51, 0x2b, 0xe4, 0xaf, 0x58, 0x94, 0x33, 0x62}},
 		blocks: []*meta.Block{
 			{
@@ -196,7 +196,7 @@ var golden = []struct {
 
 	// i=8
 	{
-		name: "testdata/input-VA.flac",
+		name: "../testdata/input-VA.flac",
 		info: &meta.StreamInfo{BlockSizeMin: 0x1200, BlockSizeMax: 0x1200, FrameSizeMin: 0xe, FrameSizeMax: 0x10, SampleRate: 0xac44, NChannels: 0x2, BitsPerSample: 0x10, NSamples: 0x16f8, MD5sum: [16]uint8{0x74, 0xff, 0xd4, 0x73, 0x7e, 0xb5, 0x48, 0x8d, 0x51, 0x2b, 0xe4, 0xaf, 0x58, 0x94, 0x33, 0x62}},
 		blocks: []*meta.Block{
 			{
@@ -244,13 +244,13 @@ func TestParseBlocks(t *testing.T) {
 }
 
 func TestParsePicture(t *testing.T) {
-	stream, err := stream.ParseFile("testdata/silence.flac")
+	stream, err := stream.ParseFile("../testdata/silence.flac")
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer stream.Close()
 
-	want, err := ioutil.ReadFile("testdata/silence.jpg")
+	want, err := ioutil.ReadFile("../testdata/silence.jpg")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -269,7 +269,7 @@ func TestParsePicture(t *testing.T) {
 
 // TODO: better error verification than string-based comparisons.
 func TestMissingValue(t *testing.T) {
-	_, err := stream.ParseFile("testdata/missing-value.flac")
+	_, err := stream.ParseFile("../testdata/missing-value.flac")
 	if err.Error() != `meta.Block.parseVorbisComment: unable to locate '=' in vector "title 2"` {
 		t.Fatal(err)
 	}
