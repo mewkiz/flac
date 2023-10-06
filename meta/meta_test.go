@@ -6,8 +6,8 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/mewkiz/flac"
 	"github.com/mewkiz/flac/meta"
+	stream "github.com/mewkiz/flac/stream"
 )
 
 var golden = []struct {
@@ -213,7 +213,7 @@ var golden = []struct {
 
 func TestParseBlocks(t *testing.T) {
 	for i, g := range golden {
-		stream, err := flac.ParseFile(g.name)
+		stream, err := stream.ParseFile(g.name)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -244,7 +244,7 @@ func TestParseBlocks(t *testing.T) {
 }
 
 func TestParsePicture(t *testing.T) {
-	stream, err := flac.ParseFile("testdata/silence.flac")
+	stream, err := stream.ParseFile("testdata/silence.flac")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -269,7 +269,7 @@ func TestParsePicture(t *testing.T) {
 
 // TODO: better error verification than string-based comparisons.
 func TestMissingValue(t *testing.T) {
-	_, err := flac.ParseFile("testdata/missing-value.flac")
+	_, err := stream.ParseFile("testdata/missing-value.flac")
 	if err.Error() != `meta.Block.parseVorbisComment: unable to locate '=' in vector "title 2"` {
 		t.Fatal(err)
 	}

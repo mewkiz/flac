@@ -6,7 +6,7 @@ import (
 	"io"
 	"testing"
 
-	"github.com/mewkiz/flac"
+	stream "github.com/mewkiz/flac/stream"
 )
 
 var golden = []struct {
@@ -29,7 +29,7 @@ var golden = []struct {
 
 func TestFrameHash(t *testing.T) {
 	for i, g := range golden {
-		stream, err := flac.Open(g.name)
+		stream, err := stream.Open(g.name)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -64,7 +64,7 @@ func BenchmarkFrameParse(b *testing.B) {
 	//
 	//    http://freesound.org/people/jarfil/sounds/151185/
 	for i := 0; i < b.N; i++ {
-		stream, err := flac.Open("../testdata/benchmark/151185.flac")
+		stream, err := stream.Open("../testdata/benchmark/151185.flac")
 		if err != nil {
 			b.Fatal(err)
 		}
@@ -89,7 +89,7 @@ func BenchmarkFrameHash(b *testing.B) {
 	//
 	//    http://freesound.org/people/jarfil/sounds/151185/
 	for i := 0; i < b.N; i++ {
-		stream, err := flac.Open("../testdata/benchmark/151185.flac")
+		stream, err := stream.Open("../testdata/benchmark/151185.flac")
 		if err != nil {
 			b.Fatal(err)
 		}

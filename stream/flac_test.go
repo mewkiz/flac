@@ -6,11 +6,11 @@ import (
 	"os"
 	"testing"
 
-	"github.com/mewkiz/flac"
+	stream "github.com/mewkiz/flac/stream"
 )
 
 func TestSkipID3v2(t *testing.T) {
-	if _, err := flac.ParseFile("testdata/id3.flac"); err != nil {
+	if _, err := stream.ParseFile("testdata/id3.flac"); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -50,7 +50,7 @@ func TestSeek(t *testing.T) {
 		{seek: 100, expected: 0},
 	}
 
-	stream, err := flac.NewSeek(f)
+	stream, err := stream.NewSeek(f)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -100,10 +100,10 @@ func TestDecode(t *testing.T) {
 		"testdata/love.flac",
 	}
 
-	funcs := map[string]func(io.Reader) (*flac.Stream, error){
-		"new":     flac.New,
-		"newSeek": func(r io.Reader) (*flac.Stream, error) { return flac.NewSeek(r.(io.ReadSeeker)) },
-		"parse":   flac.Parse,
+	funcs := map[string]func(io.Reader) (*stream.Stream, error){
+		"new":     stream.New,
+		"newSeek": func(r io.Reader) (*stream.Stream, error) { return stream.NewSeek(r.(io.ReadSeeker)) },
+		"parse":   stream.Parse,
 	}
 
 	for _, path := range paths {

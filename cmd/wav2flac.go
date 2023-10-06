@@ -1,37 +1,20 @@
-package main
+package cmd
 
 import (
-	"flag"
 	"fmt"
-	"log"
 	"os"
 
 	"github.com/go-audio/audio"
 	"github.com/go-audio/wav"
-	"github.com/mewkiz/flac"
 	"github.com/mewkiz/flac/frame"
 	"github.com/mewkiz/flac/meta"
+	stream "github.com/mewkiz/flac/stream"
 	"github.com/mewkiz/pkg/osutil"
 	"github.com/mewkiz/pkg/pathutil"
 	"github.com/pkg/errors"
 )
 
-func main() {
-	// Parse command line arguments.
-	var (
-		// force overwrite FLAC file if already present.
-		force bool
-	)
-	flag.BoolVar(&force, "f", false, "force overwrite")
-	flag.Parse()
-	for _, wavPath := range flag.Args() {
-		if err := wav2flac(wavPath, force); err != nil {
-			log.Fatalf("%+v", err)
-		}
-	}
-}
-
-func wav2flac(wavPath string, force bool) error {
+func Wav2flac(wavPath string, force bool) error {
 	// Create WAV decoder.
 	r, err := os.Open(wavPath)
 	if err != nil {
@@ -77,7 +60,7 @@ func wav2flac(wavPath string, force bool) error {
 		// MD5 checksum of the unencoded audio data.
 		//MD5sum // set by encoder.
 	}
-	enc, err := flac.NewEncoder(w, info)
+	enc, err := stream.NewEncoder(w, info)
 	if err != nil {
 		return errors.WithStack(err)
 	}

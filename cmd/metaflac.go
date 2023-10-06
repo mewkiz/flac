@@ -14,19 +14,17 @@
 //    zonophone-x28010-10407u.flac:  is last: false
 //    zonophone-x28010-10407u.flac:  length: 34
 
-package main
+package cmd
 
 import (
 	"encoding/hex"
 	"flag"
 	"fmt"
-	"log"
-	"os"
 	"strconv"
 	"strings"
 
-	"github.com/mewkiz/flac"
 	"github.com/mewkiz/flac/meta"
+	stream "github.com/mewkiz/flac/stream"
 )
 
 // flagBlockNum contains an optional comma-separated list of block numbers to
@@ -35,31 +33,9 @@ var flagBlockNum string
 
 func init() {
 	flag.StringVar(&flagBlockNum, "block-number", "", "An optional comma-separated list of block numbers to display.")
-	flag.Usage = usage
 }
 
-func usage() {
-	fmt.Fprintln(os.Stderr, "Usage: metaflac [OPTION]... FILE...")
-	fmt.Fprintln(os.Stderr)
-	fmt.Fprintln(os.Stderr, "Flags:")
-	flag.PrintDefaults()
-}
-
-func main() {
-	flag.Parse()
-	if flag.NArg() < 1 {
-		flag.Usage()
-		os.Exit(1)
-	}
-	for _, path := range flag.Args() {
-		err := list(path)
-		if err != nil {
-			log.Fatalln(err)
-		}
-	}
-}
-
-func list(path string) error {
+func List(path string) error {
 	var blockNums []int
 	if flagBlockNum != "" {
 		// Parse "--block-number" command line flag.
@@ -74,7 +50,7 @@ func list(path string) error {
 	}
 
 	// Open FLAC stream.
-	stream, err := flac.ParseFile(path)
+	stream, err := stream.ParseFile(path)
 	if err != nil {
 		return err
 	}

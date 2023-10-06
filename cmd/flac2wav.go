@@ -1,49 +1,22 @@
 // The flac2wav tool converts FLAC files to WAV files.
-package main
+package cmd
 
 import (
-	"flag"
-	"fmt"
 	"io"
-	"log"
 	"os"
 
 	"github.com/go-audio/audio"
 	"github.com/go-audio/wav"
-	"github.com/mewkiz/flac"
+	stream "github.com/mewkiz/flac/stream"
 	"github.com/mewkiz/pkg/osutil"
 	"github.com/mewkiz/pkg/pathutil"
 	"github.com/pkg/errors"
 )
 
-func usage() {
-	const use = `
-Usage: flac2wav [OPTION]... FILE.flac...`
-	fmt.Fprintln(os.Stderr, use[1:])
-	flag.PrintDefaults()
-}
-
-func main() {
-	// Parse command line arguments.
-	var (
-		// force overwrite WAV file if present already.
-		force bool
-	)
-	flag.BoolVar(&force, "f", false, "force overwrite")
-	flag.Usage = usage
-	flag.Parse()
-	for _, path := range flag.Args() {
-		err := flac2wav(path, force)
-		if err != nil {
-			log.Fatalf("%+v", err)
-		}
-	}
-}
-
 // flac2wav converts the provided FLAC file to a WAV file.
-func flac2wav(path string, force bool) error {
+func Flac2wav(path string, force bool) error {
 	// Open FLAC file.
-	stream, err := flac.Open(path)
+	stream, err := stream.Open(path)
 	if err != nil {
 		return errors.WithStack(err)
 	}

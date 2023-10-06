@@ -7,12 +7,12 @@ import (
 	"io"
 	"log"
 
-	"github.com/mewkiz/flac"
+	stream "github.com/mewkiz/flac/stream"
 )
 
 func ExampleParseFile() {
 	// Parse metadata of love.flac
-	stream, err := flac.ParseFile("testdata/love.flac")
+	stream, err := stream.ParseFile("testdata/love.flac")
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -31,7 +31,7 @@ func ExampleParseFile() {
 
 func ExampleOpen() {
 	// Open love.flac for audio streaming without parsing metadata.
-	stream, err := flac.Open("testdata/love.flac")
+	stream, err := stream.Open("testdata/love.flac")
 	if err != nil {
 		log.Fatal(err)
 	}
