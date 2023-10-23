@@ -3,8 +3,6 @@ package frame
 import (
 	"errors"
 	"fmt"
-	"log"
-
 	"github.com/mewkiz/flac/internal/bits"
 )
 
@@ -237,11 +235,11 @@ func (subframe *Subframe) decodeVerbatim(br *bits.Reader, bps uint) error {
 // fixedCoeffs maps from prediction order to the LPC coefficients used in fixed
 // encoding.
 //
-//    x_0[n] = 0
-//    x_1[n] = x[n-1]
-//    x_2[n] = 2*x[n-1] - x[n-2]
-//    x_3[n] = 3*x[n-1] - 3*x[n-2] + x[n-3]
-//    x_4[n] = 4*x[n-1] - 6*x[n-2] + 4*x[n-3] - x[n-4]
+//	x_0[n] = 0
+//	x_1[n] = x[n-1]
+//	x_2[n] = 2*x[n-1] - x[n-2]
+//	x_3[n] = 3*x[n-1] - 3*x[n-2] + x[n-3]
+//	x_4[n] = 4*x[n-1] - 6*x[n-2] + 4*x[n-3] - x[n-4]
 var fixedCoeffs = [...][]int32{
 	// ref: Section 2.2 of http://www.hpl.hp.com/techreports/1999/HPL-1999-144.pdf
 	1: {1},
@@ -395,8 +393,6 @@ func (subframe *Subframe) decodeRicePart(br *bits.Reader, paramSize uint) error 
 			nsamples = subframe.NSamples/nparts - subframe.Order
 		}
 
-		// TODO(u): Verify that decoding of subframes with Rice parameter escape
-		// codes have been implemented correctly.
 		if paramSize == 4 && param == 0xF || paramSize == 5 && param == 0x1F {
 			// 1111 or 11111: Escape code, meaning the partition is in unencoded
 			// binary form using n bits per sample; n follows as a 5-bit number.
@@ -412,9 +408,7 @@ func (subframe *Subframe) decodeRicePart(br *bits.Reader, paramSize uint) error 
 				}
 				subframe.Samples = append(subframe.Samples, int32(sample))
 			}
-			// TODO(u): Remove log message when the test cases have been extended.
-			log.Print("frame.Subframe.decodeRicePart: The flac library test cases do not yet include any audio files with Rice parameter escape codes. If possible please consider contributing this audio sample to improve the reliability of the test cases.")
-			return nil
+			continue
 		}
 
 		// Decode the Rice encoded residuals of the partition.
