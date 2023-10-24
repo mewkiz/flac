@@ -49,7 +49,6 @@ var golden = []struct {
 	{path: "../testdata/flac-test-files/subset/19 - samplerate 35467Hz.flac"},
 	{path: "../testdata/flac-test-files/subset/20 - samplerate 39kHz.flac"},
 	{path: "../testdata/flac-test-files/subset/21 - samplerate 22050Hz.flac"},
-	// TODO: fix decoding of "subset/22 - ...flac": frame.Frame.Hash: support for 12-bit sample size not yet implemented
 	{path: "../testdata/flac-test-files/subset/22 - 12 bit per sample.flac"},
 	{path: "../testdata/flac-test-files/subset/23 - 8 bit per sample.flac"},
 	{path: "../testdata/flac-test-files/subset/24 - variable blocksize file created with flake revision 264.flac"},
@@ -66,7 +65,6 @@ var golden = []struct {
 	{path: "../testdata/flac-test-files/subset/34 - samplerate 192kHz, using only 32nd order predictors.flac"},
 	{path: "../testdata/flac-test-files/subset/35 - samplerate 134560Hz.flac"},
 	{path: "../testdata/flac-test-files/subset/36 - samplerate 384kHz.flac"},
-	// TODO: fix decoding of "subset/37 - ...flac": frame.Frame.Hash: support for 20-bit sample size not yet implemented
 	{path: "../testdata/flac-test-files/subset/37 - 20 bit per sample.flac"},
 	{path: "../testdata/flac-test-files/subset/38 - 3 channels (3.0).flac"},
 	{path: "../testdata/flac-test-files/subset/39 - 4 channels (4.0).flac"},
@@ -92,7 +90,6 @@ var golden = []struct {
 	{path: "../testdata/flac-test-files/subset/59 - AVIF PICTURE.flac"},
 	{path: "../testdata/flac-test-files/subset/60 - mono audio.flac"},
 	{path: "../testdata/flac-test-files/subset/61 - predictor overflow check, 16-bit.flac"},
-	// TODO: fix decoding of "subset/62 - ...flac": frame.Frame.Hash: support for 20-bit sample size not yet implemented
 	{path: "../testdata/flac-test-files/subset/62 - predictor overflow check, 20-bit.flac"},
 	// TODO: fix decoding of "subset/63 - ...flac": MD5 checksum mismatch for decoded audio samples; expected e4e4a6b3a672a849a3e2157c11ad23c6, got a0343afaaaa6229266d78ccf3175eb8d
 	{path: "../testdata/flac-test-files/subset/63 - predictor overflow check, 24-bit.flac"},

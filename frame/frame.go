@@ -157,15 +157,15 @@ func (frame *Frame) Hash(md5sum hash.Hash) {
 	for i := 0; i < int(frame.BlockSize); i++ {
 		for _, subframe := range frame.Subframes {
 			sample := subframe.Samples[i]
-			switch bps {
-			case 8:
+			switch {
+			case 1 <= bps && bps <= 8:
 				buf[0] = uint8(sample)
 				md5sum.Write(buf[:1])
-			case 16:
+			case 9 <= bps && bps <= 16:
 				buf[0] = uint8(sample)
 				buf[1] = uint8(sample >> 8)
 				md5sum.Write(buf[:2])
-			case 24:
+			case 17 <= bps && bps <= 24:
 				buf[0] = uint8(sample)
 				buf[1] = uint8(sample >> 8)
 				buf[2] = uint8(sample >> 16)
