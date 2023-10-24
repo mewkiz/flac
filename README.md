@@ -22,6 +22,11 @@ Documentation provided by GoDoc.
 
 ## Changes
 
+* Version 1.0.9 (2023-10-24)
+    - Fix integer overflow during unfolding of rice residual (see [#61](https://github.com/mewkiz/flac/pull/61)). Thanks to [Mark Kremer](https://github.com/MarkKremer).
+    - Fix decoding of escaped partition audio samples (see [#60](https://github.com/mewkiz/flac/issues/60)). Thanks to [Mark Kremer](https://github.com/MarkKremer).
+    - Handle frame hashing of audio samples with bits-per-sample not evenly divisible by 8 (see [9d50c9e](https://github.com/mewkiz/flac/commit/9d50c9ee99ba322f487ed60442dc16f22b2affb8)).
+
 * Version 1.0.8 (2023-04-09)
     - Fix race condition when reading meta data (see [#56](https://github.com/mewkiz/flac/pull/56)). Thanks to [Zach Orosz](https://github.com/zachorosz).
     - Fix encoding of 8-bps WAV audio samples (see [#52](https://github.com/mewkiz/flac/pull/52)). Thanks to [Martijn van Beurden](https://github.com/ktmf01).
