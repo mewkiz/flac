@@ -14,6 +14,6 @@ package bits
 //	6 =>  3
 //
 // ref: https://developers.google.com/protocol-buffers/docs/encoding
-func ZigZag(x int32) int32 {
-	return x>>1 ^ -(x & 1)
+func ZigZag(x uint32) int32 {
+	return int32(x>>1) ^ -int32(x&1)
 }
