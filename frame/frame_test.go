@@ -10,28 +10,102 @@ import (
 )
 
 var golden = []struct {
-	name string
+	path string
 }{
-	{name: "../testdata/love.flac"},   // i=0
-	{name: "../testdata/19875.flac"},  // i=1
-	{name: "../testdata/44127.flac"},  // i=2
-	{name: "../testdata/59996.flac"},  // i=3
-	{name: "../testdata/80574.flac"},  // i=4
-	{name: "../testdata/172960.flac"}, // i=5
-	{name: "../testdata/189983.flac"}, // i=6
-	{name: "../testdata/191885.flac"}, // i=7
-	{name: "../testdata/212768.flac"}, // i=8
-	{name: "../testdata/220014.flac"}, // i=9
-	{name: "../testdata/243749.flac"}, // i=10
-	{name: "../testdata/256529.flac"}, // i=11
-	{name: "../testdata/257344.flac"}, // i=12
+	{path: "../testdata/love.flac"},
+	{path: "../testdata/19875.flac"},
+	{path: "../testdata/44127.flac"},
+	{path: "../testdata/59996.flac"},
+	{path: "../testdata/80574.flac"},
+	{path: "../testdata/172960.flac"},
+	{path: "../testdata/189983.flac"},
+	{path: "../testdata/191885.flac"},
+	{path: "../testdata/212768.flac"},
+	{path: "../testdata/220014.flac"},
+	{path: "../testdata/243749.flac"},
+	{path: "../testdata/256529.flac"},
+	{path: "../testdata/257344.flac"},
+
+	// IETF test cases.
+	{path: "../testdata/flac-test-files/subset/01 - blocksize 4096.flac"},
+	{path: "../testdata/flac-test-files/subset/02 - blocksize 4608.flac"},
+	{path: "../testdata/flac-test-files/subset/03 - blocksize 16.flac"},
+	{path: "../testdata/flac-test-files/subset/04 - blocksize 192.flac"},
+	{path: "../testdata/flac-test-files/subset/05 - blocksize 254.flac"},
+	{path: "../testdata/flac-test-files/subset/06 - blocksize 512.flac"},
+	{path: "../testdata/flac-test-files/subset/07 - blocksize 725.flac"},
+	{path: "../testdata/flac-test-files/subset/08 - blocksize 1000.flac"},
+	{path: "../testdata/flac-test-files/subset/09 - blocksize 1937.flac"},
+	{path: "../testdata/flac-test-files/subset/10 - blocksize 2304.flac"},
+	{path: "../testdata/flac-test-files/subset/11 - partition order 8.flac"},
+	{path: "../testdata/flac-test-files/subset/12 - qlp precision 15 bit.flac"},
+	{path: "../testdata/flac-test-files/subset/13 - qlp precision 2 bit.flac"},
+	{path: "../testdata/flac-test-files/subset/14 - wasted bits.flac"},
+	{path: "../testdata/flac-test-files/subset/15 - only verbatim subframes.flac"},
+	// TODO: fix decoding of "subset/16 - ...flac": frame_test.go:127: MD5 checksum mismatch for decoded audio samples; expected d0e1313950dc04b749c53cd349251bed, got 1d1380204d7eb5b138fe884178e9b67d
+	{path: "../testdata/flac-test-files/subset/16 - partition order 8 containing escaped partitions.flac"},
+	{path: "../testdata/flac-test-files/subset/17 - all fixed orders.flac"},
+	{path: "../testdata/flac-test-files/subset/18 - precision search.flac"},
+	{path: "../testdata/flac-test-files/subset/19 - samplerate 35467Hz.flac"},
+	{path: "../testdata/flac-test-files/subset/20 - samplerate 39kHz.flac"},
+	{path: "../testdata/flac-test-files/subset/21 - samplerate 22050Hz.flac"},
+	// TODO: fix decoding of "subset/22 - ...flac": frame.Frame.Hash: support for 12-bit sample size not yet implemented
+	{path: "../testdata/flac-test-files/subset/22 - 12 bit per sample.flac"},
+	{path: "../testdata/flac-test-files/subset/23 - 8 bit per sample.flac"},
+	{path: "../testdata/flac-test-files/subset/24 - variable blocksize file created with flake revision 264.flac"},
+	{path: "../testdata/flac-test-files/subset/25 - variable blocksize file created with flake revision 264, modified to create smaller blocks.flac"},
+	{path: "../testdata/flac-test-files/subset/26 - variable blocksize file created with CUETools.Flake 2.1.6.flac"},
+	{path: "../testdata/flac-test-files/subset/27 - old format variable blocksize file created with Flake 0.11.flac"},
+	{path: "../testdata/flac-test-files/subset/28 - high resolution audio, default settings.flac"},
+	{path: "../testdata/flac-test-files/subset/29 - high resolution audio, blocksize 16384.flac"},
+	{path: "../testdata/flac-test-files/subset/30 - high resolution audio, blocksize 13456.flac"},
+	{path: "../testdata/flac-test-files/subset/31 - high resolution audio, using only 32nd order predictors.flac"},
+	// TODO: fix decoding of "subset/32 - ...flac": MD5 checksum mismatch for decoded audio samples; expected 88c57117179b46e784643de9f20c1917, got b7377fd70228aed730cbb00e55dbafab
+	{path: "../testdata/flac-test-files/subset/32 - high resolution audio, partition order 8 containing escaped partitions.flac"},
+	{path: "../testdata/flac-test-files/subset/33 - samplerate 192kHz.flac"},
+	{path: "../testdata/flac-test-files/subset/34 - samplerate 192kHz, using only 32nd order predictors.flac"},
+	{path: "../testdata/flac-test-files/subset/35 - samplerate 134560Hz.flac"},
+	{path: "../testdata/flac-test-files/subset/36 - samplerate 384kHz.flac"},
+	// TODO: fix decoding of "subset/37 - ...flac": frame.Frame.Hash: support for 20-bit sample size not yet implemented
+	{path: "../testdata/flac-test-files/subset/37 - 20 bit per sample.flac"},
+	{path: "../testdata/flac-test-files/subset/38 - 3 channels (3.0).flac"},
+	{path: "../testdata/flac-test-files/subset/39 - 4 channels (4.0).flac"},
+	{path: "../testdata/flac-test-files/subset/40 - 5 channels (5.0).flac"},
+	{path: "../testdata/flac-test-files/subset/41 - 6 channels (5.1).flac"},
+	{path: "../testdata/flac-test-files/subset/42 - 7 channels (6.1).flac"},
+	{path: "../testdata/flac-test-files/subset/43 - 8 channels (7.1).flac"},
+	{path: "../testdata/flac-test-files/subset/44 - 8-channel surround, 192kHz, 24 bit, using only 32nd order predictors.flac"},
+	{path: "../testdata/flac-test-files/subset/45 - no total number of samples set.flac"},
+	{path: "../testdata/flac-test-files/subset/46 - no min-max framesize set.flac"},
+	{path: "../testdata/flac-test-files/subset/47 - only STREAMINFO.flac"},
+	{path: "../testdata/flac-test-files/subset/48 - Extremely large SEEKTABLE.flac"},
+	{path: "../testdata/flac-test-files/subset/49 - Extremely large PADDING.flac"},
+	{path: "../testdata/flac-test-files/subset/50 - Extremely large PICTURE.flac"},
+	{path: "../testdata/flac-test-files/subset/51 - Extremely large VORBISCOMMENT.flac"},
+	{path: "../testdata/flac-test-files/subset/52 - Extremely large APPLICATION.flac"},
+	{path: "../testdata/flac-test-files/subset/53 - CUESHEET with very many indexes.flac"},
+	{path: "../testdata/flac-test-files/subset/54 - 1000x repeating VORBISCOMMENT.flac"},
+	{path: "../testdata/flac-test-files/subset/55 - file 48-53 combined.flac"},
+	{path: "../testdata/flac-test-files/subset/56 - JPG PICTURE.flac"},
+	{path: "../testdata/flac-test-files/subset/57 - PNG PICTURE.flac"},
+	{path: "../testdata/flac-test-files/subset/58 - GIF PICTURE.flac"},
+	{path: "../testdata/flac-test-files/subset/59 - AVIF PICTURE.flac"},
+	{path: "../testdata/flac-test-files/subset/60 - mono audio.flac"},
+	{path: "../testdata/flac-test-files/subset/61 - predictor overflow check, 16-bit.flac"},
+	// TODO: fix decoding of "subset/62 - ...flac": frame.Frame.Hash: support for 20-bit sample size not yet implemented
+	{path: "../testdata/flac-test-files/subset/62 - predictor overflow check, 20-bit.flac"},
+	// TODO: fix decoding of "subset/63 - ...flac": MD5 checksum mismatch for decoded audio samples; expected e4e4a6b3a672a849a3e2157c11ad23c6, got a0343afaaaa6229266d78ccf3175eb8d
+	{path: "../testdata/flac-test-files/subset/63 - predictor overflow check, 24-bit.flac"},
+	// TODO: fix decoding of "subset/64 - ...flac": MD5 checksum mismatch for decoded audio samples; expected 0885019a14d23a6759404c96f525a9d4, got ef5f7a4d27bd066acf31c7a68d5758df
+	{path: "../testdata/flac-test-files/subset/64 - rice partitions with escape code zero.flac"},
 }
 
 func TestFrameHash(t *testing.T) {
-	for i, g := range golden {
-		stream, err := flac.Open(g.name)
+	for _, g := range golden {
+		stream, err := flac.Open(g.path)
 		if err != nil {
-			t.Fatal(err)
+			t.Error(err)
+			continue
 		}
 		defer stream.Close()
 
@@ -42,7 +116,7 @@ func TestFrameHash(t *testing.T) {
 				if err == io.EOF {
 					break
 				}
-				t.Errorf("i=%d, frameNum=%d: error while parsing frame; %v", i, frameNum, err)
+				t.Errorf("path=%q, frameNum=%d: error while parsing frame; %v", g.path, frameNum, err)
 				continue
 			}
 			frame.Hash(md5sum)
@@ -52,7 +126,7 @@ func TestFrameHash(t *testing.T) {
 		// Verify the decoded audio samples by comparing the MD5 checksum that is
 		// stored in StreamInfo with the computed one.
 		if !bytes.Equal(got, want) {
-			t.Errorf("i=%d: MD5 checksum mismatch for decoded audio samples; expected %32x, got %32x", i, want, got)
+			t.Errorf("path=%q: MD5 checksum mismatch for decoded audio samples; expected %32x, got %32x", g.path, want, got)
 		}
 	}
 }
