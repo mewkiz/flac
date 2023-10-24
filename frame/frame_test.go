@@ -42,7 +42,6 @@ var golden = []struct {
 	{path: "../testdata/flac-test-files/subset/13 - qlp precision 2 bit.flac"},
 	{path: "../testdata/flac-test-files/subset/14 - wasted bits.flac"},
 	{path: "../testdata/flac-test-files/subset/15 - only verbatim subframes.flac"},
-	// TODO: fix decoding of "subset/16 - ...flac": frame_test.go:127: MD5 checksum mismatch for decoded audio samples; expected d0e1313950dc04b749c53cd349251bed, got 1d1380204d7eb5b138fe884178e9b67d
 	{path: "../testdata/flac-test-files/subset/16 - partition order 8 containing escaped partitions.flac"},
 	{path: "../testdata/flac-test-files/subset/17 - all fixed orders.flac"},
 	{path: "../testdata/flac-test-files/subset/18 - precision search.flac"},
@@ -59,7 +58,6 @@ var golden = []struct {
 	{path: "../testdata/flac-test-files/subset/29 - high resolution audio, blocksize 16384.flac"},
 	{path: "../testdata/flac-test-files/subset/30 - high resolution audio, blocksize 13456.flac"},
 	{path: "../testdata/flac-test-files/subset/31 - high resolution audio, using only 32nd order predictors.flac"},
-	// TODO: fix decoding of "subset/32 - ...flac": MD5 checksum mismatch for decoded audio samples; expected 88c57117179b46e784643de9f20c1917, got b7377fd70228aed730cbb00e55dbafab
 	{path: "../testdata/flac-test-files/subset/32 - high resolution audio, partition order 8 containing escaped partitions.flac"},
 	{path: "../testdata/flac-test-files/subset/33 - samplerate 192kHz.flac"},
 	{path: "../testdata/flac-test-files/subset/34 - samplerate 192kHz, using only 32nd order predictors.flac"},
@@ -93,7 +91,6 @@ var golden = []struct {
 	{path: "../testdata/flac-test-files/subset/62 - predictor overflow check, 20-bit.flac"},
 	// TODO: fix decoding of "subset/63 - ...flac": MD5 checksum mismatch for decoded audio samples; expected e4e4a6b3a672a849a3e2157c11ad23c6, got a0343afaaaa6229266d78ccf3175eb8d
 	{path: "../testdata/flac-test-files/subset/63 - predictor overflow check, 24-bit.flac"},
-	// TODO: fix decoding of "subset/64 - ...flac": MD5 checksum mismatch for decoded audio samples; expected 0885019a14d23a6759404c96f525a9d4, got ef5f7a4d27bd066acf31c7a68d5758df
 	{path: "../testdata/flac-test-files/subset/64 - rice partitions with escape code zero.flac"},
 }
 

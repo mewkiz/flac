@@ -406,7 +406,15 @@ func (subframe *Subframe) decodeRicePart(br *bits.Reader, paramSize uint) error 
 				if err != nil {
 					return unexpected(err)
 				}
-				subframe.Samples = append(subframe.Samples, int32(sample))
+				// ref: https://datatracker.ietf.org/doc/draft-ietf-cellar-flac/
+				//
+				// From section 9.2.7.1.  Escaped partition:
+				//
+				// The residual samples themselves are stored signed two's
+				// complement.  For example, when a partition is escaped and each
+				// residual sample is stored with 3 bits, the number -1 is
+				// represented as 0b111.
+				subframe.Samples = append(subframe.Samples, int32(bits.IntN(sample, n)))
 			}
 			continue
 		}
