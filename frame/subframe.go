@@ -443,10 +443,10 @@ func (subframe *Subframe) decodeRiceResidual(br *bits.Reader, k uint) error {
 	if err != nil {
 		return unexpected(err)
 	}
-	residual := int32(high<<k | low)
+	folded := uint32(high<<k | low)
 
 	// ZigZag decode.
-	residual = bits.ZigZag(residual)
+	residual := bits.ZigZag(folded)
 	subframe.Samples = append(subframe.Samples, residual)
 
 	return nil
