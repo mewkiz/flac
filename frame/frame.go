@@ -340,16 +340,12 @@ func (frame *Frame) parseBitsPerSample(br *bits.Reader) error {
 	case 0x2:
 		// 010: 12 bits-per-sample.
 		frame.BitsPerSample = 12
-		// TODO(u): Remove log message when the test cases have been extended.
-		log.Printf("frame.Frame.parseHeader: The flac library test cases do not yet include any audio files with %d bits-per-sample. If possible please consider contributing this audio sample to improve the reliability of the test cases.", frame.BitsPerSample)
 	case 0x4:
 		// 100: 16 bits-per-sample.
 		frame.BitsPerSample = 16
 	case 0x5:
 		// 101: 20 bits-per-sample.
 		frame.BitsPerSample = 20
-		// TODO(u): Remove log message when the test cases have been extended.
-		log.Printf("frame.Frame.parseHeader: The flac library test cases do not yet include any audio files with %d bits-per-sample. If possible please consider contributing this audio sample to improve the reliability of the test cases.", frame.BitsPerSample)
 	case 0x6:
 		// 110: 24 bits-per-sample.
 		frame.BitsPerSample = 24
@@ -409,8 +405,6 @@ func (frame *Frame) parseBlockSize(br *bits.Reader, blockSize uint64) error {
 	case n == 0x1:
 		// 0001: 192 samples.
 		frame.BlockSize = 192
-		// TODO(u): Remove log message when the test cases have been extended.
-		log.Printf("frame.Frame.parseHeader: The flac library test cases do not yet include any audio files with block size %d. If possible please consider contributing this audio sample to improve the reliability of the test cases.", frame.BlockSize)
 	case n >= 0x2 && n <= 0x5:
 		// 0010-0101: 576 * 2^(n-2) samples.
 		frame.BlockSize = 576 * (1 << (n - 2))
@@ -501,8 +495,6 @@ func (frame *Frame) parseSampleRate(br *bits.Reader, sampleRate uint64) error {
 			return unexpected(err)
 		}
 		frame.SampleRate = uint32(x * 1000)
-		// TODO(u): Remove log message when the test cases have been extended.
-		log.Printf("frame.Frame.parseHeader: The flac library test cases do not yet include any audio files with sample rate %d. If possible please consider contributing this audio sample to improve the reliability of the test cases.", frame.SampleRate)
 	case 0xD:
 		// 1101: get 16 bit sample rate (in Hz) from the end of the header.
 		x, err := br.Read(16)
@@ -517,8 +509,6 @@ func (frame *Frame) parseSampleRate(br *bits.Reader, sampleRate uint64) error {
 			return unexpected(err)
 		}
 		frame.SampleRate = uint32(x * 10)
-		// TODO(u): Remove log message when the test cases have been extended.
-		log.Printf("frame.Frame.parseHeader: The flac library test cases do not yet include any audio files with sample rate %d. If possible please consider contributing this audio sample to improve the reliability of the test cases.", frame.SampleRate)
 	default:
 		// 1111: invalid.
 		return errors.New("frame.Frame.parseHeader: invalid sample rate bit pattern (1111)")
