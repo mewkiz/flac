@@ -102,32 +102,33 @@ var golden = []struct {
 
 func TestFrameHash(t *testing.T) {
 	for _, g := range golden {
-		stream, err := flac.Open(g.path)
-		if err != nil {
-			t.Error(err)
-			continue
-		}
-		defer stream.Close()
-
-		md5sum := md5.New()
-		for frameNum := 0; ; frameNum++ {
-			frame, err := stream.ParseNext()
+		t.Run(g.path, func(t *testing.T) {
+			stream, err := flac.Open(g.path)
 			if err != nil {
-				if err == io.EOF {
-					break
-				}
-				t.Errorf("path=%q, frameNum=%d: error while parsing frame; %v", g.path, frameNum, err)
-				continue
+				t.Fatal(err)
 			}
-			frame.Hash(md5sum)
-		}
-		want := stream.Info.MD5sum[:]
-		got := md5sum.Sum(nil)
-		// Verify the decoded audio samples by comparing the MD5 checksum that is
-		// stored in StreamInfo with the computed one.
-		if !bytes.Equal(got, want) {
-			t.Errorf("path=%q: MD5 checksum mismatch for decoded audio samples; expected %32x, got %32x", g.path, want, got)
-		}
+			defer stream.Close()
+
+			md5sum := md5.New()
+			for frameNum := 0; ; frameNum++ {
+				frame, err := stream.ParseNext()
+				if err != nil {
+					if err == io.EOF {
+						break
+					}
+					t.Errorf("path=%q, frameNum=%d: error while parsing frame; %v", g.path, frameNum, err)
+					continue
+				}
+				frame.Hash(md5sum)
+			}
+			want := stream.Info.MD5sum[:]
+			got := md5sum.Sum(nil)
+			// Verify the decoded audio samples by comparing the MD5 checksum that is
+			// stored in StreamInfo with the computed one.
+			if !bytes.Equal(got, want) {
+				t.Errorf("path=%q: MD5 checksum mismatch for decoded audio samples; expected %32x, got %32x", g.path, want, got)
+			}
+		})
 	}
 }
 
