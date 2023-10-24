@@ -143,10 +143,11 @@ var typeName = map[meta.Type]string{
 // is_last.
 //
 // Example:
-//    METADATA block #0
-//      type: 0 (STREAMINFO)
-//      is last: false
-//      length: 34
+//
+//	METADATA block #0
+//	  type: 0 (STREAMINFO)
+//	  is last: false
+//	  length: 34
 func listStreamInfoHeader(isLast bool) {
 	fmt.Println("METADATA block #0")
 	fmt.Println("  type: 0 (STREAMINFO)")
@@ -155,10 +156,11 @@ func listStreamInfoHeader(isLast bool) {
 }
 
 // Example:
-//    METADATA block #0
-//      type: 0 (STREAMINFO)
-//      is last: false
-//      length: 34
+//
+//	METADATA block #0
+//	  type: 0 (STREAMINFO)
+//	  is last: false
+//	  length: 34
 func listHeader(header *meta.Header, blockNum int) {
 	name, ok := typeName[header.Type]
 	if !ok {
@@ -171,15 +173,16 @@ func listHeader(header *meta.Header, blockNum int) {
 }
 
 // Example:
-//      minimum blocksize: 4608 samples
-//      maximum blocksize: 4608 samples
-//      minimum framesize: 0 bytes
-//      maximum framesize: 19024 bytes
-//      sample_rate: 44100 Hz
-//      channels: 2
-//      bits-per-sample: 16
-//      total samples: 151007220
-//      MD5 signature: 2e6238f5d9fe5c19f3ead628f750fd3d
+//
+//	minimum blocksize: 4608 samples
+//	maximum blocksize: 4608 samples
+//	minimum framesize: 0 bytes
+//	maximum framesize: 19024 bytes
+//	sample_rate: 44100 Hz
+//	channels: 2
+//	bits-per-sample: 16
+//	total samples: 151007220
+//	MD5 signature: 2e6238f5d9fe5c19f3ead628f750fd3d
 func listStreamInfo(si *meta.StreamInfo) {
 	fmt.Printf("  minimum blocksize: %d samples\n", si.BlockSizeMin)
 	fmt.Printf("  maximum blocksize: %d samples\n", si.BlockSizeMax)
@@ -193,9 +196,10 @@ func listStreamInfo(si *meta.StreamInfo) {
 }
 
 // Example:
-//      application ID: 46696361
-//      data contents:
-//    Medieval CUE Splitter (www.medieval.it)
+//
+//	  application ID: 46696361
+//	  data contents:
+//	Medieval CUE Splitter (www.medieval.it)
 func listApplication(app *meta.Application) {
 	fmt.Printf("  application ID: %d\n", app.ID)
 	fmt.Println("  data contents:")
@@ -205,10 +209,11 @@ func listApplication(app *meta.Application) {
 }
 
 // Example:
-//      seek points: 17
-//        point 0: sample_number=0, stream_offset=0, frame_samples=4608
-//        point 1: sample_number=2419200, stream_offset=3733871, frame_samples=4608
-//        ...
+//
+//	seek points: 17
+//	  point 0: sample_number=0, stream_offset=0, frame_samples=4608
+//	  point 1: sample_number=2419200, stream_offset=3733871, frame_samples=4608
+//	  ...
 func listSeekTable(st *meta.SeekTable) {
 	fmt.Printf("  seek points: %d\n", len(st.Points))
 	for pointNum, point := range st.Points {
@@ -221,11 +226,12 @@ func listSeekTable(st *meta.SeekTable) {
 }
 
 // Example:
-//      vendor string: reference libFLAC 1.2.1 20070917
-//      comments: 10
-//        comment[0]: ALBUM=「sugar sweet nightmare」 & 「化物語」劇伴音楽集 其の壹
-//        comment[1]: ARTIST=神前暁
-//        ...
+//
+//	vendor string: reference libFLAC 1.2.1 20070917
+//	comments: 10
+//	  comment[0]: ALBUM=「sugar sweet nightmare」 & 「化物語」劇伴音楽集 其の壹
+//	  comment[1]: ARTIST=神前暁
+//	  ...
 func listVorbisComment(vc *meta.VorbisComment) {
 	fmt.Printf("  vendor string: %s\n", vc.Vendor)
 	fmt.Printf("  comments: %d\n", len(vc.Tags))
@@ -235,34 +241,35 @@ func listVorbisComment(vc *meta.VorbisComment) {
 }
 
 // Example:
-//      media catalog number:
-//      lead-in: 88200
-//      is CD: true
-//      number of tracks: 18
-//        track[0]
-//          offset: 0
-//          number: 1
-//          ISRC:
-//          type: AUDIO
-//          pre-emphasis: false
-//          number of index points: 1
-//            index[0]
-//              offset: 0
-//              number: 1
-//        track[1]
-//          offset: 2421384
-//          number: 2
-//          ISRC:
-//          type: AUDIO
-//          pre-emphasis: false
-//          number of index points: 1
-//            index[0]
-//              offset: 0
-//              number: 1
-//        ...
-//        track[17]
-//          offset: 151007220
-//          number: 170 (LEAD-OUT)
+//
+//	media catalog number:
+//	lead-in: 88200
+//	is CD: true
+//	number of tracks: 18
+//	  track[0]
+//	    offset: 0
+//	    number: 1
+//	    ISRC:
+//	    type: AUDIO
+//	    pre-emphasis: false
+//	    number of index points: 1
+//	      index[0]
+//	        offset: 0
+//	        number: 1
+//	  track[1]
+//	    offset: 2421384
+//	    number: 2
+//	    ISRC:
+//	    type: AUDIO
+//	    pre-emphasis: false
+//	    number of index points: 1
+//	      index[0]
+//	        offset: 0
+//	        number: 1
+//	  ...
+//	  track[17]
+//	    offset: 151007220
+//	    number: 170 (LEAD-OUT)
 func listCueSheet(cs *meta.CueSheet) {
 	fmt.Printf("  media catalog number: %s\n", cs.MCN)
 	fmt.Printf("  lead-in: %d\n", cs.NLeadInSamples)
@@ -294,17 +301,18 @@ func listCueSheet(cs *meta.CueSheet) {
 }
 
 // Example:
-//      type: 3 (Cover (front))
-//      MIME type: image/jpeg
-//      description:
-//      width: 0
-//      height: 0
-//      depth: 0
-//      colors: 0 (unindexed)
-//      data length: 234569
-//      data:
-//        00000000: FF D8 FF E0 00 10 4A 46 49 46 00 01 01 01 00 60 ......JFIF.....`
-//        00000010: 00 60 00 00 FF DB 00 43 00 01 01 01 01 01 01 01 .`.....C........
+//
+//	type: 3 (Cover (front))
+//	MIME type: image/jpeg
+//	description:
+//	width: 0
+//	height: 0
+//	depth: 0
+//	colors: 0 (unindexed)
+//	data length: 234569
+//	data:
+//	  00000000: FF D8 FF E0 00 10 4A 46 49 46 00 01 01 01 00 60 ......JFIF.....`
+//	  00000010: 00 60 00 00 FF DB 00 43 00 01 01 01 01 01 01 01 .`.....C........
 func listPicture(pic *meta.Picture) {
 	typeName := map[uint32]string{
 		0:  "Other",

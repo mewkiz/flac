@@ -40,24 +40,24 @@ const (
 // ref: http://permalink.gmane.org/gmane.comp.audio.compression.flac.devel/3033
 //
 // Algorithm description:
-//    - read one byte B0 from the stream
-//    - if B0 = 0xxxxxxx then the read value is B0 -> end
-//    - if B0 = 10xxxxxx, the encoding is invalid
-//    - if B0 = 11xxxxxx, set L to the number of leading binary 1s minus 1:
-//         B0 = 110xxxxx -> L = 1
-//         B0 = 1110xxxx -> L = 2
-//         B0 = 11110xxx -> L = 3
-//         B0 = 111110xx -> L = 4
-//         B0 = 1111110x -> L = 5
-//         B0 = 11111110 -> L = 6
-//    - assign the bits following the encoding (the x bits in the examples) to
-//      a variable R with a magnitude of at least 36 bits
-//    - loop from 1 to L
-//         - left shift R 6 bits
-//         - read B from the stream
-//         - if B does not match 10xxxxxx, the encoding is invalid
-//         - set R = R or <the lower 6 bits from B>
-//    - the read value is R
+//   - read one byte B0 from the stream
+//   - if B0 = 0xxxxxxx then the read value is B0 -> end
+//   - if B0 = 10xxxxxx, the encoding is invalid
+//   - if B0 = 11xxxxxx, set L to the number of leading binary 1s minus 1:
+//     B0 = 110xxxxx -> L = 1
+//     B0 = 1110xxxx -> L = 2
+//     B0 = 11110xxx -> L = 3
+//     B0 = 111110xx -> L = 4
+//     B0 = 1111110x -> L = 5
+//     B0 = 11111110 -> L = 6
+//   - assign the bits following the encoding (the x bits in the examples) to
+//     a variable R with a magnitude of at least 36 bits
+//   - loop from 1 to L
+//   - left shift R 6 bits
+//   - read B from the stream
+//   - if B does not match 10xxxxxx, the encoding is invalid
+//   - set R = R or <the lower 6 bits from B>
+//   - the read value is R
 func Decode(r io.Reader) (x uint64, err error) {
 	c0, err := ioutilx.ReadByte(r)
 	if err != nil {

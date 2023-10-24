@@ -8,23 +8,24 @@
 //
 // At the time of this writing, the FLAC metadata format defines seven different
 // metadata block types, namely:
-//    * StreamInfo [2]
-//    * Padding [3]
-//    * Application [4]
-//    * SeekTable [5]
-//    * VorbisComment [6]
-//    * CueSheet [7]
-//    * Picture [8]
+//   - StreamInfo [2]
+//   - Padding [3]
+//   - Application [4]
+//   - SeekTable [5]
+//   - VorbisComment [6]
+//   - CueSheet [7]
+//   - Picture [8]
+//
 // Please refer to their respective documentation for further information.
 //
-//    [1]: https://www.xiph.org/flac/format.html#format_overview
-//    [2]: https://godoc.org/github.com/mewkiz/flac/meta#StreamInfo
-//    [3]: https://www.xiph.org/flac/format.html#metadata_block_padding
-//    [4]: https://godoc.org/github.com/mewkiz/flac/meta#Application
-//    [5]: https://godoc.org/github.com/mewkiz/flac/meta#SeekTable
-//    [6]: https://godoc.org/github.com/mewkiz/flac/meta#VorbisComment
-//    [7]: https://godoc.org/github.com/mewkiz/flac/meta#CueSheet
-//    [8]: https://godoc.org/github.com/mewkiz/flac/meta#Picture
+//	[1]: https://www.xiph.org/flac/format.html#format_overview
+//	[2]: https://godoc.org/github.com/mewkiz/flac/meta#StreamInfo
+//	[3]: https://www.xiph.org/flac/format.html#metadata_block_padding
+//	[4]: https://godoc.org/github.com/mewkiz/flac/meta#Application
+//	[5]: https://godoc.org/github.com/mewkiz/flac/meta#SeekTable
+//	[6]: https://godoc.org/github.com/mewkiz/flac/meta#VorbisComment
+//	[7]: https://godoc.org/github.com/mewkiz/flac/meta#CueSheet
+//	[8]: https://godoc.org/github.com/mewkiz/flac/meta#Picture
 package meta
 
 import (

@@ -10,19 +10,20 @@
 // of the channels and the difference between the channels, or store the average
 // of the channels and their difference. An encoder decorrelates audio samples
 // as follows:
-//    mid = (left + right)/2 // average of the channels
-//    side = left - right    // difference between the channels
+//
+//	mid = (left + right)/2 // average of the channels
+//	side = left - right    // difference between the channels
 //
 // The blocks are encoded using a variety of prediction methods [4][5] and
 // stored in frames. Blocks and subblocks contains unencoded audio samples while
 // frames and subframes contain encoded audio samples. A FLAC stream contains
 // one or more audio frames.
 //
-//    [1]: https://www.xiph.org/flac/format.html#architecture
-//    [2]: https://www.xiph.org/flac/format.html#blocking
-//    [3]: https://www.xiph.org/flac/format.html#interchannel
-//    [4]: https://www.xiph.org/flac/format.html#prediction
-//    [5]: https://godoc.org/github.com/mewkiz/flac/frame#Pred
+//	[1]: https://www.xiph.org/flac/format.html#architecture
+//	[2]: https://www.xiph.org/flac/format.html#blocking
+//	[3]: https://www.xiph.org/flac/format.html#interchannel
+//	[4]: https://www.xiph.org/flac/format.html#prediction
+//	[5]: https://godoc.org/github.com/mewkiz/flac/frame#Pred
 package frame
 
 import (
@@ -521,18 +522,20 @@ func (frame *Frame) parseSampleRate(br *bits.Reader, sampleRate uint64) error {
 type Channels uint8
 
 // Channel assignments. The following abbreviations are used:
-//    C:   center (directly in front)
-//    R:   right (standard stereo)
-//    Sr:  side right (directly to the right)
-//    Rs:  right surround (back right)
-//    Cs:  center surround (rear center)
-//    Ls:  left surround (back left)
-//    Sl:  side left (directly to the left)
-//    L:   left (standard stereo)
-//    Lfe: low-frequency effect (placed according to room acoustics)
+//
+//	C:   center (directly in front)
+//	R:   right (standard stereo)
+//	Sr:  side right (directly to the right)
+//	Rs:  right surround (back right)
+//	Cs:  center surround (rear center)
+//	Ls:  left surround (back left)
+//	Sl:  side left (directly to the left)
+//	L:   left (standard stereo)
+//	Lfe: low-frequency effect (placed according to room acoustics)
 //
 // The first 6 channel constants follow the SMPTE/ITU-R channel order:
-//    L R C Lfe Ls Rs
+//
+//	L R C Lfe Ls Rs
 const (
 	ChannelsMono           Channels = iota // 1 channel: mono.
 	ChannelsLR                             // 2 channels: left, right.
@@ -572,8 +575,9 @@ func (channels Channels) Count() int {
 // subframes.
 //
 // An encoder decorrelates audio samples as follows:
-//    mid = (left + right)/2
-//    side = left - right
+//
+//	mid = (left + right)/2
+//	side = left - right
 func (frame *Frame) correlate() {
 	switch frame.Channels {
 	case ChannelsLeftSide:

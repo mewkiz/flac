@@ -18,9 +18,9 @@
 // Please refer to the documentation of the meta [2] and the frame [3] packages
 // for a brief introduction of their respective formats.
 //
-//    [1]: https://www.xiph.org/flac/format.html#stream
-//    [2]: https://godoc.org/github.com/mewkiz/flac/meta
-//    [3]: https://godoc.org/github.com/mewkiz/flac/frame
+//	[1]: https://www.xiph.org/flac/format.html#stream
+//	[2]: https://godoc.org/github.com/mewkiz/flac/meta
+//	[3]: https://godoc.org/github.com/mewkiz/flac/frame
 //
 // Note: the Encoder API is experimental until the 1.1.x release. As such, it's
 // API is expected to change.
