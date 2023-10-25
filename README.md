@@ -1,6 +1,6 @@
 # flac
 
-[![Build Status](https://travis-ci.org/mewkiz/flac.svg?branch=master)](https://travis-ci.org/mewkiz/flac)
+[![Go build status](https://github.com/mewkiz/flac/actions/workflows/go.yml/badge.svg?branch=master)](https://github.com/mewkiz/flac/actions/workflows/go.yml)
 [![Coverage Status](https://img.shields.io/coveralls/mewkiz/flac.svg)](https://coveralls.io/r/mewkiz/flac?branch=master)
 [![GoDoc](https://pkg.go.dev/badge/github.com/mewkiz/flac)](https://pkg.go.dev/github.com/mewkiz/flac)
 
