@@ -27,11 +27,19 @@ jobs:
         with:
           go-version: ${{ matrix.go-version }}
 
+      - name: Install goveralls
+        run: go install github.com/mattn/goveralls@latest
+
       - name: Build
         run: go build -v ./...
 
       - name: Test
-        run: go test -v ./...
+        run: go test -v -covermode atomic -coverprofile=covprofile ./...
 
       - name: Gofmt
         run: gofmt -d ./
+
+      - name: Send coverage
+        env:
+          COVERALLS_TOKEN: ${{ secrets.COVERALLS_TOKEN }}
+        run: goveralls -coverprofile=covprofile -service=github
