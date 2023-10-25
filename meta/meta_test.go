@@ -11,13 +11,12 @@ import (
 )
 
 var golden = []struct {
-	name   string
+	path   string
 	info   *meta.StreamInfo
 	blocks []*meta.Block
 }{
-	// i=0
 	{
-		name: "../testdata/59996.flac",
+		path: "../testdata/59996.flac",
 		info: &meta.StreamInfo{BlockSizeMin: 0x1000, BlockSizeMax: 0x1000, FrameSizeMin: 0x44c5, FrameSizeMax: 0x4588, SampleRate: 0xac44, NChannels: 0x2, BitsPerSample: 0x18, NSamples: 0x2000, MD5sum: [16]uint8{0x95, 0xba, 0xe5, 0xe2, 0xc7, 0x45, 0xbb, 0x3c, 0xa9, 0x5c, 0xa3, 0xb1, 0x35, 0xc9, 0x43, 0xf4}},
 		blocks: []*meta.Block{
 			{
@@ -26,10 +25,8 @@ var golden = []struct {
 			},
 		},
 	},
-
-	// i=1
 	{
-		name: "../testdata/172960.flac",
+		path: "../testdata/172960.flac",
 		info: &meta.StreamInfo{BlockSizeMin: 0x1000, BlockSizeMax: 0x1000, FrameSizeMin: 0xb7c, FrameSizeMax: 0x256b, SampleRate: 0x17700, NChannels: 0x2, BitsPerSample: 0x10, NSamples: 0xaaa3, MD5sum: [16]uint8{0x76, 0x3d, 0xa8, 0xa5, 0xb7, 0x58, 0xe6, 0x2, 0x61, 0xb4, 0xd4, 0xc2, 0x88, 0x4d, 0x8e, 0xe}},
 		blocks: []*meta.Block{
 			{
@@ -38,10 +35,8 @@ var golden = []struct {
 			},
 		},
 	},
-
-	// i=2
 	{
-		name: "../testdata/189983.flac",
+		path: "../testdata/189983.flac",
 		info: &meta.StreamInfo{BlockSizeMin: 0x1200, BlockSizeMax: 0x1200, FrameSizeMin: 0x94d, FrameSizeMax: 0x264a, SampleRate: 0xac44, NChannels: 0x2, BitsPerSample: 0x10, NSamples: 0x50f4, MD5sum: [16]uint8{0x63, 0x28, 0xed, 0x6d, 0xd3, 0xe, 0x55, 0xfb, 0xa5, 0x73, 0x69, 0x2b, 0xb7, 0x35, 0x73, 0xb7}},
 		blocks: []*meta.Block{
 			{
@@ -50,10 +45,8 @@ var golden = []struct {
 			},
 		},
 	},
-
-	// i=3
 	{
-		name: "testdata/input-SCPAP.flac",
+		path: "testdata/input-SCPAP.flac",
 		info: &meta.StreamInfo{BlockSizeMin: 0x1200, BlockSizeMax: 0x1200, FrameSizeMin: 0xe, FrameSizeMax: 0x10, SampleRate: 0xac44, NChannels: 0x2, BitsPerSample: 0x10, NSamples: 0x16f8, MD5sum: [16]uint8{0x74, 0xff, 0xd4, 0x73, 0x7e, 0xb5, 0x48, 0x8d, 0x51, 0x2b, 0xe4, 0xaf, 0x58, 0x94, 0x33, 0x62}},
 		blocks: []*meta.Block{
 			{
@@ -78,10 +71,8 @@ var golden = []struct {
 			},
 		},
 	},
-
-	// i=4
 	{
-		name: "testdata/input-SCVA.flac",
+		path: "testdata/input-SCVA.flac",
 		info: &meta.StreamInfo{BlockSizeMin: 0x1200, BlockSizeMax: 0x1200, FrameSizeMin: 0xe, FrameSizeMax: 0x10, SampleRate: 0xac44, NChannels: 0x2, BitsPerSample: 0x10, NSamples: 0x16f8, MD5sum: [16]uint8{0x74, 0xff, 0xd4, 0x73, 0x7e, 0xb5, 0x48, 0x8d, 0x51, 0x2b, 0xe4, 0xaf, 0x58, 0x94, 0x33, 0x62}},
 		blocks: []*meta.Block{
 			{
@@ -102,10 +93,8 @@ var golden = []struct {
 			},
 		},
 	},
-
-	// i=5
 	{
-		name: "testdata/input-SCVAUP.flac",
+		path: "testdata/input-SCVAUP.flac",
 		info: &meta.StreamInfo{BlockSizeMin: 0x1200, BlockSizeMax: 0x1200, FrameSizeMin: 0xe, FrameSizeMax: 0x10, SampleRate: 0xac44, NChannels: 0x2, BitsPerSample: 0x10, NSamples: 0x16f8, MD5sum: [16]uint8{0x74, 0xff, 0xd4, 0x73, 0x7e, 0xb5, 0x48, 0x8d, 0x51, 0x2b, 0xe4, 0xaf, 0x58, 0x94, 0x33, 0x62}},
 		blocks: []*meta.Block{
 			{
@@ -134,9 +123,8 @@ var golden = []struct {
 			},
 		},
 	},
-	// i=6
 	{
-		name: "testdata/input-SCVPAP.flac",
+		path: "testdata/input-SCVPAP.flac",
 		info: &meta.StreamInfo{BlockSizeMin: 0x1200, BlockSizeMax: 0x1200, FrameSizeMin: 0xe, FrameSizeMax: 0x10, SampleRate: 0xac44, NChannels: 0x2, BitsPerSample: 0x10, NSamples: 0x16f8, MD5sum: [16]uint8{0x74, 0xff, 0xd4, 0x73, 0x7e, 0xb5, 0x48, 0x8d, 0x51, 0x2b, 0xe4, 0xaf, 0x58, 0x94, 0x33, 0x62}},
 		blocks: []*meta.Block{
 			{
@@ -165,10 +153,8 @@ var golden = []struct {
 			},
 		},
 	},
-
-	// i=7
 	{
-		name: "testdata/input-SVAUP.flac",
+		path: "testdata/input-SVAUP.flac",
 		info: &meta.StreamInfo{BlockSizeMin: 0x1200, BlockSizeMax: 0x1200, FrameSizeMin: 0xe, FrameSizeMax: 0x10, SampleRate: 0xac44, NChannels: 0x2, BitsPerSample: 0x10, NSamples: 0x16f8, MD5sum: [16]uint8{0x74, 0xff, 0xd4, 0x73, 0x7e, 0xb5, 0x48, 0x8d, 0x51, 0x2b, 0xe4, 0xaf, 0x58, 0x94, 0x33, 0x62}},
 		blocks: []*meta.Block{
 			{
@@ -193,10 +179,8 @@ var golden = []struct {
 			},
 		},
 	},
-
-	// i=8
 	{
-		name: "testdata/input-VA.flac",
+		path: "testdata/input-VA.flac",
 		info: &meta.StreamInfo{BlockSizeMin: 0x1200, BlockSizeMax: 0x1200, FrameSizeMin: 0xe, FrameSizeMax: 0x10, SampleRate: 0xac44, NChannels: 0x2, BitsPerSample: 0x10, NSamples: 0x16f8, MD5sum: [16]uint8{0x74, 0xff, 0xd4, 0x73, 0x7e, 0xb5, 0x48, 0x8d, 0x51, 0x2b, 0xe4, 0xaf, 0x58, 0x94, 0x33, 0x62}},
 		blocks: []*meta.Block{
 			{
@@ -212,8 +196,8 @@ var golden = []struct {
 }
 
 func TestParseBlocks(t *testing.T) {
-	for i, g := range golden {
-		stream, err := flac.ParseFile(g.name)
+	for _, g := range golden {
+		stream, err := flac.ParseFile(g.path)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -221,23 +205,23 @@ func TestParseBlocks(t *testing.T) {
 		blocks := stream.Blocks
 
 		if len(blocks) != len(g.blocks) {
-			t.Errorf("i=%d: invalid number of metadata blocks; expected %d, got %d", i, len(g.blocks), len(blocks))
+			t.Errorf("path=%q: invalid number of metadata blocks; expected %d, got %d", g.path, len(g.blocks), len(blocks))
 			continue
 		}
 
 		got := stream.Info
 		want := g.info
 		if !reflect.DeepEqual(got, want) {
-			t.Errorf("i=%d: metadata StreamInfo block bodies differ; expected %#v, got %#v", i, want, got)
+			t.Errorf("path=%q: metadata StreamInfo block bodies differ; expected %#v, got %#v", g.path, want, got)
 		}
 
-		for j, got := range blocks {
-			want := g.blocks[j]
+		for blockNum, got := range blocks {
+			want := g.blocks[blockNum]
 			if !reflect.DeepEqual(got.Header, want.Header) {
-				t.Errorf("i=%d, j=%d: metadata block headers differ; expected %#v, got %#v", i, j, want.Header, got.Header)
+				t.Errorf("path=%q, blockNum=%d: metadata block headers differ; expected %#v, got %#v", g.path, blockNum, want.Header, got.Header)
 			}
 			if !reflect.DeepEqual(got.Body, want.Body) {
-				t.Errorf("i=%d, j=%d: metadata block bodies differ; expected %#v, got %#v", i, j, want.Body, got.Body)
+				t.Errorf("path=%q, blockNum=%d: metadata block bodies differ; expected %#v, got %#v", g.path, blockNum, want.Body, got.Body)
 			}
 		}
 	}
