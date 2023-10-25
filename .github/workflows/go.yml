@@ -28,6 +28,7 @@ jobs:
           go-version: ${{ matrix.go-version }}
 
       - name: Install goveralls
+        if: ${{ matrix.go-version }} == 'stable'
         run: go install github.com/mattn/goveralls@latest
 
       - name: Build
@@ -40,6 +41,7 @@ jobs:
         run: gofmt -d ./
 
       - name: Send coverage
+        if: ${{ matrix.go-version }} == 'stable'
         env:
           COVERALLS_TOKEN: ${{ secrets.COVERALLS_TOKEN }}
         run: goveralls -coverprofile=covprofile -service=github
