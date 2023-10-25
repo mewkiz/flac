@@ -43,5 +43,5 @@ jobs:
       - name: Send coverage
         if: ${{ matrix.go-version == 'stable' }}
         env:
-          COVERALLS_TOKEN: ${{ secrets.COVERALLS_TOKEN }}
+          COVERALLS_TOKEN: ${{ secrets.COVERALLS_REPO_TOKEN }}
         run: goveralls -coverprofile=covprofile -service=github
