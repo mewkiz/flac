@@ -3,6 +3,7 @@ package frame
 import (
 	"errors"
 	"fmt"
+
 	"github.com/mewkiz/flac/internal/bits"
 )
 

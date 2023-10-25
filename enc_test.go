@@ -1,10 +1,8 @@
-//go:build ignore
-// +build ignore
-
 package flac_test
 
 import (
 	"bytes"
+	"io"
 	"io/ioutil"
 	"testing"
 
@@ -19,21 +17,36 @@ func TestEncode(t *testing.T) {
 		"meta/testdata/input-SCVPAP.flac",
 		"meta/testdata/input-VA.flac",
 		"meta/testdata/silence.flac",
-		"testdata/19875.flac",
-		"testdata/44127.flac",
-		"testdata/59996.flac",
-		"testdata/80574.flac",
-		"testdata/172960.flac",
-		"testdata/189983.flac",
-		"testdata/191885.flac",
-		"testdata/212768.flac",
-		"testdata/220014.flac",
-		"testdata/243749.flac",
-		"testdata/256529.flac",
-		"testdata/257344.flac",
-		"testdata/8297-275156-0011.flac",
-		"testdata/love.flac",
+		// TODO: fix: support for prediction method 3 not yet implemented
+		//"testdata/19875.flac",
+		// TODO: fix: support for prediction method 3 not yet implemented
+		//"testdata/44127.flac",
+		// TODO: fix: support for prediction method 3 not yet implemented
+		//"testdata/59996.flac",
+		// TODO: fix: support for prediction method 3 not yet implemented
+		//"testdata/80574.flac",
+		// TODO: fix: support for prediction method 3 not yet implemented
+		//"testdata/172960.flac",
+		// TODO: fix: support for prediction method 2 not yet implemented
+		//"testdata/189983.flac",
+		// TODO: fix: support for prediction method 3 not yet implemented
+		//"testdata/191885.flac",
+		// TODO: fix: support for prediction method 2 not yet implemented
+		//"testdata/212768.flac",
+		// TODO: fix: support for prediction method 2 not yet implemented
+		//"testdata/220014.flac",
+		// TODO: fix: support for prediction method 2 not yet implemented
+		//"testdata/243749.flac",
+		// TODO: fix: support for prediction method 3 not yet implemented
+		//"testdata/256529.flac",
+		// TODO: fix: support for prediction method 3 not yet implemented
+		//"testdata/257344.flac",
+		// TODO: fix: support for prediction method 2 not yet implemented
+		//"testdata/8297-275156-0011.flac",
+		// TODO: fix: support for prediction method 2 not yet implemented
+		//"testdata/love.flac",
 	}
+loop:
 	for _, path := range paths {
 		// Decode source file.
 		stream, err := flac.ParseFile(path)
@@ -43,10 +56,31 @@ func TestEncode(t *testing.T) {
 		}
 		defer stream.Close()
 
-		// Encode FLAC stream.
+		// Open encoder for FLAC stream.
 		out := new(bytes.Buffer)
-		if err := flac.Encode(out, stream); err != nil {
-			t.Errorf("%q: unable to encode FLAC stream; %v", path, err)
+		enc, err := flac.NewEncoder(out, stream.Info, stream.Blocks...)
+		if err != nil {
+			t.Errorf("%q: unable to create encoder for FLAC stream; %v", path, err)
+			continue
+		}
+		// Encode audio samples.
+		for {
+			frame, err := stream.ParseNext()
+			if err != nil {
+				if err == io.EOF {
+					break
+				}
+				t.Errorf("%q: unable to parse audio frame of FLAC stream; %v", path, err)
+				continue loop
+			}
+			if err := enc.WriteFrame(frame); err != nil {
+				t.Errorf("%q: unable to encode audio frame of FLAC stream; %v", path, err)
+				continue loop
+			}
+		}
+		// Close encoder and flush pending writes.
+		if err := enc.Close(); err != nil {
+			t.Errorf("%q: unable to close encoder for FLAC stream; %v", path, err)
 			continue
 		}
 
@@ -66,7 +100,8 @@ func TestEncode(t *testing.T) {
 
 func TestEncodeComment(t *testing.T) {
 	// Decode FLAC file.
-	src, err := flac.ParseFile("testdata/love.flac")
+	const path = "meta/testdata/input-VA.flac"
+	src, err := flac.ParseFile(path)
 	if err != nil {
 		t.Fatalf("unable to parse input FLAC file; %v", err)
 	}
@@ -80,12 +115,31 @@ func TestEncodeComment(t *testing.T) {
 		}
 	}
 
-	// Encode FLAC file.
+	// Open encoder for FLAC stream.
 	out := new(bytes.Buffer)
-	if err := flac.Encode(out, src); err != nil {
-		t.Fatalf("unable to encode FLAC file; %v", err)
+	enc, err := flac.NewEncoder(out, src.Info, src.Blocks...)
+	if err != nil {
+		t.Fatalf("%q: unable to create encoder for FLAC stream; %v", path, err)
+	}
+	// Encode audio samples.
+	for {
+		frame, err := src.ParseNext()
+		if err != nil {
+			if err == io.EOF {
+				break
+			}
+			t.Fatalf("%q: unable to parse audio frame of FLAC stream; %v", path, err)
+		}
+		if err := enc.WriteFrame(frame); err != nil {
+			t.Fatalf("%q: unable to encode audio frame of FLAC stream; %v", path, err)
+		}
+	}
+	// Close encoder and flush pending writes.
+	if err := enc.Close(); err != nil {
+		t.Fatalf("%q: unable to close encoder for FLAC stream; %v", path, err)
 	}
 
+	// Parse encoded FLAC file.
 	stream, err := flac.Parse(out)
 	if err != nil {
 		t.Fatalf("unable to parse output FLAC file; %v", err)

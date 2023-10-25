@@ -14,8 +14,11 @@ import (
 // --- [ Metadata block ] ------------------------------------------------------
 
 // encodeBlock encodes the metadata block, writing to bw.
-func encodeBlock(bw *bitio.Writer, body interface{}, last bool) error {
-	switch body := body.(type) {
+func encodeBlock(bw *bitio.Writer, block *meta.Block, last bool) error {
+	if block.Type == meta.TypePadding {
+		return encodePadding(bw, block.Length, last)
+	}
+	switch body := block.Body.(type) {
 	case *meta.StreamInfo:
 		return encodeStreamInfo(bw, body, last)
 	case *meta.Application:
@@ -102,6 +105,26 @@ func encodeStreamInfo(bw *bitio.Writer, info *meta.StreamInfo, last bool) error 
 	}
 	// 16 bytes: MD5sum.
 	if _, err := bw.Write(info.MD5sum[:]); err != nil {
+		return errutil.Err(err)
+	}
+	return nil
+}
+
+// --- [ Padding ] ----------------------------------------------------------
+
+// encodePadding encodes the Padding metadata block, writing to bw.
+func encodePadding(bw *bitio.Writer, length int64, last bool) error {
+	// Store metadata block header.
+	hdr := &meta.Header{
+		IsLast: last,
+		Type:   meta.TypePadding,
+		Length: length,
+	}
+	if err := encodeBlockHeader(bw, hdr); err != nil {
+		return errutil.Err(err)
+	}
+	// Store metadata block body.
+	if _, err := io.CopyN(bw, ioutilx.Zero, length); err != nil {
 		return errutil.Err(err)
 	}
 	return nil
@@ -320,7 +343,7 @@ func encodePicture(bw *bitio.Writer, pic *meta.Picture, last bool) error {
 	nbits := int64(32 + 32 + 8*len(pic.MIME) + 32 + 8*len(pic.Desc) + 32 + 32 + 32 + 32 + 32 + 8*len(pic.Data))
 	hdr := &meta.Header{
 		IsLast: last,
-		Type:   meta.TypeCueSheet,
+		Type:   meta.TypePicture,
 		Length: nbits / 8,
 	}
 	if err := encodeBlockHeader(bw, hdr); err != nil {

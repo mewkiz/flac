@@ -3,6 +3,7 @@ package flac
 import (
 	"encoding/binary"
 	"io"
+	"math"
 
 	"github.com/icza/bitio"
 	"github.com/mewkiz/flac/frame"
@@ -202,10 +203,10 @@ func encodeFrameHeaderBlockSize(bw *bitio.Writer, blockSize uint16) (nblockSizeS
 		bits = 0x1
 	case 576, 1152, 2304, 4608:
 		// 0010-0101 : 576 * (2^(n-2)) samples, i.e. 576/1152/2304/4608
-		bits = 0x2 + uint64(blockSize/576) - 1
+		bits = 0x2 + uint64(math.Log2(float64(blockSize/576)))
 	case 256, 512, 1024, 2048, 4096, 8192, 16384, 32768:
 		// 1000-1111 : 256 * (2^(n-8)) samples, i.e. 256/512/1024/2048/4096/8192/16384/32768
-		bits = 0x8 + uint64(blockSize/256) - 1
+		bits = 0x8 + uint64(math.Log2(float64(blockSize/256)))
 	default:
 		if blockSize <= 256 {
 			// 0110 : get 8 bit (blocksize-1) from end of header

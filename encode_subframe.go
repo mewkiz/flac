@@ -26,10 +26,12 @@ func encodeSubframe(bw *bitio.Writer, hdr frame.Header, subframe *frame.Subframe
 		if err := encodeVerbatimSamples(bw, hdr, subframe.Samples); err != nil {
 			return errutil.Err(err)
 		}
+	// TODO: implement support for LPC encoding of audio samples.
 	//case frame.PredFixed:
 	//	if err := encodeFixedSamples(bw, hdr, subframe.Samples, subframe.Order); err != nil {
 	//		return errutil.Err(err)
 	//	}
+	// TODO: implement support for LPC encoding of audio samples.
 	//case frame.PredFIR:
 	//	if err := encodeFIRSamples(bw, hdr, subframe.Samples, subframe.Order); err != nil {
 	//		return errutil.Err(err)

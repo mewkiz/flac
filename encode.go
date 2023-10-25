@@ -56,7 +56,7 @@ func NewEncoder(w io.Writer, info *meta.StreamInfo, blocks ...*meta.Block) (*Enc
 		return nil, errutil.Err(err)
 	}
 	for i, block := range blocks {
-		if err := encodeBlock(bw, block.Body, i == len(blocks)-1); err != nil {
+		if err := encodeBlock(bw, block, i == len(blocks)-1); err != nil {
 			return nil, errutil.Err(err)
 		}
 	}
