@@ -19,6 +19,8 @@ jobs:
     name: Build with Go ${{ matrix.go-version }}
     steps:
       - uses: actions/checkout@v3
+        with:
+          submodules: recursive
 
       - name: Set up Go
         uses: actions/setup-go@v4
