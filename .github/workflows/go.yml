@@ -13,10 +13,6 @@ jobs:
 
   build:
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        go-version: ['1.14', 'stable']
-    name: Build with Go ${{ matrix.go-version }}
     steps:
       - uses: actions/checkout@v3
         with:
@@ -25,10 +21,10 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v4
         with:
-          go-version: ${{ matrix.go-version }}
+          go-version-file: 'go.mod'
 
       - name: Install goveralls
-        if: ${{ matrix.go-version == 'stable' && github.ref == 'refs/heads/master' }}
+        if: ${{ github.ref == 'refs/heads/master' }}
         run: go install github.com/mattn/goveralls@latest
 
       - name: Build
@@ -41,7 +37,7 @@ jobs:
         run: gofmt -d ./
 
       - name: Send coverage
-        if: ${{ matrix.go-version == 'stable' && github.ref == 'refs/heads/master' }}
+        if: ${{ github.ref == 'refs/heads/master' }}
         env:
           COVERALLS_TOKEN: ${{ secrets.COVERALLS_REPO_TOKEN }}
         run: goveralls -coverprofile=covprofile -service=github
