@@ -16,6 +16,7 @@ jobs:
     strategy:
       matrix:
         go-version: ['1.14', '1.21']
+    name: Build with Go ${{ matrix.go-version }}
     steps:
       - uses: actions/checkout@v3
 
