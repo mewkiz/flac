@@ -46,55 +46,49 @@ func TestEncode(t *testing.T) {
 		// TODO: fix: support for prediction method 2 not yet implemented
 		//"testdata/love.flac",
 	}
-loop:
 	for _, path := range paths {
-		// Decode source file.
-		stream, err := flac.ParseFile(path)
-		if err != nil {
-			t.Errorf("%q: unable to parse FLAC file; %v", path, err)
-			continue
-		}
-		defer stream.Close()
-
-		// Open encoder for FLAC stream.
-		out := new(bytes.Buffer)
-		enc, err := flac.NewEncoder(out, stream.Info, stream.Blocks...)
-		if err != nil {
-			t.Errorf("%q: unable to create encoder for FLAC stream; %v", path, err)
-			continue
-		}
-		// Encode audio samples.
-		for {
-			frame, err := stream.ParseNext()
+		t.Run(path, func(t *testing.T) {
+			// Decode source file.
+			stream, err := flac.ParseFile(path)
 			if err != nil {
-				if err == io.EOF {
-					break
-				}
-				t.Errorf("%q: unable to parse audio frame of FLAC stream; %v", path, err)
-				continue loop
+				t.Fatalf("%q: unable to parse FLAC file; %v", path, err)
 			}
-			if err := enc.WriteFrame(frame); err != nil {
-				t.Errorf("%q: unable to encode audio frame of FLAC stream; %v", path, err)
-				continue loop
-			}
-		}
-		// Close encoder and flush pending writes.
-		if err := enc.Close(); err != nil {
-			t.Errorf("%q: unable to close encoder for FLAC stream; %v", path, err)
-			continue
-		}
+			defer stream.Close()
 
-		// Compare source and destination FLAC streams.
-		want, err := ioutil.ReadFile(path)
-		if err != nil {
-			t.Errorf("%q: unable to read file; %v", path, err)
-			continue
-		}
-		got := out.Bytes()
-		if !bytes.Equal(got, want) {
-			t.Errorf("%q: content mismatch; expected % X, got % X", path, want, got)
-			continue
-		}
+			// Open encoder for FLAC stream.
+			out := new(bytes.Buffer)
+			enc, err := flac.NewEncoder(out, stream.Info, stream.Blocks...)
+			if err != nil {
+				t.Fatalf("%q: unable to create encoder for FLAC stream; %v", path, err)
+			}
+			// Encode audio samples.
+			for {
+				frame, err := stream.ParseNext()
+				if err != nil {
+					if err == io.EOF {
+						break
+					}
+					t.Fatalf("%q: unable to parse audio frame of FLAC stream; %v", path, err)
+				}
+				if err := enc.WriteFrame(frame); err != nil {
+					t.Fatalf("%q: unable to encode audio frame of FLAC stream; %v", path, err)
+				}
+			}
+			// Close encoder and flush pending writes.
+			if err := enc.Close(); err != nil {
+				t.Fatalf("%q: unable to close encoder for FLAC stream; %v", path, err)
+			}
+
+			// Compare source and destination FLAC streams.
+			want, err := ioutil.ReadFile(path)
+			if err != nil {
+				t.Fatalf("%q: unable to read file; %v", path, err)
+			}
+			got := out.Bytes()
+			if !bytes.Equal(got, want) {
+				t.Fatalf("%q: content mismatch; expected % X, got % X", path, want, got)
+			}
+		})
 	}
 }
 
