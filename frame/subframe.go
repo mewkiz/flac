@@ -84,12 +84,11 @@ type RiceSubframe struct {
 	Partitions []RicePartition
 }
 
-// RicePartition holds data of a rice partition.
+// RicePartition is a partition containing a subset of the residuals of a
+// subframe.
 type RicePartition struct {
 	// Rice parameter.
 	Param uint
-	// Residuals of rice partition.
-	Residuals []int32
 }
 
 // parseHeader reads and parses the header of a subframe.
@@ -255,7 +254,7 @@ func (subframe *Subframe) decodeVerbatim(br *bits.Reader, bps uint) error {
 	return nil
 }
 
-// fixedCoeffs maps from prediction order to the LPC coefficients used in fixed
+// FixedCoeffs maps from prediction order to the LPC coefficients used in fixed
 // encoding.
 //
 //	x_0[n] = 0
@@ -263,7 +262,7 @@ func (subframe *Subframe) decodeVerbatim(br *bits.Reader, bps uint) error {
 //	x_2[n] = 2*x[n-1] - x[n-2]
 //	x_3[n] = 3*x[n-1] - 3*x[n-2] + x[n-3]
 //	x_4[n] = 4*x[n-1] - 6*x[n-2] + 4*x[n-3] - x[n-4]
-var fixedCoeffs = [...][]int32{
+var FixedCoeffs = [...][]int32{
 	// ref: Section 2.2 of http://www.hpl.hp.com/techreports/1999/HPL-1999-144.pdf
 	1: {1},
 	2: {2, -1},
@@ -296,7 +295,8 @@ func (subframe *Subframe) decodeFixed(br *bits.Reader, bps uint) error {
 	// Predict the audio samples of the subframe using a polynomial with
 	// predefined coefficients of a given order. Correct signal errors using the
 	// decoded residuals.
-	return subframe.decodeLPC(fixedCoeffs[subframe.Order], 0)
+	const shift = 0
+	return subframe.decodeLPC(FixedCoeffs[subframe.Order], shift)
 }
 
 // decodeFIR decodes the linear prediction coded samples of the subframe, using
@@ -468,7 +468,6 @@ func (subframe *Subframe) decodeRicePart(br *bits.Reader, paramSize uint) error 
 			if err != nil {
 				return err
 			}
-			partition.Residuals = append(partition.Residuals, residual) // NOTE: residual stored for encoding round-trip.
 			subframe.Samples = append(subframe.Samples, residual)
 		}
 	}
