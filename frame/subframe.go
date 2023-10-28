@@ -50,7 +50,7 @@ func (frame *Frame) parseSubframe(br *bits.Reader, bps uint) (subframe *Subframe
 		err = subframe.decodeFIR(br, bps)
 	}
 
-	// Left shift to accout for wasted bits-per-sample.
+	// Left shift to account for wasted bits-per-sample.
 	for i, sample := range subframe.Samples {
 		subframe.Samples[i] = sample << subframe.Wasted
 	}
@@ -68,6 +68,28 @@ type SubHeader struct {
 	Order int
 	// Wasted bits-per-sample.
 	Wasted uint
+	// Residual coding method used by fixed and FIR linear prediction decoding.
+	ResidualCodingMethod ResidualCodingMethod
+	// Rice-coding subframe fields used by residual coding methods rice1 and
+	// rice2; nil if unused.
+	RiceSubframe *RiceSubframe
+}
+
+// Rice-coding subframe fields used by residual coding methods rice1 and rice2.
+type RiceSubframe struct {
+	// Partition order used by fixed and FIR linear prediction decoding
+	// (for residual coding methods, rice1 and rice2).
+	PartOrder int // TODO: remove PartOrder and infer from int(math.Log2(float64(len(Partitions))))?
+	// Rice partitions.
+	Partitions []RicePartition
+}
+
+// RicePartition holds data of a rice partition.
+type RicePartition struct {
+	// Rice parameter.
+	Param uint
+	// Residuals of rice partition.
+	Residuals []int32
 }
 
 // parseHeader reads and parses the header of a subframe.
@@ -267,8 +289,7 @@ func (subframe *Subframe) decodeFixed(br *bits.Reader, bps uint) error {
 	}
 
 	// Decode subframe residuals.
-	err := subframe.decodeResidual(br)
-	if err != nil {
+	if err := subframe.decodeResiduals(br); err != nil {
 		return err
 	}
 
@@ -323,7 +344,7 @@ func (subframe *Subframe) decodeFIR(br *bits.Reader, bps uint) error {
 	}
 
 	// Decode subframe residuals.
-	if err = subframe.decodeResidual(br); err != nil {
+	if err := subframe.decodeResiduals(br); err != nil {
 		return err
 	}
 
@@ -333,28 +354,41 @@ func (subframe *Subframe) decodeFIR(br *bits.Reader, bps uint) error {
 	return subframe.decodeLPC(coeffs, shift)
 }
 
-// decodeResidual decodes the encoded residuals (prediction method error
+// ResidualCodingMethod specifies a residual coding method.
+type ResidualCodingMethod uint8
+
+// Residual coding methods.
+const (
+	// Rice coding with a 4-bit Rice parameter (rice1).
+	ResidualCodingMethodRice1 ResidualCodingMethod = 0
+	// Rice coding with a 5-bit Rice parameter (rice2).
+	ResidualCodingMethodRice2 ResidualCodingMethod = 1
+)
+
+// decodeResiduals decodes the encoded residuals (prediction method error
 // signals) of the subframe.
 //
 // ref: https://www.xiph.org/flac/format.html#residual
-func (subframe *Subframe) decodeResidual(br *bits.Reader) error {
+func (subframe *Subframe) decodeResiduals(br *bits.Reader) error {
 	// 2 bits: Residual coding method.
 	x, err := br.Read(2)
 	if err != nil {
 		return unexpected(err)
 	}
+	residualCodingMethod := ResidualCodingMethod(x)
+	subframe.ResidualCodingMethod = residualCodingMethod
 	// The 2 bits are used to specify the residual coding method as follows:
 	//    00: Rice coding with a 4-bit Rice parameter.
 	//    01: Rice coding with a 5-bit Rice parameter.
 	//    10: reserved.
 	//    11: reserved.
-	switch x {
+	switch residualCodingMethod {
 	case 0x0:
 		return subframe.decodeRicePart(br, 4)
 	case 0x1:
 		return subframe.decodeRicePart(br, 5)
 	default:
-		return fmt.Errorf("frame.Subframe.decodeResidual: reserved residual coding method bit pattern (%02b)", x)
+		return fmt.Errorf("frame.Subframe.decodeResiduals: reserved residual coding method bit pattern (%02b)", uint8(residualCodingMethod))
 	}
 }
 
@@ -369,20 +403,28 @@ func (subframe *Subframe) decodeRicePart(br *bits.Reader, paramSize uint) error 
 	if err != nil {
 		return unexpected(err)
 	}
-	partOrder := x
+	partOrder := int(x)
+	riceSubframe := &RiceSubframe{
+		PartOrder: partOrder,
+	}
+	subframe.RiceSubframe = riceSubframe
 
 	// Parse Rice partitions; in total 2^partOrder partitions.
 	//
 	// ref: https://www.xiph.org/flac/format.html#rice_partition
 	// ref: https://www.xiph.org/flac/format.html#rice2_partition
 	nparts := 1 << partOrder
+	partitions := make([]RicePartition, nparts)
+	riceSubframe.Partitions = partitions
 	for i := 0; i < nparts; i++ {
+		partition := &partitions[i]
 		// (4 or 5) bits: Rice parameter.
 		x, err = br.Read(paramSize)
 		if err != nil {
 			return unexpected(err)
 		}
 		param := uint(x)
+		partition.Param = param
 
 		// Determine the number of Rice encoded samples in the partition.
 		var nsamples int
@@ -422,35 +464,37 @@ func (subframe *Subframe) decodeRicePart(br *bits.Reader, paramSize uint) error 
 
 		// Decode the Rice encoded residuals of the partition.
 		for j := 0; j < nsamples; j++ {
-			if err = subframe.decodeRiceResidual(br, param); err != nil {
+			residual, err := subframe.decodeRiceResidual(br, param)
+			if err != nil {
 				return err
 			}
+			partition.Residuals = append(partition.Residuals, residual) // NOTE: residual stored for encoding round-trip.
+			subframe.Samples = append(subframe.Samples, residual)
 		}
 	}
 
 	return nil
 }
 
-// decodeRiceResidual decodes a Rice encoded residual (error signal).
-func (subframe *Subframe) decodeRiceResidual(br *bits.Reader, k uint) error {
+// decodeRiceResidual decodes and returns a Rice encoded residual (error
+// signal).
+func (subframe *Subframe) decodeRiceResidual(br *bits.Reader, k uint) (int32, error) {
 	// Read unary encoded most significant bits.
 	high, err := br.ReadUnary()
 	if err != nil {
-		return unexpected(err)
+		return 0, unexpected(err)
 	}
 
 	// Read binary encoded least significant bits.
 	low, err := br.Read(k)
 	if err != nil {
-		return unexpected(err)
+		return 0, unexpected(err)
 	}
 	folded := uint32(high<<k | low)
 
 	// ZigZag decode.
 	residual := bits.DecodeZigZag(folded)
-	subframe.Samples = append(subframe.Samples, residual)
-
-	return nil
+	return residual, nil
 }
 
 // decodeLPC decodes linear prediction coded audio samples, using the
