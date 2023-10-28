@@ -27,23 +27,21 @@ func TestEncode(t *testing.T) {
 		//"testdata/80574.flac",
 		// TODO: fix: support for prediction method 3 not yet implemented
 		//"testdata/172960.flac",
-		// TODO: fix: support for prediction method 2 not yet implemented
+		// TODO: fix: support for prediction method 3 not yet implemented
 		//"testdata/189983.flac",
 		// TODO: fix: support for prediction method 3 not yet implemented
 		//"testdata/191885.flac",
-		// TODO: fix: support for prediction method 2 not yet implemented
+		// TODO: fix: support for prediction method 3 not yet implemented
 		//"testdata/212768.flac",
-		// TODO: fix: support for prediction method 2 not yet implemented
-		//"testdata/220014.flac",
-		// TODO: fix: support for prediction method 2 not yet implemented
-		//"testdata/243749.flac",
+		"testdata/220014.flac", // prediction method 2 (Fixed)
+		"testdata/243749.flac", // prediction method 2 (Fixed)
 		// TODO: fix: support for prediction method 3 not yet implemented
 		//"testdata/256529.flac",
 		// TODO: fix: support for prediction method 3 not yet implemented
 		//"testdata/257344.flac",
-		// TODO: fix: support for prediction method 2 not yet implemented
+		// TODO: fix: support for prediction method 3 not yet implemented
 		//"testdata/8297-275156-0011.flac",
-		// TODO: fix: support for prediction method 2 not yet implemented
+		// TODO: fix: support for prediction method 3 not yet implemented
 		//"testdata/love.flac",
 	}
 	for _, path := range paths {
