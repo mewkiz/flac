@@ -144,8 +144,16 @@ func encodeFixedSamples(bw *bitio.Writer, hdr frame.Header, subframe *frame.Subf
 			return errutil.Err(err)
 		}
 	}
+	// Compute residuals (signal errors of the prediction) between audio
+	// samples and LPC predicted audio samples.
+	const shift = 0
+	residuals, err := getLPCResiduals(subframe, frame.FixedCoeffs[subframe.Order], shift)
+	if err != nil {
+		return errutil.Err(err)
+	}
+
 	// Encode subframe residuals.
-	if err := encodeResiduals(bw, subframe); err != nil {
+	if err := encodeResiduals(bw, subframe, residuals); err != nil {
 		return errutil.Err(err)
 	}
 	return nil
@@ -155,7 +163,7 @@ func encodeFixedSamples(bw *bitio.Writer, hdr frame.Header, subframe *frame.Subf
 // subframe.
 //
 // ref: https://www.xiph.org/flac/format.html#residual
-func encodeResiduals(bw *bitio.Writer, subframe *frame.Subframe) error {
+func encodeResiduals(bw *bitio.Writer, subframe *frame.Subframe, residuals []int32) error {
 	// 2 bits: Residual coding method.
 	if err := bw.WriteBits(uint64(subframe.ResidualCodingMethod), 2); err != nil {
 		return errutil.Err(err)
@@ -167,9 +175,9 @@ func encodeResiduals(bw *bitio.Writer, subframe *frame.Subframe) error {
 	//    11: reserved.
 	switch subframe.ResidualCodingMethod {
 	case frame.ResidualCodingMethodRice1:
-		return encodeRicePart(bw, subframe, 4)
+		return encodeRicePart(bw, subframe, 4, residuals)
 	case frame.ResidualCodingMethodRice2:
-		return encodeRicePart(bw, subframe, 5)
+		return encodeRicePart(bw, subframe, 5, residuals)
 	default:
 		return fmt.Errorf("encodeResiduals: reserved residual coding method bit pattern (%02b)", uint8(subframe.ResidualCodingMethod))
 	}
@@ -180,7 +188,7 @@ func encodeResiduals(bw *bitio.Writer, subframe *frame.Subframe) error {
 //
 // ref: https://www.xiph.org/flac/format.html#partitioned_rice
 // ref: https://www.xiph.org/flac/format.html#partitioned_rice2
-func encodeRicePart(bw *bitio.Writer, subframe *frame.Subframe, paramSize uint) error {
+func encodeRicePart(bw *bitio.Writer, subframe *frame.Subframe, paramSize uint, residuals []int32) error {
 	// 4 bits: Partition order.
 	riceSubframe := subframe.RiceSubframe
 	if err := bw.WriteBits(uint64(riceSubframe.PartOrder), 4); err != nil {
@@ -193,6 +201,7 @@ func encodeRicePart(bw *bitio.Writer, subframe *frame.Subframe, paramSize uint) 
 	// ref: https://www.xiph.org/flac/format.html#rice2_partition
 	partOrder := riceSubframe.PartOrder
 	nparts := 1 << partOrder
+	curResidualIndex := 0
 	for i := range riceSubframe.Partitions {
 		partition := &riceSubframe.Partitions[i]
 		// (4 or 5) bits: Rice parameter.
@@ -218,7 +227,8 @@ func encodeRicePart(bw *bitio.Writer, subframe *frame.Subframe, paramSize uint) 
 
 		// Encode the Rice residuals of the partition.
 		for j := 0; j < nsamples; j++ {
-			residual := partition.Residuals[j]
+			residual := residuals[curResidualIndex]
+			curResidualIndex++
 			if err := encodeRiceResidual(bw, param, residual); err != nil {
 				return errutil.Err(err)
 			}
@@ -249,4 +259,30 @@ func encodeRiceResidual(bw *bitio.Writer, k uint, residual int32) error {
 		return errutil.Err(err)
 	}
 	return nil
+}
+
+// getLPCResiduals returns the residuals (signal errors of the prediction)
+// between the given audio samples and the LPC predicted audio samples, using
+// the coefficients of a given polynomial, and a couple (order of polynomial;
+// i.e. len(coeffs)) of unencoded warm-up samples.
+func getLPCResiduals(subframe *frame.Subframe, coeffs []int32, shift int32) ([]int32, error) {
+	if len(coeffs) != subframe.Order {
+		return nil, fmt.Errorf("getLPCResiduals: prediction order (%d) differs from number of coefficients (%d)", subframe.Order, len(coeffs))
+	}
+	if shift < 0 {
+		return nil, fmt.Errorf("getLPCResiduals: invalid negative shift")
+	}
+	if subframe.NSamples != len(subframe.Samples) {
+		return nil, fmt.Errorf("getLPCResiduals: subframe sample count mismatch; expected %d, got %d", subframe.NSamples, len(subframe.Samples))
+	}
+	var residuals []int32
+	for i := subframe.Order; i < subframe.NSamples; i++ {
+		var sample int64
+		for j, c := range coeffs {
+			sample += int64(c) * int64(subframe.Samples[i-j-1])
+		}
+		residual := subframe.Samples[i] - int32(sample>>uint(shift))
+		residuals = append(residuals, residual)
+	}
+	return residuals, nil
 }
