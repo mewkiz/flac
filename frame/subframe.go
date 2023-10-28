@@ -70,6 +70,13 @@ type SubHeader struct {
 	Wasted uint
 	// Residual coding method used by fixed and FIR linear prediction decoding.
 	ResidualCodingMethod ResidualCodingMethod
+	// Coefficients' precision in bits used by FIR linear prediction decoding.
+	CoeffPrec uint
+	// Predictor coefficient shift needed in bits used by FIR linear prediction
+	// decoding.
+	CoeffShift int32
+	// Predictor coefficients used by FIR linear prediction decoding.
+	Coeffs []int32
 	// Rice-coding subframe fields used by residual coding methods rice1 and
 	// rice2; nil if unused.
 	RiceSubframe *RiceSubframe
@@ -324,6 +331,7 @@ func (subframe *Subframe) decodeFIR(br *bits.Reader, bps uint) error {
 		return errors.New("frame.Subframe.decodeFIR: invalid coefficient precision bit pattern (1111)")
 	}
 	prec := uint(x) + 1
+	subframe.CoeffPrec = prec
 
 	// 5 bits: predictor coefficient shift needed in bits.
 	x, err = br.Read(5)
@@ -331,6 +339,7 @@ func (subframe *Subframe) decodeFIR(br *bits.Reader, bps uint) error {
 		return unexpected(err)
 	}
 	shift := signExtend(x, 5)
+	subframe.CoeffShift = shift
 
 	// Parse coefficients.
 	coeffs := make([]int32, subframe.Order)
@@ -342,6 +351,7 @@ func (subframe *Subframe) decodeFIR(br *bits.Reader, bps uint) error {
 		}
 		coeffs[i] = signExtend(x, prec)
 	}
+	subframe.Coeffs = coeffs
 
 	// Decode subframe residuals.
 	if err := subframe.decodeResiduals(br); err != nil {
