@@ -17,31 +17,26 @@ func TestEncode(t *testing.T) {
 		"meta/testdata/input-SCVPAP.flac",
 		"meta/testdata/input-VA.flac",
 		"meta/testdata/silence.flac",
-		// TODO: fix: support for prediction method 3 not yet implemented
-		//"testdata/19875.flac",
-		// TODO: fix: support for prediction method 3 not yet implemented
-		//"testdata/44127.flac",
-		// TODO: fix: support for prediction method 3 not yet implemented
+		"testdata/19875.flac", // prediction method 3 (FIR)
+		"testdata/44127.flac", // prediction method 3 (FIR)
+		// TODO: fix diff.
 		//"testdata/59996.flac",
-		// TODO: fix: support for prediction method 3 not yet implemented
-		//"testdata/80574.flac",
-		// TODO: fix: support for prediction method 3 not yet implemented
+		"testdata/80574.flac", // prediction method 3 (FIR)
+		// TODO: fix diff.
 		//"testdata/172960.flac",
-		// TODO: fix: support for prediction method 3 not yet implemented
+		// TODO: fix diff.
 		//"testdata/189983.flac",
-		// TODO: fix: support for prediction method 3 not yet implemented
+		// TODO: fix: invalid number of samples per channel; expected >= 16 && <= 65535, got 1
 		//"testdata/191885.flac",
-		// TODO: fix: support for prediction method 3 not yet implemented
+		// TODO: fix diff.
 		//"testdata/212768.flac",
 		"testdata/220014.flac", // prediction method 2 (Fixed)
 		"testdata/243749.flac", // prediction method 2 (Fixed)
-		// TODO: fix: support for prediction method 3 not yet implemented
+		// TODO: fix diff.
 		//"testdata/256529.flac",
-		// TODO: fix: support for prediction method 3 not yet implemented
-		//"testdata/257344.flac",
-		// TODO: fix: support for prediction method 3 not yet implemented
-		//"testdata/8297-275156-0011.flac",
-		// TODO: fix: support for prediction method 3 not yet implemented
+		"testdata/257344.flac", // prediction method 3 (FIR)
+		"testdata/8297-275156-0011.flac", // prediction method 3 (FIR)
+		// TODO: fix: constant sample mismatch; expected 126, got 125
 		//"testdata/love.flac",
 	}
 	for _, path := range paths {

@@ -32,11 +32,10 @@ func encodeSubframe(bw *bitio.Writer, hdr frame.Header, subframe *frame.Subframe
 		if err := encodeFixedSamples(bw, hdr, subframe); err != nil {
 			return errutil.Err(err)
 		}
-	// TODO: implement support for LPC encoding of audio samples.
-	//case frame.PredFIR:
-	//	if err := encodeFIRSamples(bw, hdr, subframe.Samples, subframe.Order); err != nil {
-	//		return errutil.Err(err)
-	//	}
+	case frame.PredFIR:
+		if err := encodeFIRSamples(bw, hdr, subframe); err != nil {
+			return errutil.Err(err)
+		}
 	default:
 		return errutil.Newf("support for prediction method %v not yet implemented", subframe.Pred)
 	}
@@ -144,10 +143,57 @@ func encodeFixedSamples(bw *bitio.Writer, hdr frame.Header, subframe *frame.Subf
 			return errutil.Err(err)
 		}
 	}
+
 	// Compute residuals (signal errors of the prediction) between audio
 	// samples and LPC predicted audio samples.
 	const shift = 0
 	residuals, err := getLPCResiduals(subframe, frame.FixedCoeffs[subframe.Order], shift)
+	if err != nil {
+		return errutil.Err(err)
+	}
+
+	// Encode subframe residuals.
+	if err := encodeResiduals(bw, subframe, residuals); err != nil {
+		return errutil.Err(err)
+	}
+	return nil
+}
+
+// --- [ FIR samples ] -------------------------------------------------------
+
+// encodeFIRSamples stores the given samples using linear prediction coding
+// with a custom set of predefined polynomial coefficients, writing to bw.
+func encodeFIRSamples(bw *bitio.Writer, hdr frame.Header, subframe *frame.Subframe) error {
+	// Encode unencoded warm-up samples.
+	samples := subframe.Samples
+	for i := 0; i < subframe.Order; i++ {
+		sample := samples[i]
+		if err := bw.WriteBits(uint64(sample), hdr.BitsPerSample); err != nil {
+			return errutil.Err(err)
+		}
+	}
+
+	// 4 bits: (coefficients' precision in bits) - 1.
+	if err := bw.WriteBits(uint64(subframe.CoeffPrec-1), 4); err != nil {
+		return errutil.Err(err)
+	}
+
+	// 5 bits: predictor coefficient shift needed in bits.
+	if err := bw.WriteBits(uint64(subframe.CoeffShift), 5); err != nil {
+		return errutil.Err(err)
+	}
+
+	// Encode coefficients.
+	for _, coeff := range subframe.Coeffs {
+		// (prec) bits: Predictor coefficient.
+		if err := bw.WriteBits(uint64(coeff), uint8(subframe.CoeffPrec)); err != nil {
+			return errutil.Err(err)
+		}
+	}
+
+	// Compute residuals (signal errors of the prediction) between audio
+	// samples and LPC predicted audio samples.
+	residuals, err := getLPCResiduals(subframe, subframe.Coeffs, subframe.CoeffShift)
 	if err != nil {
 		return errutil.Err(err)
 	}
