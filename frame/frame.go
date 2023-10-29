@@ -33,6 +33,7 @@ import (
 	"hash"
 	"io"
 	"log"
+	"math"
 
 	"github.com/mewkiz/flac/internal/bits"
 	"github.com/mewkiz/flac/internal/hashutil"
@@ -130,7 +131,7 @@ func (frame *Frame) Parse() error {
 	}
 
 	// Inter-channel correlation of subframe samples.
-	frame.correlate()
+	frame.Correlate()
 
 	// 2 bytes: CRC-16 checksum.
 	var want uint16
@@ -571,14 +572,14 @@ func (channels Channels) Count() int {
 	return nChannels[channels]
 }
 
-// correlate reverts any inter-channel decorrelation between the samples of the
+// Correlate reverts any inter-channel decorrelation between the samples of the
 // subframes.
 //
 // An encoder decorrelates audio samples as follows:
 //
 //	mid = (left + right)/2
 //	side = left - right
-func (frame *Frame) correlate() {
+func (frame *Frame) Correlate() {
 	switch frame.Channels {
 	case ChannelsLeftSide:
 		// 2 channels: left, side; using inter-channel decorrelation.
@@ -614,6 +615,57 @@ func (frame *Frame) correlate() {
 			m |= s & 1
 			mid[i] = (m + s) / 2
 			side[i] = (m - s) / 2
+		}
+	}
+}
+
+// Decorrelate performs inter-channel decorrelation between the samples of the
+// subframes.
+//
+// An encoder decorrelates audio samples as follows:
+//
+//	mid = (left + right)/2
+//	side = left - right
+func (frame *Frame) Decorrelate() {
+	switch frame.Channels {
+	case ChannelsLeftSide:
+		// 2 channels: left, side; using inter-channel decorrelation.
+		left := frame.Subframes[0].Samples  // already left; no change after inter-channel decorrelation.
+		right := frame.Subframes[1].Samples // set to side after inter-channel decorrelation.
+		for i := range left {
+			l := left[i]
+			r := right[i]
+			// inter-channel decorrelation:
+			//	side = left - right
+			side := l - r
+			right[i] = side
+		}
+	case ChannelsSideRight:
+		// 2 channels: side, right; using inter-channel decorrelation.
+		left := frame.Subframes[0].Samples  // set to side after inter-channel decorrelation.
+		right := frame.Subframes[1].Samples // already right; no change after inter-channel decorrelation.
+		for i := range left {
+			l := left[i]
+			r := right[i]
+			// inter-channel decorrelation:
+			//	side = left - right
+			side := l - r
+			left[i] = side
+		}
+	case ChannelsMidSide:
+		// 2 channels: mid, side; using inter-channel decorrelation.
+		left := frame.Subframes[0].Samples  // set to mid after inter-channel decorrelation.
+		right := frame.Subframes[1].Samples // set to side after inter-channel decorrelation.
+		for i := range left {
+			// inter-channel decorrelation:
+			//	mid = (left + right)/2
+			//	side = left - right
+			l := left[i]
+			r := right[i]
+			mid := int32(math.Round((float64(l) + float64(r)) / 2.0)) // rounded up.
+			side := l - r
+			left[i] = mid
+			right[i] = side
 		}
 	}
 }

@@ -12,28 +12,39 @@ import (
 // --- [ Subframe ] ------------------------------------------------------------
 
 // encodeSubframe encodes the given subframe, writing to bw.
-func encodeSubframe(bw *bitio.Writer, hdr frame.Header, subframe *frame.Subframe) error {
+func encodeSubframe(bw *bitio.Writer, hdr frame.Header, subframe *frame.Subframe, bps uint) error {
 	// Encode subframe header.
 	if err := encodeSubframeHeader(bw, subframe.SubHeader); err != nil {
 		return errutil.Err(err)
 	}
 
+	// Adjust bps of subframe for wasted bits-per-sample.
+	bps -= subframe.Wasted
+
+	// Right shift to account for wasted bits-per-sample.
+	// TODO: figure out how to make this non-destructive (use defer to restore original samples?).
+	if subframe.Wasted > 0 {
+		for i, sample := range subframe.Samples {
+			subframe.Samples[i] = sample >> subframe.Wasted
+		}
+	}
+
 	// Encode audio samples.
 	switch subframe.Pred {
 	case frame.PredConstant:
-		if err := encodeConstantSamples(bw, hdr, subframe); err != nil {
+		if err := encodeConstantSamples(bw, hdr, subframe, bps); err != nil {
 			return errutil.Err(err)
 		}
 	case frame.PredVerbatim:
-		if err := encodeVerbatimSamples(bw, hdr, subframe); err != nil {
+		if err := encodeVerbatimSamples(bw, hdr, subframe, bps); err != nil {
 			return errutil.Err(err)
 		}
 	case frame.PredFixed:
-		if err := encodeFixedSamples(bw, hdr, subframe); err != nil {
+		if err := encodeFixedSamples(bw, hdr, subframe, bps); err != nil {
 			return errutil.Err(err)
 		}
 	case frame.PredFIR:
-		if err := encodeFIRSamples(bw, hdr, subframe); err != nil {
+		if err := encodeFIRSamples(bw, hdr, subframe, bps); err != nil {
 			return errutil.Err(err)
 		}
 	default:
@@ -87,7 +98,7 @@ func encodeSubframeHeader(bw *bitio.Writer, subHdr frame.SubHeader) error {
 		return errutil.Err(err)
 	}
 	if hasWastedBits {
-		if err := iobits.WriteUnary(bw, uint64(subHdr.Wasted)); err != nil {
+		if err := iobits.WriteUnary(bw, uint64(subHdr.Wasted-1)); err != nil {
 			return errutil.Err(err)
 		}
 	}
@@ -97,7 +108,7 @@ func encodeSubframeHeader(bw *bitio.Writer, subHdr frame.SubHeader) error {
 // --- [ Constant samples ] ----------------------------------------------------
 
 // encodeConstantSamples stores the given constant sample, writing to bw.
-func encodeConstantSamples(bw *bitio.Writer, hdr frame.Header, subframe *frame.Subframe) error {
+func encodeConstantSamples(bw *bitio.Writer, hdr frame.Header, subframe *frame.Subframe, bps uint) error {
 	samples := subframe.Samples
 	sample := samples[0]
 	for _, s := range samples[1:] {
@@ -106,7 +117,7 @@ func encodeConstantSamples(bw *bitio.Writer, hdr frame.Header, subframe *frame.S
 		}
 	}
 	// Unencoded constant value of the subblock, n = frame's bits-per-sample.
-	if err := bw.WriteBits(uint64(sample), hdr.BitsPerSample); err != nil {
+	if err := bw.WriteBits(uint64(sample), uint8(bps)); err != nil {
 		return errutil.Err(err)
 	}
 	return nil
@@ -116,14 +127,14 @@ func encodeConstantSamples(bw *bitio.Writer, hdr frame.Header, subframe *frame.S
 
 // encodeVerbatimSamples stores the given samples verbatim (uncompressed),
 // writing to bw.
-func encodeVerbatimSamples(bw *bitio.Writer, hdr frame.Header, subframe *frame.Subframe) error {
+func encodeVerbatimSamples(bw *bitio.Writer, hdr frame.Header, subframe *frame.Subframe, bps uint) error {
 	// Unencoded subblock; n = frame's bits-per-sample, i = frame's blocksize.
 	samples := subframe.Samples
 	if int(hdr.BlockSize) != len(samples) {
 		return errutil.Newf("block size and sample count mismatch; expected %d, got %d", hdr.BlockSize, len(samples))
 	}
 	for _, sample := range samples {
-		if err := bw.WriteBits(uint64(sample), hdr.BitsPerSample); err != nil {
+		if err := bw.WriteBits(uint64(sample), uint8(bps)); err != nil {
 			return errutil.Err(err)
 		}
 	}
@@ -134,12 +145,12 @@ func encodeVerbatimSamples(bw *bitio.Writer, hdr frame.Header, subframe *frame.S
 
 // encodeFixedSamples stores the given samples using linear prediction coding
 // with a fixed set of predefined polynomial coefficients, writing to bw.
-func encodeFixedSamples(bw *bitio.Writer, hdr frame.Header, subframe *frame.Subframe) error {
+func encodeFixedSamples(bw *bitio.Writer, hdr frame.Header, subframe *frame.Subframe, bps uint) error {
 	// Encode unencoded warm-up samples.
 	samples := subframe.Samples
 	for i := 0; i < subframe.Order; i++ {
 		sample := samples[i]
-		if err := bw.WriteBits(uint64(sample), hdr.BitsPerSample); err != nil {
+		if err := bw.WriteBits(uint64(sample), uint8(bps)); err != nil {
 			return errutil.Err(err)
 		}
 	}
@@ -163,12 +174,12 @@ func encodeFixedSamples(bw *bitio.Writer, hdr frame.Header, subframe *frame.Subf
 
 // encodeFIRSamples stores the given samples using linear prediction coding
 // with a custom set of predefined polynomial coefficients, writing to bw.
-func encodeFIRSamples(bw *bitio.Writer, hdr frame.Header, subframe *frame.Subframe) error {
+func encodeFIRSamples(bw *bitio.Writer, hdr frame.Header, subframe *frame.Subframe, bps uint) error {
 	// Encode unencoded warm-up samples.
 	samples := subframe.Samples
 	for i := 0; i < subframe.Order; i++ {
 		sample := samples[i]
-		if err := bw.WriteBits(uint64(sample), hdr.BitsPerSample); err != nil {
+		if err := bw.WriteBits(uint64(sample), uint8(bps)); err != nil {
 			return errutil.Err(err)
 		}
 	}
