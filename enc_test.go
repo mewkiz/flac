@@ -34,10 +34,9 @@ func TestEncode(t *testing.T) {
 		"testdata/243749.flac", // prediction method 2 (Fixed)
 		// TODO: fix diff.
 		//"testdata/256529.flac",
-		"testdata/257344.flac", // prediction method 3 (FIR)
+		"testdata/257344.flac",           // prediction method 3 (FIR)
 		"testdata/8297-275156-0011.flac", // prediction method 3 (FIR)
-		// TODO: fix: constant sample mismatch; expected 126, got 125
-		//"testdata/love.flac",
+		"testdata/love.flac",             // wasted bits
 	}
 	for _, path := range paths {
 		t.Run(path, func(t *testing.T) {

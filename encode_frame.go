@@ -64,10 +64,30 @@ func (enc *Encoder) WriteFrame(f *frame.Frame) error {
 		return errutil.Err(err)
 	}
 
+	// Inter-channel decorrelation of subframe samples.
+	f.Decorrelate()     // TODO: figure out how to make this non-destructive; using defer for now (i.e. not updating the Samples slice of frame.Subframes)
+	defer f.Correlate() // NOTE: revert decorrelation of audio samples after encoding is done.
+
 	// Encode subframes.
 	bw := bitio.NewWriter(hw)
-	for _, subframe := range f.Subframes {
-		if err := encodeSubframe(bw, f.Header, subframe); err != nil {
+	for channel, subframe := range f.Subframes {
+		// The side channel requires an extra bit per sample when using
+		// inter-channel decorrelation.
+		bps := uint(f.BitsPerSample)
+		switch f.Channels {
+		case frame.ChannelsSideRight:
+			// channel 0 is the side channel.
+			if channel == 0 {
+				bps++
+			}
+		case frame.ChannelsLeftSide, frame.ChannelsMidSide:
+			// channel 1 is the side channel.
+			if channel == 1 {
+				bps++
+			}
+		}
+
+		if err := encodeSubframe(bw, f.Header, subframe, bps); err != nil {
 			return errutil.Err(err)
 		}
 	}
