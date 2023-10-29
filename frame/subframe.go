@@ -82,7 +82,8 @@ type SubHeader struct {
 	RiceSubframe *RiceSubframe
 }
 
-// Rice-coding subframe fields used by residual coding methods rice1 and rice2.
+// RiceSubframe holds rice-coding subframe fields used by residual coding
+// methods rice1 and rice2.
 type RiceSubframe struct {
 	// Partition order used by fixed and FIR linear prediction decoding
 	// (for residual coding methods, rice1 and rice2).
