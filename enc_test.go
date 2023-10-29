@@ -16,6 +16,8 @@ func TestEncode(t *testing.T) {
 		"meta/testdata/input-SCVA.flac",
 		"meta/testdata/input-SCVPAP.flac",
 		"meta/testdata/input-VA.flac",
+		"meta/testdata/input-SCVAUP.flac", // empty metadata block (of type 0x7e)
+		"meta/testdata/input-SVAUP.flac",  // empty metadata block (of type 0x7e)
 		"meta/testdata/silence.flac",
 		"testdata/19875.flac", // prediction method 3 (FIR)
 		"testdata/44127.flac", // prediction method 3 (FIR)

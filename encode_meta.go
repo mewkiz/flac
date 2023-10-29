@@ -18,6 +18,9 @@ func encodeBlock(bw *bitio.Writer, block *meta.Block, last bool) error {
 	if block.Type == meta.TypePadding {
 		return encodePadding(bw, block.Length, last)
 	}
+	if block.Length == 0 {
+		return encodeEmptyBlock(bw, block.Type, last)
+	}
 	switch body := block.Body.(type) {
 	case *meta.StreamInfo:
 		return encodeStreamInfo(bw, body, last)
@@ -34,6 +37,23 @@ func encodeBlock(bw *bitio.Writer, block *meta.Block, last bool) error {
 	default:
 		panic(fmt.Errorf("support for metadata block body type %T not yet implemented", body))
 	}
+}
+
+// --- [ Metadata block header ] -----------------------------------------------
+
+// encodeEmptyBlock encodes the metadata block header of an empty metadata
+// block with the specified type, writing to bw.
+func encodeEmptyBlock(bw *bitio.Writer, typ meta.Type, last bool) error {
+	// Store metadata block header.
+	hdr := &meta.Header{
+		IsLast: last,
+		Type:   typ,
+		Length: 0,
+	}
+	if err := encodeBlockHeader(bw, hdr); err != nil {
+		return errutil.Err(err)
+	}
+	return nil
 }
 
 // --- [ Metadata block header ] -----------------------------------------------
