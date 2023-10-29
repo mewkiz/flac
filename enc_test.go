@@ -200,6 +200,9 @@ func TestEncode(t *testing.T) {
 			}
 			got := out.Bytes()
 			if !bytes.Equal(got, want) {
+				//if err := ioutil.WriteFile("/tmp/got.flac", got, 0o644); err != nil {
+				//	panic(err)
+				//}
 				t.Fatalf("%q: content mismatch; expected % X, got % X", path, want, got)
 			}
 		})
