@@ -64,9 +64,19 @@ func TestEncode(t *testing.T) {
 		//"testdata/flac-test-files/subset/23 - 8 bit per sample.flac",
 		"testdata/flac-test-files/subset/24 - variable blocksize file created with flake revision 264.flac",
 		"testdata/flac-test-files/subset/25 - variable blocksize file created with flake revision 264, modified to create smaller blocks.flac",
-		// TODO: fix diff.
+		// NOTE: the only diff is that "26 - ...flac" uses `block_size: 0b111
+		// (end of header (16 bit))` to encode the block size at the end of the
+		// header, whereas mewkiz/flac encodes it directly `block_size: 4096
+		// (0b1100)`. Notably, the computed md5 hash of the decoded audio samples
+		// is identical (MD5: 3b2939b39ae7369b80451c77865e60c1). Thus, ignore the
+		// test case.
 		//"testdata/flac-test-files/subset/26 - variable blocksize file created with CUETools.Flake 2.1.6.flac",
-		// TODO: fix diff.
+		// NOTE: the only diff is that "27 - ...flac" uses `block_size: 0b111
+		// (end of header (16 bit))` to encode the block size at the end of the
+		// header, whereas mewkiz/flac encodes it directly `block_size: 4608
+		// (0b101)`. Notably, the computed md5 hash of the decoded audio samples
+		// is identical (MD5: 9fb66177d2f735d4b1f501a5af1320a3). Thus, ignore the
+		// test case.
 		//"testdata/flac-test-files/subset/27 - old format variable blocksize file created with Flake 0.11.flac",
 		"testdata/flac-test-files/subset/28 - high resolution audio, default settings.flac",
 		"testdata/flac-test-files/subset/29 - high resolution audio, blocksize 16384.flac",
@@ -74,7 +84,11 @@ func TestEncode(t *testing.T) {
 		"testdata/flac-test-files/subset/31 - high resolution audio, using only 32nd order predictors.flac",
 		"testdata/flac-test-files/subset/32 - high resolution audio, partition order 8 containing escaped partitions.flac",
 		"testdata/flac-test-files/subset/33 - samplerate 192kHz.flac",
-		// TODO: fix diff.
+		// NOTE: the only diff is that "34 - ...flac" uses `0b1100 (end of header
+		// (8 bit*1000))` to encode the sample rate at the end of the header,
+		// whereas mewkiz/flac encodes it directly `192000 (0b11)`. Notably, the
+		// computed md5 hash of the decoded audio samples is identical
+		// (MD5: 942f56e503437dfd4c269c331774b2e3). Thus, ignore the test case.
 		//"testdata/flac-test-files/subset/34 - samplerate 192kHz, using only 32nd order predictors.flac",
 		"testdata/flac-test-files/subset/35 - samplerate 134560Hz.flac",
 		"testdata/flac-test-files/subset/36 - samplerate 384kHz.flac",
@@ -85,7 +99,11 @@ func TestEncode(t *testing.T) {
 		"testdata/flac-test-files/subset/41 - 6 channels (5.1).flac",
 		"testdata/flac-test-files/subset/42 - 7 channels (6.1).flac",
 		"testdata/flac-test-files/subset/43 - 8 channels (7.1).flac",
-		// TODO: fix diff.
+		// TODO: check why there is an audio sample diff (they look identical,
+		// except for using `sample_rate: 0b1100 (end of header (8 bit*1000))`
+		// for orig and `sample_rate: 192000 (0b11)` for mewkiz/flac); orig md5:
+		// cdf531d4d4b95233986bc499518a89db, output md5:
+		// 678a704da087bf8e98a19f1ad47ca359.
 		//"testdata/flac-test-files/subset/44 - 8-channel surround, 192kHz, 24 bit, using only 32nd order predictors.flac",
 		"testdata/flac-test-files/subset/45 - no total number of samples set.flac",
 		"testdata/flac-test-files/subset/46 - no min-max framesize set.flac",
