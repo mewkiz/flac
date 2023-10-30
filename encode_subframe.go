@@ -278,8 +278,27 @@ func encodeRicePart(bw *bitio.Writer, subframe *frame.Subframe, paramSize uint, 
 		}
 
 		if paramSize == 4 && param == 0xF || paramSize == 5 && param == 0x1F {
-			// TODO: implement encoding of escaped partitions.
-			panic("TODO: implement encoding of escaped partitions.")
+			// 1111 or 11111: Escape code, meaning the partition is in unencoded
+			// binary form using n bits per sample; n follows as a 5-bit number.
+			if err := bw.WriteBits(uint64(partition.EscapedBitsPerSample), 5); err != nil {
+				return errutil.Err(err)
+			}
+			for j := 0; j < nsamples; j++ {
+				// ref: https://datatracker.ietf.org/doc/draft-ietf-cellar-flac/
+				//
+				// From section 9.2.7.1.  Escaped partition:
+				//
+				// The residual samples themselves are stored signed two's
+				// complement.  For example, when a partition is escaped and each
+				// residual sample is stored with 3 bits, the number -1 is
+				// represented as 0b111.
+				residual := residuals[curResidualIndex]
+				curResidualIndex++
+				if err := bw.WriteBits(uint64(residual), uint8(partition.EscapedBitsPerSample)); err != nil {
+					return errutil.Err(err)
+				}
+			}
+			continue
 		}
 
 		// Encode the Rice residuals of the partition.

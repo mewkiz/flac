@@ -53,8 +53,7 @@ func TestEncode(t *testing.T) {
 		"testdata/flac-test-files/subset/13 - qlp precision 2 bit.flac",
 		"testdata/flac-test-files/subset/14 - wasted bits.flac",
 		"testdata/flac-test-files/subset/15 - only verbatim subframes.flac",
-		// TODO: implement encoding of escaped partitions
-		//"testdata/flac-test-files/subset/16 - partition order 8 containing escaped partitions.flac",
+		"testdata/flac-test-files/subset/16 - partition order 8 containing escaped partitions.flac",
 		"testdata/flac-test-files/subset/17 - all fixed orders.flac",
 		"testdata/flac-test-files/subset/18 - precision search.flac",
 		"testdata/flac-test-files/subset/19 - samplerate 35467Hz.flac",
@@ -73,8 +72,7 @@ func TestEncode(t *testing.T) {
 		"testdata/flac-test-files/subset/29 - high resolution audio, blocksize 16384.flac",
 		"testdata/flac-test-files/subset/30 - high resolution audio, blocksize 13456.flac",
 		"testdata/flac-test-files/subset/31 - high resolution audio, using only 32nd order predictors.flac",
-		// TODO: implement encoding of escaped partitions.
-		//"testdata/flac-test-files/subset/32 - high resolution audio, partition order 8 containing escaped partitions.flac",
+		"testdata/flac-test-files/subset/32 - high resolution audio, partition order 8 containing escaped partitions.flac",
 		"testdata/flac-test-files/subset/33 - samplerate 192kHz.flac",
 		// TODO: fix diff.
 		//"testdata/flac-test-files/subset/34 - samplerate 192kHz, using only 32nd order predictors.flac",
@@ -108,8 +106,7 @@ func TestEncode(t *testing.T) {
 		"testdata/flac-test-files/subset/61 - predictor overflow check, 16-bit.flac",
 		"testdata/flac-test-files/subset/62 - predictor overflow check, 20-bit.flac",
 		"testdata/flac-test-files/subset/63 - predictor overflow check, 24-bit.flac",
-		// TODO: implement encoding of escaped partitions.
-		//"testdata/flac-test-files/subset/64 - rice partitions with escape code zero.flac",
+		"testdata/flac-test-files/subset/64 - rice partitions with escape code zero.flac",
 	}
 	for _, path := range paths {
 		t.Run(path, func(t *testing.T) {

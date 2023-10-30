@@ -97,6 +97,8 @@ type RiceSubframe struct {
 type RicePartition struct {
 	// Rice parameter.
 	Param uint
+	// Residual sample size in bits-per-sample used by escaped partitions.
+	EscapedBitsPerSample uint
 }
 
 // parseHeader reads and parses the header of a subframe.
@@ -455,6 +457,7 @@ func (subframe *Subframe) decodeRicePart(br *bits.Reader, paramSize uint) error 
 				return unexpected(err)
 			}
 			n := uint(x)
+			partition.EscapedBitsPerSample = n
 			for j := 0; j < nsamples; j++ {
 				sample, err := br.Read(n)
 				if err != nil {
