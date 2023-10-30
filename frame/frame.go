@@ -33,7 +33,6 @@ import (
 	"hash"
 	"io"
 	"log"
-	"math"
 
 	"github.com/mewkiz/flac/internal/bits"
 	"github.com/mewkiz/flac/internal/hashutil"
@@ -593,9 +592,9 @@ func (frame *Frame) Correlate() {
 		// 2 channels: side, right; using inter-channel decorrelation.
 		side := frame.Subframes[0].Samples
 		right := frame.Subframes[1].Samples
-		// left = right + side
 		for i := range side {
-			side[i] += right[i]
+			// left = right + side
+			side[i] = right[i] + side[i]
 		}
 	case ChannelsMidSide:
 		// 2 channels: mid, side; using inter-channel decorrelation.
@@ -662,7 +661,7 @@ func (frame *Frame) Decorrelate() {
 			//	side = left - right
 			l := left[i]
 			r := right[i]
-			mid := int32(math.Round((float64(l) + float64(r)) / 2.0)) // rounded up.
+			mid := int32((int64(l) + int64(r)) >> 1) // NOTE: using `(left + right) >> 1`, not the same as `(left + right) / 2`.
 			side := l - r
 			left[i] = mid
 			right[i] = side
