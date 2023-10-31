@@ -22,11 +22,16 @@ func encodeSubframe(bw *bitio.Writer, hdr frame.Header, subframe *frame.Subframe
 	bps -= subframe.Wasted
 
 	// Right shift to account for wasted bits-per-sample.
-	// TODO: figure out how to make this non-destructive (use defer to restore original samples?).
 	if subframe.Wasted > 0 {
 		for i, sample := range subframe.Samples {
 			subframe.Samples[i] = sample >> subframe.Wasted
 		}
+		// NOTE: use defer to restore original samples after encode.
+		defer func() {
+			for i, sample := range subframe.Samples {
+				subframe.Samples[i] = sample << subframe.Wasted
+			}
+		}()
 	}
 
 	// Encode audio samples.
