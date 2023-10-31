@@ -15,22 +15,22 @@ func TestUnary(t *testing.T) {
 	for ; want < 1000; want++ {
 		// Write unary
 		if err := bits.WriteUnary(bw, want); err != nil {
-			t.Fatalf("error writing unary: %v", err)
+			t.Fatalf("unable to write unary; %v", err)
 		}
 		// Flush buffer
 		if err := bw.Close(); err != nil {
-			t.Fatalf("error closing the buffer: %v", err)
+			t.Fatalf("unable to close (flush) the bit buffer; %v", err)
 		}
 
 		// Read written unary
 		r := bits.NewReader(w)
 		got, err := r.ReadUnary()
 		if err != nil {
-			t.Fatalf("error reading unary: %v", err)
+			t.Fatalf("unable to read unary; %v", err)
 		}
 
 		if got != want {
-			t.Fatalf("the written and read unary doesn't match the original. got: %v, expected: %v", got, want)
+			t.Fatalf("the written and read unary doesn't match the original value, got: %v, expected: %v", got, want)
 		}
 	}
 }
