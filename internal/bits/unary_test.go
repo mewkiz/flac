@@ -2,17 +2,17 @@ package bits_test
 
 import (
 	"bytes"
+	"testing"
+
 	"github.com/icza/bitio"
 	"github.com/mewkiz/flac/internal/bits"
-	"testing"
 )
 
 func TestUnary(t *testing.T) {
-	w := new(bytes.Buffer)
-	bw := bitio.NewWriter(w)
+	buf := &bytes.Buffer{}
+	bw := bitio.NewWriter(buf)
 
-	var want uint64
-	for ; want < 1000; want++ {
+	for want := uint64(0); want < 1000; want++ {
 		// Write unary
 		if err := bits.WriteUnary(bw, want); err != nil {
 			t.Fatalf("unable to write unary; %v", err)
@@ -23,14 +23,14 @@ func TestUnary(t *testing.T) {
 		}
 
 		// Read written unary
-		r := bits.NewReader(w)
+		r := bits.NewReader(buf)
 		got, err := r.ReadUnary()
 		if err != nil {
 			t.Fatalf("unable to read unary; %v", err)
 		}
 
-		if got != want {
-			t.Fatalf("the written and read unary doesn't match the original value, got: %v, expected: %v", got, want)
+		if want != got {
+			t.Fatalf("mismatch between written and read unary value; expected: %d, got: %d", want, got)
 		}
 	}
 }
