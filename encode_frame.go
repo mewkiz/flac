@@ -24,9 +24,6 @@ func (enc *Encoder) WriteFrame(f *frame.Frame) error {
 		return errutil.Newf("subframe and channel count mismatch; expected %d, got %d", nchannels, len(f.Subframes))
 	}
 	nsamplesPerChannel := f.Subframes[0].NSamples
-	if !(16 <= nsamplesPerChannel && nsamplesPerChannel <= 65535) {
-		return errutil.Newf("invalid number of samples per channel; expected >= 16 && <= 65535, got %d", nsamplesPerChannel)
-	}
 	for i, subframe := range f.Subframes {
 		if nsamplesPerChannel != len(subframe.Samples) {
 			return errutil.Newf("invalid number of samples in channel %d; expected %d, got %d", i, nsamplesPerChannel, len(subframe.Samples))
@@ -65,8 +62,8 @@ func (enc *Encoder) WriteFrame(f *frame.Frame) error {
 	}
 
 	// Inter-channel decorrelation of subframe samples.
-	f.Decorrelate()     // TODO: figure out how to make this non-destructive; using defer for now (i.e. not updating the Samples slice of frame.Subframes)
-	defer f.Correlate() // NOTE: revert decorrelation of audio samples after encoding is done.
+	f.Decorrelate()
+	defer f.Correlate() // NOTE: revert decorrelation of audio samples after encoding is done (to make encode non-destructive).
 
 	// Encode subframes.
 	bw := bitio.NewWriter(hw)

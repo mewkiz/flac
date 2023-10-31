@@ -27,8 +27,7 @@ func TestEncode(t *testing.T) {
 		"testdata/80574.flac", // prediction method 3 (FIR)
 		"testdata/172960.flac",
 		"testdata/189983.flac",
-		// TODO: fix: invalid number of samples per channel; expected >= 16 && <= 65535, got 1
-		//"testdata/191885.flac",
+		"testdata/191885.flac",
 		"testdata/212768.flac",
 		"testdata/220014.flac", // prediction method 2 (Fixed)
 		"testdata/243749.flac", // prediction method 2 (Fixed)
@@ -39,8 +38,7 @@ func TestEncode(t *testing.T) {
 		// IETF test cases.
 		"testdata/flac-test-files/subset/01 - blocksize 4096.flac",
 		"testdata/flac-test-files/subset/02 - blocksize 4608.flac",
-		// TODO: fix: invalid number of samples per channel; expected >= 16 && <= 65535, got 12
-		//"testdata/flac-test-files/subset/03 - blocksize 16.flac",
+		"testdata/flac-test-files/subset/03 - blocksize 16.flac",
 		"testdata/flac-test-files/subset/04 - blocksize 192.flac",
 		"testdata/flac-test-files/subset/05 - blocksize 254.flac",
 		"testdata/flac-test-files/subset/06 - blocksize 512.flac",
@@ -60,8 +58,7 @@ func TestEncode(t *testing.T) {
 		"testdata/flac-test-files/subset/20 - samplerate 39kHz.flac",
 		"testdata/flac-test-files/subset/21 - samplerate 22050Hz.flac",
 		"testdata/flac-test-files/subset/22 - 12 bit per sample.flac",
-		// TODO: fix: invalid number of samples per channel; expected >= 16 && <= 65535, got 5
-		//"testdata/flac-test-files/subset/23 - 8 bit per sample.flac",
+		"testdata/flac-test-files/subset/23 - 8 bit per sample.flac",
 		"testdata/flac-test-files/subset/24 - variable blocksize file created with flake revision 264.flac",
 		"testdata/flac-test-files/subset/25 - variable blocksize file created with flake revision 264, modified to create smaller blocks.flac",
 		// NOTE: the only diff is that "26 - ...flac" uses `block_size: 0b111
@@ -166,9 +163,6 @@ func TestEncode(t *testing.T) {
 			}
 			got := out.Bytes()
 			if !bytes.Equal(got, want) {
-				//if err := ioutil.WriteFile("/tmp/got.flac", got, 0o644); err != nil {
-				//	panic(err)
-				//}
 				t.Fatalf("%q: content mismatch; expected % X, got % X", path, want, got)
 			}
 		})
