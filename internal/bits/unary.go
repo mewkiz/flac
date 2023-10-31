@@ -43,11 +43,14 @@ func (br *Reader) ReadUnary() (x uint64, err error) {
 //	5 => 000001
 //	6 => 0000001
 func WriteUnary(bw *bitio.Writer, x uint64) error {
-	bits := uint64(1)
-	n := byte(1)
-	for ; x > 0; x-- {
-		n++
+	for ; x > 8; x -= 8 {
+		if err := bw.WriteByte(0x0); err != nil {
+			return err
+		}
 	}
+
+	bits := uint64(1)
+	n := byte(x + 1)
 	if err := bw.WriteBits(bits, n); err != nil {
 		return err
 	}

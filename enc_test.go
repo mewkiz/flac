@@ -96,11 +96,11 @@ func TestEncode(t *testing.T) {
 		"testdata/flac-test-files/subset/41 - 6 channels (5.1).flac",
 		"testdata/flac-test-files/subset/42 - 7 channels (6.1).flac",
 		"testdata/flac-test-files/subset/43 - 8 channels (7.1).flac",
-		// TODO: check why there is an audio sample diff (they look identical,
-		// except for using `sample_rate: 0b1100 (end of header (8 bit*1000))`
-		// for orig and `sample_rate: 192000 (0b11)` for mewkiz/flac); orig md5:
-		// cdf531d4d4b95233986bc499518a89db, output md5:
-		// 678a704da087bf8e98a19f1ad47ca359.
+		// NOTE: the only diff is that "44 - ...flac" uses `0b1100 (end of header
+		// (8 bit*1000))` to encode the sample rate at the end of the header,
+		// whereas mewkiz/flac encodes it directly `192000 (0b11)`. Notably, the
+		// computed md5 hash of the decoded audio samples is identical
+		// (MD5: cdf531d4d4b95233986bc499518a89db). Thus, ignore the test case.
 		//"testdata/flac-test-files/subset/44 - 8-channel surround, 192kHz, 24 bit, using only 32nd order predictors.flac",
 		"testdata/flac-test-files/subset/45 - no total number of samples set.flac",
 		"testdata/flac-test-files/subset/46 - no min-max framesize set.flac",
