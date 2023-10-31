@@ -24,6 +24,7 @@ Documentation provided by GoDoc.
 
 * Version 1.0.10 (TBD)
     - Add support for LPC audio sample encoding (see [#66](https://github.com/mewkiz/flac/pull/66)). Thanks to [Mark Kremer](https://github.com/MarkKremer) for bug fixes and [Mattias Wadman](https://github.com/wader) for the invaluable [fq](https://github.com/wader/fq) tool used to investigate FLAC encoding issues.
+    - Replace Travis CI with GitHub actions for CI build status, test status and code coverage [#64](https://github.com/mewkiz/flac/pull/64)). Thanks to [Mark Kremer](https://github.com/MarkKremer)
 
 * Version 1.0.9 (2023-10-24)
     - Fix integer overflow during unfolding of rice residual (see [#61](https://github.com/mewkiz/flac/pull/61)). Thanks to [Mark Kremer](https://github.com/MarkKremer).
