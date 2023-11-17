@@ -193,13 +193,19 @@ var golden = []struct {
 			},
 		},
 	},
+	// TODO reviewer: These values look weird, Apple Music cannot play it, but ffmpeg converts it just fine
+	// ffmpeg -i testdata/24000-tts-sf.flac -acodec pcm_s16le converted.wav
 	{
 		path: "../testdata/24000-tts-sf.flac",
-		info: &meta.StreamInfo{BlockSizeMin: 0x1200, BlockSizeMax: 0x1200, FrameSizeMin: 0x94d, FrameSizeMax: 0x264a, SampleRate: 0xac44, NChannels: 0x2, BitsPerSample: 0x10, NSamples: 0x50f4, MD5sum: [16]uint8{0x63, 0x28, 0xed, 0x6d, 0xd3, 0xe, 0x55, 0xfb, 0xa5, 0x73, 0x69, 0x2b, 0xb7, 0x35, 0x73, 0xb7}},
+		info: &meta.StreamInfo{BlockSizeMin: 0x1000, BlockSizeMax: 0x1000, FrameSizeMin: 0x0, FrameSizeMax: 0x0, SampleRate: 0x5dc0, NChannels: 0x1, BitsPerSample: 0x10, NSamples: 0x0, MD5sum: [16]uint8{0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0}},
 		blocks: []*meta.Block{
 			{
-				Header: meta.Header{Type: 0x4, Length: 40, IsLast: true},
-				Body:   &meta.VorbisComment{Vendor: "reference libFLAC 1.2.1 20070917", Tags: nil},
+				Header: meta.Header{Type: 0x4, Length: 40, IsLast: false},
+				Body:   &meta.VorbisComment{Vendor: "reference libFLAC 1.3.3 20190804", Tags: [][2]string(nil)},
+			},
+			{
+				Header: meta.Header{Type: 0x1, Length: 8192, IsLast: true},
+				Body:   nil,
 			},
 		},
 	},
