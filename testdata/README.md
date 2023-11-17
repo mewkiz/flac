@@ -20,3 +20,8 @@ The following testcase sounds have been released into the [public domain].
 The following flac files are CC BY 4.0:
 
 * [8297-275156-0011.flac](http://www.openslr.org/12/) - a single file from the LibriSpeech ASR corpus, by Vassil Panyotov and DanielPovey.
+
+
+The following flac files are TODO:
+
+* [24000-tts-sf.flac](https://platform.openai.com/docs/guides/text-to-speech/do-i-own-the-outputted-audio-files)

@@ -475,8 +475,6 @@ func (frame *Frame) parseSampleRate(br *bits.Reader, sampleRate uint64) error {
 	case 0x7:
 		// 0111: 24 kHz.
 		frame.SampleRate = 24000
-		// TODO(u): Remove log message when the test cases have been extended.
-		log.Printf("frame.Frame.parseHeader: The flac library test cases do not yet include any audio files with sample rate %d. If possible please consider contributing this audio sample to improve the reliability of the test cases.", frame.SampleRate)
 	case 0x8:
 		// 1000: 32 kHz.
 		frame.SampleRate = 32000

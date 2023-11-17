@@ -34,6 +34,7 @@ func TestEncode(t *testing.T) {
 		"testdata/256529.flac",
 		"testdata/257344.flac",           // prediction method 3 (FIR)
 		"testdata/8297-275156-0011.flac", // prediction method 3 (FIR)
+		"testdata/24000-tts-sf.flac",     // 24khz test
 		"testdata/love.flac",             // wasted bits
 		// IETF test cases.
 		"testdata/flac-test-files/subset/01 - blocksize 4096.flac",

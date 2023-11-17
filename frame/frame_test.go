@@ -25,6 +25,7 @@ var golden = []struct {
 	{path: "../testdata/243749.flac"},
 	{path: "../testdata/256529.flac"},
 	{path: "../testdata/257344.flac"},
+	{path: "../testdata/24000-tts-sf.flac"},
 
 	// IETF test cases.
 	{path: "../testdata/flac-test-files/subset/01 - blocksize 4096.flac"},
