@@ -95,6 +95,7 @@ var golden = []struct {
 }
 
 func TestFrameHash(t *testing.T) {
+	var zeroHash [md5.Size]byte
 	for _, g := range golden {
 		t.Run(g.path, func(t *testing.T) {
 			stream, err := flac.Open(g.path)
@@ -102,6 +103,13 @@ func TestFrameHash(t *testing.T) {
 				t.Fatal(err)
 			}
 			defer stream.Close()
+
+			// Skip frame hash test if no MD5 hash was set in StreamInfo.
+			want := stream.Info.MD5sum[:]
+			if bytes.Equal(want, zeroHash[:]) {
+				t.Skipf("path=%q, skipping frame hash test as no MD5 hash was set in StreamInfo", g.path)
+				return
+			}
 
 			md5sum := md5.New()
 			for frameNum := 0; ; frameNum++ {
@@ -115,7 +123,6 @@ func TestFrameHash(t *testing.T) {
 				}
 				frame.Hash(md5sum)
 			}
-			want := stream.Info.MD5sum[:]
 			got := md5sum.Sum(nil)
 			// Verify the decoded audio samples by comparing the MD5 checksum that is
 			// stored in StreamInfo with the computed one.
