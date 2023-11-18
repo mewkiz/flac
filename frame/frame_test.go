@@ -25,6 +25,7 @@ var golden = []struct {
 	{path: "../testdata/243749.flac"},
 	{path: "../testdata/256529.flac"},
 	{path: "../testdata/257344.flac"},
+	{path: "../testdata/24000-tts-sf.flac"},
 
 	// IETF test cases.
 	{path: "../testdata/flac-test-files/subset/01 - blocksize 4096.flac"},
@@ -126,6 +127,9 @@ func TestFrameHash(t *testing.T) {
 			got := md5sum.Sum(nil)
 			// Verify the decoded audio samples by comparing the MD5 checksum that is
 			// stored in StreamInfo with the computed one.
+			// TODO WELP, seems OpenAI is moving so fast they don't even have time to compute checksums :/
+			// frame_test.go:124: path="../testdata/24000-tts-sf.flac": MD5 checksum mismatch for decoded audio samples;
+			// expected 00000000000000000000000000000000, got f5e621f2580ee8ace6158966793abdbf
 			if !bytes.Equal(got, want) {
 				t.Errorf("path=%q: MD5 checksum mismatch for decoded audio samples; expected %32x, got %32x", g.path, want, got)
 			}

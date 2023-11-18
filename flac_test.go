@@ -97,6 +97,7 @@ func TestDecode(t *testing.T) {
 		"testdata/256529.flac",
 		"testdata/257344.flac",
 		"testdata/8297-275156-0011.flac",
+		"testdata/24000-tts-sf.flac",
 		"testdata/love.flac",
 		// IETF test cases.
 		//

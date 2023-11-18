@@ -193,6 +193,22 @@ var golden = []struct {
 			},
 		},
 	},
+	// TODO reviewer: These values look weird, Apple Music cannot play it, but ffmpeg converts it just fine
+	// ffmpeg -i testdata/24000-tts-sf.flac -acodec pcm_s16le converted.wav
+	{
+		path: "../testdata/24000-tts-sf.flac",
+		info: &meta.StreamInfo{BlockSizeMin: 0x1000, BlockSizeMax: 0x1000, FrameSizeMin: 0x0, FrameSizeMax: 0x0, SampleRate: 0x5dc0, NChannels: 0x1, BitsPerSample: 0x10, NSamples: 0x0, MD5sum: [16]uint8{0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0}},
+		blocks: []*meta.Block{
+			{
+				Header: meta.Header{Type: 0x4, Length: 40, IsLast: false},
+				Body:   &meta.VorbisComment{Vendor: "reference libFLAC 1.3.3 20190804", Tags: [][2]string(nil)},
+			},
+			{
+				Header: meta.Header{Type: 0x1, Length: 8192, IsLast: true},
+				Body:   nil,
+			},
+		},
+	},
 }
 
 func TestParseBlocks(t *testing.T) {
