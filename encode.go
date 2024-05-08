@@ -14,10 +14,8 @@ import (
 type Encoder struct {
 	// FLAC stream of encoder.
 	*Stream
-	// Underlying io.Writer to the output stream.
+	// Underlying io.Writer or io.WriteCloser to the output stream.
 	w io.Writer
-	// io.Closer to flush pending writes to output stream.
-	c io.Closer
 	// Minimum and maximum block size (in samples) of frames written by encoder.
 	blockSizeMin, blockSizeMax uint16
 	// Minimum and maximum frame size (in bytes) of frames written by encoder.
@@ -43,9 +41,7 @@ func NewEncoder(w io.Writer, info *meta.StreamInfo, blocks ...*meta.Block) (*Enc
 		w:      w,
 		md5sum: md5.New(),
 	}
-	if c, ok := w.(io.Closer); ok {
-		enc.c = c
-	}
+
 	bw := bitio.NewWriter(w)
 	if _, err := bw.Write(flacSignature); err != nil {
 		return nil, errutil.Err(err)
@@ -102,8 +98,8 @@ func (enc *Encoder) Close() error {
 			return errutil.Err(err)
 		}
 	}
-	if enc.c != nil {
-		return enc.c.Close()
+	if closer, ok := enc.w.(io.Closer); ok {
+		return closer.Close()
 	}
 	return nil
 }

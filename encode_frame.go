@@ -115,7 +115,9 @@ func (enc *Encoder) encodeFrameHeader(w io.Writer, hdr frame.Header) error {
 	h := crc8.NewATM()
 	hw := io.MultiWriter(h, w)
 	bw := bitio.NewWriter(hw)
-	enc.c = bw
+
+	// Closing the *bitio.Writer will not close the underlying writer
+	defer bw.Close()
 
 	//  Sync code: 11111111111110
 	if err := bw.WriteBits(0x3FFE, 14); err != nil {
