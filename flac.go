@@ -59,11 +59,8 @@ type Stream struct {
 	// is relative to this position.
 	dataStart int64
 
-	// Underlying io.Reader.
+	// Underlying io.Reader, or io.ReadCloser.
 	r io.Reader
-	// Underlying io.Closer of file if opened with Open and ParseFile, and nil
-	// otherwise.
-	c io.Closer
 }
 
 // New creates a new Stream for accessing the audio samples of r. It reads and
@@ -264,7 +261,7 @@ func Open(path string) (stream *Stream, err error) {
 	if err != nil {
 		return nil, err
 	}
-	stream.c = f
+
 	return stream, err
 }
 
@@ -285,16 +282,16 @@ func ParseFile(path string) (stream *Stream, err error) {
 	if err != nil {
 		return nil, err
 	}
-	stream.c = f
+
 	return stream, err
 }
 
-// Close closes the stream if opened through a call to Open or ParseFile, and
-// performs no operation otherwise.
+// Close closes the stream gracefully if the underlying io.Reader also implements the io.Closer interface.
 func (stream *Stream) Close() error {
-	if stream.c != nil {
-		return stream.c.Close()
+	if closer, ok := stream.r.(io.Closer); ok {
+		return closer.Close()
 	}
+
 	return nil
 }
 
