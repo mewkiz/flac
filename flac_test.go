@@ -48,6 +48,8 @@ func TestSeek(t *testing.T) {
 		{seek: 0, expected: 0},
 		{seek: 50000, expected: 0, err: "unable to seek to sample number 50000"},
 		{seek: 100, expected: 0},
+		{seek: 8192, expected: 8192},
+		{seek: 8191, expected: 4096},
 	}
 
 	stream, err := flac.NewSeek(f)

@@ -343,7 +343,7 @@ func (stream *Stream) Seek(sampleNum uint64) (uint64, error) {
 		if err != nil {
 			return 0, err
 		}
-		if frame.SampleNumber()+uint64(frame.BlockSize) >= sampleNum {
+		if frame.SampleNumber()+uint64(frame.BlockSize) > sampleNum {
 			// Restore seek offset to the start of the frame containing the
 			// specified sample number.
 			_, err := rs.Seek(offset, io.SeekStart)
