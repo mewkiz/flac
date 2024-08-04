@@ -25,7 +25,7 @@ Documentation provided by GoDoc.
 * Version 1.0.11 (2024-08-04)
     - Move example tools to dedicated [mewkiz/flac-tools](https://github.com/mewkiz/flac-tools) repository to reduce external dependencies (see [#62](https://github.com/mewkiz/flac/pull/62)).
     - Fix seek to frame start (see [#71](https://github.com/mewkiz/flac/pull/71)). Thanks to [Mark Kremer](https://github.com/MarkKremer).
-    - Simplify internal handling of io.Closer element in flac.Stream and flac.Encoder types [#70](https://github.com/mewkiz/flac/pull/70)). Thanks to [Mario Salgado](https://github.com/zalgonoise).
+    - Simplify internal handling of io.Closer element in flac.Stream and flac.Encoder types (see [#70](https://github.com/mewkiz/flac/pull/70)). Thanks to [Mario Salgado](https://github.com/zalgonoise).
 
 * Version 1.0.10 (2023-11-11)
     - Add support for LPC audio sample encoding (see [#66](https://github.com/mewkiz/flac/pull/66)). Thanks to [Mark Kremer](https://github.com/MarkKremer) for bug fixes and [Mattias Wadman](https://github.com/wader) for the invaluable [fq](https://github.com/wader/fq) tool used to investigate FLAC encoding issues.
