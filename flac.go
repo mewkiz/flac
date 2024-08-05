@@ -35,6 +35,7 @@ import (
 	"os"
 
 	"github.com/mewkiz/flac/frame"
+	"github.com/mewkiz/flac/internal/bufseekio"
 	"github.com/mewkiz/flac/meta"
 )
 
@@ -96,7 +97,8 @@ func New(r io.Reader) (stream *Stream, err error) {
 // will not be buffered, which might result in performance issues. Using an
 // in-memory buffer like *bytes.Reader should work well.
 func NewSeek(rs io.ReadSeeker) (stream *Stream, err error) {
-	stream = &Stream{r: rs, seekTableSize: defaultSeekTableSize}
+	br := bufseekio.NewReadSeeker(rs)
+	stream = &Stream{r: br, seekTableSize: defaultSeekTableSize}
 
 	// Verify FLAC signature and parse the StreamInfo metadata block.
 	block, err := stream.parseStreamInfo()
@@ -121,7 +123,7 @@ func NewSeek(rs io.ReadSeeker) (stream *Stream, err error) {
 	}
 
 	// Record file offset of the first frame header.
-	stream.dataStart, err = rs.Seek(0, io.SeekCurrent)
+	stream.dataStart, err = br.Seek(0, io.SeekCurrent)
 	return stream, err
 }
 
