@@ -323,7 +323,7 @@ func (stream *Stream) Seek(sampleNum uint64) (uint64, error) {
 
 	rs := stream.r.(io.ReadSeeker)
 
-	isBiggerThanStream := stream.Info.NSamples != 0 && sampleNum > stream.Info.NSamples
+	isBiggerThanStream := stream.Info.NSamples != 0 && sampleNum >= stream.Info.NSamples
 	if isBiggerThanStream || sampleNum < 0 {
 		return 0, fmt.Errorf("unable to seek to sample number %d", sampleNum)
 	}
