@@ -24,6 +24,7 @@ Documentation provided by GoDoc.
 
 * Version 1.0.12 (2024-08-11)
     - Improve performance of flac.NewSeek() by using a buffered reader (see [#72](https://github.com/mewkiz/flac/pull/72)).
+    - Fix off-by-one error in Seek end of stream check (see [#73](https://github.com/mewkiz/flac/pull/73)).
 
 * Version 1.0.11 (2024-08-04)
     - Move example tools to dedicated [mewkiz/flac-tools](https://github.com/mewkiz/flac-tools) repository to reduce external dependencies (see [#62](https://github.com/mewkiz/flac/pull/62)).
