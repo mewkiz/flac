@@ -27,6 +27,8 @@ type Encoder struct {
 	// Current frame number if block size is fixed, and the first sample number
 	// of the current frame otherwise.
 	curNum uint64
+	// AnalysisEnabled indicates whether analysis is enabled for the encoder.
+	AnalysisEnabled bool
 }
 
 // NewEncoder returns a new FLAC encoder for the given metadata StreamInfo block
@@ -102,4 +104,8 @@ func (enc *Encoder) Close() error {
 		return closer.Close()
 	}
 	return nil
+}
+
+func (enc *Encoder) EnablePredictionAnalysis(enable bool) {
+	enc.AnalysisEnabled = enable
 }
