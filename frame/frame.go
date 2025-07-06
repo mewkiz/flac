@@ -154,7 +154,12 @@ func (frame *Frame) Hash(md5sum hash.Hash) {
 	// Write decoded samples to a running MD5 hash.
 	bps := frame.BitsPerSample
 	var buf [3]byte
-	for i := 0; i < int(frame.BlockSize); i++ {
+	if len(frame.Subframes) == 0 {
+		return
+	}
+	// Use the length of the first subframe's samples as they should all be the same length
+	numSamples := len(frame.Subframes[0].Samples)
+	for i := 0; i < numSamples; i++ {
 		for _, subframe := range frame.Subframes {
 			sample := subframe.Samples[i]
 			switch {
