@@ -1,6 +1,6 @@
 module github.com/mewkiz/flac
 
-go 1.14
+go 1.22
 
 require (
 	github.com/icza/bitio v1.1.0

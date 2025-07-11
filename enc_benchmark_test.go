@@ -9,14 +9,17 @@ import (
 	"github.com/mewkiz/flac/meta"
 )
 
-// BenchmarkEncodeSyntheticAudio measures the performance of encoding synthetic audio data.
-// It creates a simple sine wave pattern to avoid dependency on external files.
+// BenchmarkEncodeSyntheticAudio measures the performance of encoding synthetic
+// audio data. It creates a simple sine wave pattern to avoid dependency on
+// external files.
 func BenchmarkEncodeSyntheticAudio(b *testing.B) {
 	// Create synthetic audio data (1 second of 44.1kHz stereo audio)
-	sampleRate := 44100
-	channels := 2
-	bitsPerSample := 16
-	numSamples := sampleRate
+	const (
+		sampleRate    = 44100
+		nchannels     = 2
+		bitsPerSample = 16
+		nsamples      = sampleRate
+	)
 
 	// Create StreamInfo
 	info := &meta.StreamInfo{
@@ -24,16 +27,16 @@ func BenchmarkEncodeSyntheticAudio(b *testing.B) {
 		BlockSizeMax:  4096,
 		FrameSizeMin:  0,
 		FrameSizeMax:  0,
-		SampleRate:    uint32(sampleRate),
-		NChannels:     uint8(channels),
-		BitsPerSample: uint8(bitsPerSample),
-		NSamples:      uint64(numSamples),
+		SampleRate:    sampleRate,
+		NChannels:     nchannels,
+		BitsPerSample: bitsPerSample,
+		NSamples:      nsamples,
 	}
 
 	// Generate synthetic audio data (sine wave)
-	samples := make([]int32, numSamples*channels)
+	samples := make([]int32, nsamples*nchannels)
 	freq := 440.0 // A4 note
-	for i := 0; i < numSamples; i++ {
+	for i := 0; i < nsamples; i++ {
 		// Generate a sine wave
 		sample := int32(math.Sin(2*math.Pi*freq*float64(i)/float64(sampleRate)) * 32767)
 		// Fill both channels with the same data
@@ -45,7 +48,7 @@ func BenchmarkEncodeSyntheticAudio(b *testing.B) {
 	b.ResetTimer()
 
 	// Run the benchmark
-	for i := 0; i < b.N; i++ {
+	for range b.N {
 		// Create a buffer to write the encoded data
 		buf := &bytes.Buffer{}
 
@@ -56,34 +59,34 @@ func BenchmarkEncodeSyntheticAudio(b *testing.B) {
 		}
 
 		// Process samples in blocks
-		for offset := 0; offset < numSamples; offset += 4096 {
+		for offset := 0; offset < nsamples; offset += 4096 {
 			blockSize := 4096
-			if offset+blockSize > numSamples {
-				blockSize = numSamples - offset
+			if offset+blockSize > nsamples {
+				blockSize = nsamples - offset
 			}
 
 			// Create frame
-			fr := &frame.Frame{
+			f := &frame.Frame{
 				Header: frame.Header{
 					HasFixedBlockSize: true,
 					BlockSize:         uint16(blockSize),
-					SampleRate:        uint32(sampleRate),
+					SampleRate:        sampleRate,
 					Channels:          frame.ChannelsLR,
-					BitsPerSample:     uint8(bitsPerSample),
+					BitsPerSample:     bitsPerSample,
 				},
 			}
 
 			// Create subframes
-			fr.Subframes = make([]*frame.Subframe, channels)
-			for ch := 0; ch < channels; ch++ {
+			f.Subframes = make([]*frame.Subframe, nchannels)
+			for channel := 0; channel < nchannels; channel++ {
 				// Extract samples for this channel
 				channelSamples := make([]int32, blockSize)
-				for j := 0; j < blockSize; j++ {
-					channelSamples[j] = samples[(offset+j)*channels+ch]
+				for i := 0; i < blockSize; i++ {
+					channelSamples[i] = samples[(offset+i)*nchannels+channel]
 				}
 
 				// Create verbatim subframe since we're just testing encoding speed
-				fr.Subframes[ch] = &frame.Subframe{
+				f.Subframes[channel] = &frame.Subframe{
 					SubHeader: frame.SubHeader{
 						Pred: frame.PredVerbatim,
 					},
@@ -93,7 +96,7 @@ func BenchmarkEncodeSyntheticAudio(b *testing.B) {
 			}
 
 			// Encode frame
-			if err := enc.WriteFrame(fr); err != nil {
+			if err := enc.WriteFrame(f); err != nil {
 				b.Fatal(err)
 			}
 		}
