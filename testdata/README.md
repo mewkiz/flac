@@ -15,6 +15,8 @@ The following testcase sounds have been released into the [public domain].
 * [256529.flac](http://freesound.org/people/tymorafarr/sounds/256529/)
 * [257344.flac](http://freesound.org/people/arseniiv/sounds/257344/)
 
+*Note:* run `convert_to_verbatim.sh` to convert the above FLAC test files to verbatim encoding (used by the prediction analysis test case).
+
 [public domain]: https://creativecommons.org/publicdomain/zero/1.0/
 
 The following flac files are CC BY 4.0:

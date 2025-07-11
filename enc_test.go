@@ -37,6 +37,21 @@ var paths = []string{
 	"testdata/257344.flac",           // prediction method 3 (FIR)
 	"testdata/8297-275156-0011.flac", // prediction method 3 (FIR)
 	"testdata/love.flac",             // wasted bits
+	// test cases for prediction analysis.
+	//
+	// Run `testdata/convert_to_verbatim.sh` to generate these test files.
+	"testdata/19875_verbatim.flac",  // verbatim
+	"testdata/44127_verbatim.flac",  // verbatim
+	"testdata/59996_verbatim.flac",  // verbatim
+	"testdata/80574_verbatim.flac",  // verbatim
+	"testdata/172960_verbatim.flac", // verbatim
+	"testdata/189983_verbatim.flac", // verbatim
+	"testdata/191885_verbatim.flac", // verbatim
+	"testdata/212768_verbatim.flac", // verbatim
+	"testdata/220014_verbatim.flac", // verbatim
+	"testdata/243749_verbatim.flac", // verbatim
+	"testdata/256529_verbatim.flac", // verbatim
+	"testdata/257344_verbatim.flac", // verbatim
 	// IETF test cases.
 	"testdata/flac-test-files/subset/01 - blocksize 4096.flac",
 	"testdata/flac-test-files/subset/02 - blocksize 4608.flac",
@@ -129,6 +144,9 @@ var paths = []string{
 func TestEncodeRoundTrip(t *testing.T) {
 	for _, path := range paths {
 		t.Run(path, func(t *testing.T) {
+			if !exists(path) {
+				t.Skipf("path %q does not exist", path)
+			}
 			// Decode source file.
 			stream, err := flac.ParseFile(path)
 			if err != nil {
@@ -237,6 +255,9 @@ func TestEncodeComment(t *testing.T) {
 func TestEncodeAnalysisFixed(t *testing.T) {
 	for _, path := range paths {
 		t.Run(path, func(t *testing.T) {
+			if !exists(path) {
+				t.Skipf("path %q does not exist", path)
+			}
 			// Decode source file.
 			stream, err := flac.ParseFile(path)
 			if err != nil {
@@ -289,7 +310,7 @@ func TestEncodeAnalysisFixed(t *testing.T) {
 			wantSize := fi.Size()
 
 			gotBytes := out.Bytes()
-			gotSize := len(gotBytes)
+			gotSize := int64(len(gotBytes))
 			gotStream, err := flac.Parse(bytes.NewReader(gotBytes))
 			if err != nil {
 				t.Fatalf("%q: unable to parse encoded FLAC file; %v", path, err)
@@ -305,8 +326,10 @@ func TestEncodeAnalysisFixed(t *testing.T) {
 			if !slices.Equal(wantSamples, gotSamples) {
 				t.Fatalf("%q: content mismatch; expected %#v, got %#v", path, wantSamples, gotSamples)
 			}
-			percent := 100 * float64(wantSize) / float64(gotSize)
-			t.Logf("%q: input size: %d, output size: %d. ratio: %.02f", path, wantSize, gotSize, percent)
+			percent := 100 * float64(gotSize) / float64(wantSize)
+			if wantSize != gotSize {
+				t.Logf("%q: input size: %d, output size: %d. ratio: %.02f%%", path, wantSize, gotSize, percent)
+			}
 		})
 	}
 }
@@ -327,4 +350,10 @@ func getSamples(stream *flac.Stream) ([]int32, error) {
 		}
 	}
 	return out, nil
+}
+
+// exists reports whether the given file or directory exists.
+func exists(path string) bool {
+	_, err := os.Stat(path)
+	return err == nil
 }
