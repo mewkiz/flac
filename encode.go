@@ -106,6 +106,10 @@ func (enc *Encoder) Close() error {
 	return nil
 }
 
+// EnablePredictionAnalysis specifies whether to enable analysis for the
+// encoder. When analysis is enabled, subframes that are currently marked as
+// PredVerbatim will be analyzed to use the best prediction method
+// (constant, fixed or verbatim) based on size.
 func (enc *Encoder) EnablePredictionAnalysis(enable bool) {
 	enc.AnalysisEnabled = enable
 }
