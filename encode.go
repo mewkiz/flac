@@ -33,6 +33,9 @@ type Encoder struct {
 
 // NewEncoder returns a new FLAC encoder for the given metadata StreamInfo block
 // and optional metadata blocks.
+//
+// By default prediction analysis is enabled. For more information, see
+// Encoder.EnablePredictionAnalysis.
 func NewEncoder(w io.Writer, info *meta.StreamInfo, blocks ...*meta.Block) (*Encoder, error) {
 	// Store FLAC signature.
 	enc := &Encoder{
@@ -42,6 +45,7 @@ func NewEncoder(w io.Writer, info *meta.StreamInfo, blocks ...*meta.Block) (*Enc
 		},
 		w:      w,
 		md5sum: md5.New(),
+		AnalysisEnabled: true, // enable prediction analysis by default.
 	}
 
 	bw := bitio.NewWriter(w)

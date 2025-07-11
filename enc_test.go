@@ -138,6 +138,7 @@ func TestEncode(t *testing.T) {
 			if err != nil {
 				t.Fatalf("%q: unable to create encoder for FLAC stream; %v", path, err)
 			}
+			enc.EnablePredictionAnalysis(false) // disable prediction analysis to support round-trip decode/encode test.
 			// Encode audio samples.
 			for {
 				frame, err := stream.ParseNext()
