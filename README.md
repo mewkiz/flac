@@ -22,14 +22,17 @@ Documentation provided by GoDoc.
 
 ## Changes
 
+* Version 1.0.13 (2025-07-11)
+    - Add support for Fixed prediction encoding of FLAC subframes (see [#76](https://github.com/mewkiz/flac/pull/76)). Thanks to [Michael Braha](https://github.com/braheezy).
+
 * Version 1.0.12 (2024-08-11)
-    - Improve performance of flac.NewSeek() by using a buffered reader (see [#72](https://github.com/mewkiz/flac/pull/72)).
-    - Fix off-by-one error in Seek end of stream check (see [#73](https://github.com/mewkiz/flac/pull/73)).
+    - Improve performance of `flac.NewSeek()` by using a buffered reader (see [#72](https://github.com/mewkiz/flac/pull/72)).
+    - Fix off-by-one error in `Seek` end of stream check (see [#73](https://github.com/mewkiz/flac/pull/73)).
 
 * Version 1.0.11 (2024-08-04)
     - Move example tools to dedicated [mewkiz/flac-tools](https://github.com/mewkiz/flac-tools) repository to reduce external dependencies (see [#62](https://github.com/mewkiz/flac/pull/62)).
     - Fix seek to frame start (see [#71](https://github.com/mewkiz/flac/pull/71)). Thanks to [Mark Kremer](https://github.com/MarkKremer).
-    - Simplify internal handling of io.Closer element in flac.Stream and flac.Encoder types (see [#70](https://github.com/mewkiz/flac/pull/70)). Thanks to [Mario Salgado](https://github.com/zalgonoise).
+    - Simplify internal handling of `io.Closer` element in `flac.Stream` and `flac.Encoder` types (see [#70](https://github.com/mewkiz/flac/pull/70)). Thanks to [Mario Salgado](https://github.com/zalgonoise).
 
 * Version 1.0.10 (2023-11-11)
     - Add support for LPC audio sample encoding (see [#66](https://github.com/mewkiz/flac/pull/66)). Thanks to [Mark Kremer](https://github.com/MarkKremer) for bug fixes and [Mattias Wadman](https://github.com/wader) for the invaluable [fq](https://github.com/wader/fq) tool used to investigate FLAC encoding issues.
@@ -43,7 +46,7 @@ Documentation provided by GoDoc.
 * Version 1.0.8 (2023-04-09)
     - Fix race condition when reading meta data (see [#56](https://github.com/mewkiz/flac/pull/56)). Thanks to [Zach Orosz](https://github.com/zachorosz).
     - Fix encoding of 8-bps WAV audio samples (see [#52](https://github.com/mewkiz/flac/pull/52)). Thanks to [Martijn van Beurden](https://github.com/ktmf01).
-    - Fix StreamInfo block type error message (see [#49](https://github.com/mewkiz/flac/pull/49)).
+    - Fix `StreamInfo` block type error message (see [#49](https://github.com/mewkiz/flac/pull/49)).
 
 * Version 1.0.7 (2021-01-28)
     - Add seek API (see [#44](https://github.com/mewkiz/flac/pull/44) and [#46](https://github.com/mewkiz/flac/pull/46)). Thanks to [Craig Swank](https://github.com/cswank).
