@@ -43,8 +43,8 @@ func NewEncoder(w io.Writer, info *meta.StreamInfo, blocks ...*meta.Block) (*Enc
 			Info:   info,
 			Blocks: blocks,
 		},
-		w:      w,
-		md5sum: md5.New(),
+		w:               w,
+		md5sum:          md5.New(),
 		AnalysisEnabled: true, // enable prediction analysis by default.
 	}
 
