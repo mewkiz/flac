@@ -158,8 +158,8 @@ func (frame *Frame) Hash(md5sum hash.Hash) {
 		return
 	}
 	// Use the length of the first subframe's samples as they should all be the same length
-	numSamples := len(frame.Subframes[0].Samples)
-	for i := 0; i < numSamples; i++ {
+	nsamples := len(frame.Subframes[0].Samples)
+	for i := 0; i < nsamples; i++ {
 		for _, subframe := range frame.Subframes {
 			sample := subframe.Samples[i]
 			switch {

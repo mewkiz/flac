@@ -85,11 +85,14 @@ func (enc *Encoder) WriteFrame(f *frame.Frame) error {
 		}
 
 		// optional prediction analysis
+		//
+		// (leave subframe as-is if AnalysisEnabled is false)
 		if enc.AnalysisEnabled {
-			if subframe.Pred == frame.PredVerbatim {
-				analyseSubframe(subframe, bps)
+			switch subframe.Pred {
+			case frame.PredVerbatim:
+				analyzeSubframe(subframe, bps)
 			}
-		} // when AnalysisEnabled is false we leave subframe as-is
+		}
 
 		if err := encodeSubframe(bw, f.Header, subframe, bps); err != nil {
 			return errutil.Err(err)

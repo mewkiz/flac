@@ -5,19 +5,19 @@ import (
 	iobits "github.com/mewkiz/flac/internal/bits"
 )
 
-// analyseFixed selects the best fixed predictor (order 0-4) for the given
+// analyzeFixed selects the best fixed predictor (order 0-4) for the given
 // subframe and fills the fields required by the existing writer so that a
 // compressed SUBFRAME_FIXED is emitted instead of a verbatim subframe.
 //
 // The algorithm is a very small subset of libFLAC's encoder analysis:
 //  1. For each order 0..4 compute residuals using the fixed coefficients
 //     defined in frame.FixedCoeffs.
-//  2. For those residuals, choose the Rice parameter k (0..14) that minimises
+//  2. For those residuals, choose the Rice parameter k (0..14) that minimizes
 //     the encoded bit-length assuming partition order 0.
 //  3. Pick the order with the overall fewest bits.
 //
-// ignoring partition orders >0 and Rice2 for now.
-func analyseFixed(sf *frame.Subframe, bps uint) {
+// Note: ignoring partition orders >0 and Rice2 for now.
+func analyzeFixed(sf *frame.Subframe, bps uint) {
 	// Guard against degenerate inputs. If there are fewer than two samples we
 	// simply keep verbatim encoding.
 	if len(sf.Samples) < 2 {
@@ -55,32 +55,38 @@ func analyseFixed(sf *frame.Subframe, bps uint) {
 	// enough for encodeFixedSamples to reproduce the exact same residuals.
 }
 
-// computeFixedResiduals returns the residual signal for a given fixed
-// predictor order. The returned slice has length len(samples)-order.
+// computeFixedResiduals returns the residual signal for a given fixed predictor
+// order. The returned slice has length len(samples)-order.
 func computeFixedResiduals(samples []int32, order int) []int32 {
 	n := len(samples)
 	res := make([]int32, 0, n-order)
 
 	switch order {
 	case 0:
+		// x_0[n] = 0
 		for i := 0; i < n; i++ {
 			res = append(res, samples[i])
 		}
 	case 1:
+		// x_1[n] = x[n-1]
 		for i := 1; i < n; i++ {
-			res = append(res, samples[i]-samples[i-1])
+			predicted := samples[i-1]
+			res = append(res, samples[i]-predicted)
 		}
 	case 2:
+		// x_2[n] = 2*x[n-1] - x[n-2]
 		for i := 2; i < n; i++ {
 			predicted := 2*samples[i-1] - samples[i-2]
 			res = append(res, samples[i]-predicted)
 		}
 	case 3:
+		// x_3[n] = 3*x[n-1] - 3*x[n-2] + x[n-3]
 		for i := 3; i < n; i++ {
 			predicted := 3*samples[i-1] - 3*samples[i-2] + samples[i-3]
 			res = append(res, samples[i]-predicted)
 		}
 	case 4:
+		// x_4[n] = 4*x[n-1] - 6*x[n-2] + 4*x[n-3] - x[n-4]
 		for i := 4; i < n; i++ {
 			predicted := 4*samples[i-1] - 6*samples[i-2] + 4*samples[i-3] - samples[i-4]
 			res = append(res, samples[i]-predicted)
@@ -89,7 +95,7 @@ func computeFixedResiduals(samples []int32, order int) []int32 {
 	return res
 }
 
-// chooseRice returns the Rice parameter k (0..14) that minimises the encoded
+// chooseRice returns the Rice parameter k (0..14) that minimizes the encoded
 // length of residuals when using Rice coding with paramSize=4 (Rice1).
 func chooseRice(residuals []int32) uint {
 	bestK := uint(0)
@@ -128,12 +134,13 @@ func costFixed(order int, bps uint, residuals []int32, k uint) int {
 	return 6 + warmUpBits + residBits
 }
 
-// analyseSubframe decides on the best prediction method (constant, verbatim, or fixed)
-// for a subframe that is currently marked PredVerbatim. It will update the Subframe
-// fields to use the chosen method. The heuristic is simple: it picks the encoding
-// that yields the fewest estimated bits when assuming a single Rice partition.
-func analyseSubframe(sf *frame.Subframe, bps uint) {
-	// Only analyse when the caller has not chosen a prediction method yet.
+// analyzeSubframe decides on the best prediction method (constant, verbatim, or
+// fixed) for a subframe that is currently marked PredVerbatim. It will update
+// the Subframe fields to use the chosen method. The heuristic is simple: it
+// picks the encoding that yields the fewest estimated bits when assuming a
+// single Rice partition.
+func analyzeSubframe(sf *frame.Subframe, bps uint) {
+	// Only analyze when the caller has not chosen a prediction method yet.
 	if sf.Pred != frame.PredVerbatim {
 		return
 	}
@@ -152,7 +159,7 @@ func analyseSubframe(sf *frame.Subframe, bps uint) {
 			break
 		}
 	}
-	constBits := int(^uint(0) >> 1) // infinity
+	constBits := int(^uint(0) >> 1) // max int
 	if allEqual {
 		// 6-bit header + one sample.
 		constBits = 6 + int(bps)
@@ -162,20 +169,23 @@ func analyseSubframe(sf *frame.Subframe, bps uint) {
 	verbatimBits := 6 + n*int(bps) // 6-bit header + raw samples
 
 	// --- Fixed predictor: reuse existing helper to find best order/k.
-	analyseFixed(sf, bps) // fills Order, RiceSubframe, etc.
+	analyzeFixed(sf, bps) // fills Order, RiceSubframe, etc.
 	// Cost of that choice
-	fixedBits := costFixed(sf.Order, bps, computeFixedResiduals(samples, sf.Order), sf.RiceSubframe.Partitions[0].Param)
+	fixedResiduals := computeFixedResiduals(samples, sf.Order)
+	fixedBits := costFixed(sf.Order, bps, fixedResiduals, sf.RiceSubframe.Partitions[0].Param)
 
 	// Choose the smallest.
-	if constBits < verbatimBits && constBits < fixedBits {
+	switch {
+	case constBits < verbatimBits && constBits < fixedBits:
 		// Use constant encoding.
 		sf.Pred = frame.PredConstant
 		// No other metadata needed.
-	} else if fixedBits < verbatimBits {
-		// Keep fixed settings filled in by analyseFixed.
+	case fixedBits < verbatimBits:
+		// Keep fixed settings filled in by analyzeFixed.
 		sf.Pred = frame.PredFixed
-	} else {
-		// Stick with verbatim – restore defaults that analyseFixed may have overwritten.
+	default:
+		// Stick with verbatim – restore defaults that analyzeFixed may have
+		// overwritten.
 		sf.Pred = frame.PredVerbatim
 		sf.Order = 0
 		sf.RiceSubframe = nil
