@@ -18,12 +18,6 @@ import (
 //
 // Note: ignoring partition orders >0 and Rice2 for now.
 func analyzeFixed(sf *frame.Subframe, bps uint) {
-	// Guard against degenerate inputs. If there are fewer than two samples we
-	// simply keep verbatim encoding.
-	if len(sf.Samples) < 2 {
-		return
-	}
-
 	bestBits := int(^uint(0) >> 1) // max int
 	bestOrder := 0
 	bestK := uint(0)
@@ -148,6 +142,12 @@ func analyzeSubframe(sf *frame.Subframe, bps uint) {
 	samples := sf.Samples
 	n := len(samples)
 	if n == 0 {
+		return
+	}
+
+	// Guard against degenerate inputs. If there are fewer than two samples we
+	// simply keep verbatim encoding.
+	if n < 2 {
 		return
 	}
 
