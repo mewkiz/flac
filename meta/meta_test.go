@@ -2,6 +2,7 @@ package meta_test
 
 import (
 	"bytes"
+	"errors"
 	"io/ioutil"
 	"reflect"
 	"testing"
@@ -256,5 +257,55 @@ func TestMissingValue(t *testing.T) {
 	_, err := flac.ParseFile("testdata/missing-value.flac")
 	if err.Error() != `meta.Block.parseVorbisComment: unable to locate '=' in vector "title 2"` {
 		t.Fatal(err)
+	}
+}
+
+var MaliciousTooManyTags = []byte{
+		// "fLaC"
+		0x66, 0x4C, 0x61, 0x43,
+		// StreamInfo header: type=0, len=34 (0x22)
+		0x00, 0x00, 0x00, 0x22,
+		// StreamInfo body (34 bytes):
+		// BlockSizeMin=16, BlockSizeMax=16
+		0x00, 0x10, 0x00, 0x10,
+		// FrameSizeMin=0, FrameSizeMax=0
+		0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+		// 64-bit packed: sampleRate=1, channels=1, bitsPerSample=4, nSamples=0
+		0x00, 0x00, 0x10, 0x30, 0x00, 0x00, 0x00, 0x00,
+		// MD5 (16 zeros)
+		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+		// VorbisComment header: isLast=1,type=4,len=9
+		0x84, 0x00, 0x00, 0x09,
+		// vendor length = 1 (little endian)
+		0x01, 0x00, 0x00, 0x00,
+		// vendor string: "x"
+		0x78,
+		// tags list length = 4278190080 (little endian)
+		0x00, 0x00, 0x00, 0xff,
+	}
+
+func TestVorbisCommentTooManyTags(t *testing.T) {
+	_, err := flac.Parse(bytes.NewReader(MaliciousTooManyTags))
+	if !errors.Is(err, meta.ErrDeclaredBlockTooBig) {
+		t.Errorf("expected to detect malicious number of tags; actual error=%q", err)
+	}
+}
+
+// TestVorbisCommentTooManyTagsOOM is designed to parse corrupt or malicious data that may lead to out-of-memory problems.
+// It is skipped by default as it may cause instability during test runs.
+func TestVorbisCommentTooManyTagsOOM(t *testing.T) {
+	t.Skip()
+	for i := 0; i < 255; i++ {
+		// Parse full metadata stream
+		s, err := flac.Parse(bytes.NewReader(MaliciousTooManyTags))
+		if err != nil {
+			continue
+		}
+		for {
+			if _, err := s.ParseNext(); err != nil {
+				break
+			}
+		}
 	}
 }

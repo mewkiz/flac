@@ -2,8 +2,11 @@ package meta
 
 import (
 	"encoding/binary"
+	"fmt"
 	"io"
 )
+
+const maxPictureDataSize = 16 << 20 // 16 MB
 
 // Picture contains the image data of an embedded picture.
 //
@@ -111,6 +114,9 @@ func (block *Block) parsePicture() error {
 	}
 	if x == 0 {
 		return nil
+	}
+	if x > maxPictureDataSize {
+		return fmt.Errorf("meta.parsePicture: %w, picture data size=%d", ErrDeclaredBlockTooBig, x)
 	}
 
 	// (data length) bytes: Data.

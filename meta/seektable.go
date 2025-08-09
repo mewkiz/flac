@@ -6,6 +6,8 @@ import (
 	"fmt"
 )
 
+const maxSeekPoints = 10000
+
 // SeekTable contains one or more pre-calculated audio frame seek points.
 //
 // ref: https://www.xiph.org/flac/format.html#metadata_block_seektable
@@ -21,6 +23,9 @@ func (block *Block) parseSeekTable() error {
 	n := block.Length / 18
 	if n < 1 {
 		return errors.New("meta.Block.parseSeekTable: at least one seek point is required")
+	}
+	if n > maxSeekPoints {
+		return fmt.Errorf("meta.parseSeekTable: %w, number of seekpoints: %d", ErrDeclaredBlockTooBig, n)
 	}
 	table := &SeekTable{Points: make([]SeekPoint, n)}
 	block.Body = table
