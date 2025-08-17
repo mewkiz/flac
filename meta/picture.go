@@ -6,7 +6,7 @@ import (
 	"io"
 )
 
-const maxPictureDataSize = 16 << 20 // 16 MB
+const maxPictureDataSize = 128 << 20 // 128 MB
 
 // Picture contains the image data of an embedded picture.
 //
