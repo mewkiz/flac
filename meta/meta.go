@@ -78,8 +78,9 @@ func Parse(r io.Reader) (block *Block, err error) {
 
 // Errors returned by Parse.
 var (
-	ErrReservedType = errors.New("meta.Block.Parse: reserved block type")
-	ErrInvalidType  = errors.New("meta.Block.Parse: invalid block type")
+	ErrReservedType        = errors.New("meta.Block.Parse: reserved block type")
+	ErrInvalidType         = errors.New("meta.Block.Parse: invalid block type")
+	ErrDeclaredBlockTooBig = errors.New("declared block size is too big to allocate")
 )
 
 // Parse reads and parses the metadata block body.

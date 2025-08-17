@@ -6,6 +6,8 @@ import (
 	"strings"
 )
 
+const maxTags = 1024
+
 // VorbisComment contains a list of name-value pairs.
 //
 // ref: https://www.xiph.org/flac/format.html#metadata_block_vorbis_comment
@@ -38,6 +40,9 @@ func (block *Block) parseVorbisComment() (err error) {
 	// 32 bits: number of tags.
 	if err = binary.Read(block.lr, binary.LittleEndian, &x); err != nil {
 		return unexpected(err)
+	}
+	if x > maxTags {
+		return fmt.Errorf("meta.Block.parseVorbisComment: %w, tags number=%d", ErrDeclaredBlockTooBig, x)
 	}
 	if x < 1 {
 		return nil
