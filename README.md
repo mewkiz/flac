@@ -22,6 +22,9 @@ Documentation provided by GoDoc.
 
 ## Changes
 
+* Version 1.0.14 (TBA)
+    - Make parsing more robust against corrupt/malicious FLAC files (see [#77](https://github.com/mewkiz/flac/pull/77)). Thanks to [Alex Svetkin](https://github.com/whisk).
+
 * Version 1.0.13 (2025-07-11)
     - Add support for Fixed prediction encoding of FLAC subframes (see [#76](https://github.com/mewkiz/flac/pull/76)). Thanks to [Michael Braha](https://github.com/braheezy).
 
