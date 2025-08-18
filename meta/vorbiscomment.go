@@ -6,7 +6,7 @@ import (
 	"strings"
 )
 
-const maxTags = 1024
+const maxTags = 50000
 
 // VorbisComment contains a list of name-value pairs.
 //
@@ -42,7 +42,7 @@ func (block *Block) parseVorbisComment() (err error) {
 		return unexpected(err)
 	}
 	if x > maxTags {
-		return fmt.Errorf("meta.Block.parseVorbisComment: %w, tags number=%d", ErrDeclaredBlockTooBig, x)
+		return fmt.Errorf("meta.Block.parseVorbisComment: %w, number of tags=%d", ErrDeclaredBlockTooBig, x)
 	}
 	if x < 1 {
 		return nil
