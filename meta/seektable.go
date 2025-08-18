@@ -6,7 +6,7 @@ import (
 	"fmt"
 )
 
-const maxSeekPoints = 100000
+const maxSeekPoints = 1000000
 
 // SeekTable contains one or more pre-calculated audio frame seek points.
 //
