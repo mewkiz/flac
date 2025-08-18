@@ -1,3 +1,11 @@
+## Git Submodule
+
+To fetch the FLAC test files of the `testdata/flac-test-files` directory, run the following command:
+
+```bash
+git submodule update --init --recursive
+```
+
 ## Public domain
 
 The following testcase sounds have been released into the [public domain].
