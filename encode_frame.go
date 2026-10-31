@@ -15,6 +15,14 @@ import (
 
 // --- [ Frame ] ---------------------------------------------------------------
 
+// byteCounter counts the number of bytes written to it.
+type byteCounter uint32
+
+func (c *byteCounter) Write(p []byte) (int, error) {
+	*c += byteCounter(len(p))
+	return len(p), nil
+}
+
 // WriteFrame encodes the given audio frame to the output stream. The Num field
 // of the frame header is automatically calculated by the encoder.
 func (enc *Encoder) WriteFrame(f *frame.Frame) error {
@@ -36,7 +44,8 @@ func (enc *Encoder) WriteFrame(f *frame.Frame) error {
 	// Create a new CRC-16 hash writer which adds the data from all write
 	// operations to a running hash.
 	h := crc16.NewIBM()
-	hw := io.MultiWriter(h, enc.w)
+	var frameSize byteCounter
+	hw := io.MultiWriter(h, enc.w, &frameSize)
 
 	// Encode frame header.
 	f.Num = enc.curNum
@@ -46,15 +55,19 @@ func (enc *Encoder) WriteFrame(f *frame.Frame) error {
 		enc.curNum += uint64(nsamplesPerChannel)
 	}
 	enc.nsamples += uint64(nsamplesPerChannel)
-	blockSize := uint16(nsamplesPerChannel)
-	if enc.blockSizeMin == 0 || blockSize < enc.blockSizeMin {
-		enc.blockSizeMin = blockSize
+	blockSize := uint16(nsamplesPerChannel) // current block size
+	if enc.blockSizePrev != 0 {
+		// The STREAMINFO specification excludes the last block from blockSizeMin.
+		// Update blockSizeMin using the previous block size.
+		// ref: https://www.rfc-editor.org/rfc/rfc9639.html#section-8.2
+		if enc.blockSizeMin == 0 || enc.blockSizePrev < enc.blockSizeMin {
+			enc.blockSizeMin = enc.blockSizePrev
+		}
 	}
+	enc.blockSizePrev = blockSize // update the last block size
 	if enc.blockSizeMax == 0 || blockSize > enc.blockSizeMax {
 		enc.blockSizeMax = blockSize
 	}
-	// TODO: track number of bytes written to hw, to update values of
-	// frameSizeMin and frameSizeMax.
 	// Add unencoded audio samples to running MD5 hash.
 	f.Hash(enc.md5sum)
 	if err := enc.encodeFrameHeader(hw, f.Header); err != nil {
@@ -111,6 +124,13 @@ func (enc *Encoder) WriteFrame(f *frame.Frame) error {
 	crc := h.Sum16()
 	if err := binary.Write(enc.w, binary.BigEndian, crc); err != nil {
 		return errutil.Err(err)
+	}
+	size := uint32(frameSize) + 2
+	if enc.frameSizeMin == 0 || size < enc.frameSizeMin {
+		enc.frameSizeMin = size
+	}
+	if enc.frameSizeMax == 0 || size > enc.frameSizeMax {
+		enc.frameSizeMax = size
 	}
 
 	return nil

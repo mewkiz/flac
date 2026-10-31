@@ -6,6 +6,7 @@ import (
 	"io"
 	"io/ioutil"
 	"os"
+	"reflect"
 	"slices"
 	"testing"
 
@@ -32,7 +33,6 @@ var paths = []string{
 	"testdata/191885.flac",
 	"testdata/212768.flac",
 	"testdata/220014.flac", // prediction method 2 (Fixed)
-	"testdata/243749.flac", // prediction method 2 (Fixed)
 	"testdata/256529.flac",
 	"testdata/257344.flac",           // prediction method 3 (FIR)
 	"testdata/8297-275156-0011.flac", // prediction method 3 (FIR)
@@ -49,7 +49,6 @@ var paths = []string{
 	"testdata/191885_verbatim.flac", // verbatim
 	"testdata/212768_verbatim.flac", // verbatim
 	"testdata/220014_verbatim.flac", // verbatim
-	"testdata/243749_verbatim.flac", // verbatim
 	"testdata/256529_verbatim.flac", // verbatim
 	"testdata/257344_verbatim.flac", // verbatim
 	// IETF test cases.
@@ -119,8 +118,6 @@ var paths = []string{
 	// computed md5 hash of the decoded audio samples is identical
 	// (MD5: cdf531d4d4b95233986bc499518a89db). Thus, ignore the test case.
 	//"testdata/flac-test-files/subset/44 - 8-channel surround, 192kHz, 24 bit, using only 32nd order predictors.flac",
-	"testdata/flac-test-files/subset/45 - no total number of samples set.flac",
-	"testdata/flac-test-files/subset/46 - no min-max framesize set.flac",
 	"testdata/flac-test-files/subset/47 - only STREAMINFO.flac",
 	"testdata/flac-test-files/subset/48 - Extremely large SEEKTABLE.flac",
 	"testdata/flac-test-files/subset/49 - Extremely large PADDING.flac",
@@ -141,8 +138,19 @@ var paths = []string{
 	"testdata/flac-test-files/subset/64 - rice partitions with escape code zero.flac",
 }
 
+// nonStandardHeaderPaths lists files whose source StreamInfo are missing or invalid, and
+// therefore cannot be reproduced from the encoded frames
+var nonStandardHeaderPaths = []string{
+	"testdata/243749.flac",          // single 402-sample frame with BlockSizeMin/Max = 4096
+	"testdata/243749_verbatim.flac", // single 402-sample frame with BlockSizeMin/Max = 1152
+	"testdata/flac-test-files/subset/45 - no total number of samples set.flac",
+	"testdata/flac-test-files/subset/46 - no min-max framesize set.flac",
+}
+
+var allPaths = slices.Concat(paths, nonStandardHeaderPaths)
+
 func TestEncodeRoundTrip(t *testing.T) {
-	for _, path := range paths {
+	for _, path := range allPaths {
 		t.Run(path, func(t *testing.T) {
 			if !exists(path) {
 				t.Skipf("path %q does not exist", path)
@@ -193,67 +201,98 @@ func TestEncodeRoundTrip(t *testing.T) {
 }
 
 func TestEncodeComment(t *testing.T) {
-	// Decode FLAC file.
-	const path = "meta/testdata/input-VA.flac"
-	src, err := flac.ParseFile(path)
-	if err != nil {
-		t.Fatalf("unable to parse input FLAC file; %v", err)
+	commentPaths := []string{
+		"meta/testdata/input-SCVA.flac",
+		"meta/testdata/input-SCVPAP.flac",
+		"meta/testdata/input-VA.flac",
+		"meta/testdata/input-SCVAUP.flac",
+		"meta/testdata/input-SVAUP.flac",
 	}
-	defer src.Close()
-
-	// Add custom vorbis comment.
-	const want = "FLAC encoding test case"
-	for _, block := range src.Blocks {
-		if comment, ok := block.Body.(*meta.VorbisComment); ok {
-			comment.Vendor = want
-		}
-	}
-
-	// Open encoder for FLAC stream.
-	out := new(bytes.Buffer)
-	enc, err := flac.NewEncoder(out, src.Info, src.Blocks...)
-	if err != nil {
-		t.Fatalf("%q: unable to create encoder for FLAC stream; %v", path, err)
-	}
-	// Encode audio samples.
-	for {
-		frame, err := src.ParseNext()
-		if err != nil {
-			if err == io.EOF {
-				break
+	for _, path := range commentPaths {
+		t.Run(path, func(t *testing.T) {
+			// Decode FLAC file.
+			src, err := flac.ParseFile(path)
+			if err != nil {
+				t.Fatalf("%q: unable to parse input FLAC file; %v", path, err)
 			}
-			t.Fatalf("%q: unable to parse audio frame of FLAC stream; %v", path, err)
-		}
-		if err := enc.WriteFrame(frame); err != nil {
-			t.Fatalf("%q: unable to encode audio frame of FLAC stream; %v", path, err)
-		}
-	}
-	// Close encoder and flush pending writes.
-	if err := enc.Close(); err != nil {
-		t.Fatalf("%q: unable to close encoder for FLAC stream; %v", path, err)
-	}
+			defer src.Close()
 
-	// Parse encoded FLAC file.
-	stream, err := flac.Parse(out)
-	if err != nil {
-		t.Fatalf("unable to parse output FLAC file; %v", err)
-	}
-	defer stream.Close()
+			wantBlockSizeMax := src.Info.BlockSizeMax
+			wantNSamples := src.Info.NSamples
+			wantMD5sum := src.Info.MD5sum
+			src.Info.BlockSizeMax = 0
+			src.Info.NSamples = 0
+			src.Info.MD5sum = [16]byte{}
 
-	// Add custom vorbis comment.
-	for _, block := range stream.Blocks {
-		if comment, ok := block.Body.(*meta.VorbisComment); ok {
-			got := comment.Vendor
-			if got != want {
-				t.Errorf("Vorbis comment mismatch; expected %q, got %q", want, got)
-				continue
+			// Add custom vorbis comment.
+			const want = "FLAC encoding test case"
+			for _, block := range src.Blocks {
+				if comment, ok := block.Body.(*meta.VorbisComment); ok {
+					comment.Vendor = want
+				}
 			}
-		}
+
+			// Open encoder for FLAC stream.
+			out, err := os.CreateTemp(t.TempDir(), "*.flac")
+			if err != nil {
+				t.Fatalf("unable to create temp file; %v", err)
+			}
+			defer out.Close()
+			enc, err := flac.NewEncoder(out, src.Info, src.Blocks...)
+			if err != nil {
+				t.Fatalf("%q: unable to create encoder for FLAC stream; %v", path, err)
+			}
+			// Encode audio samples.
+			for {
+				frame, err := src.ParseNext()
+				if err != nil {
+					if err == io.EOF {
+						break
+					}
+					t.Fatalf("%q: unable to parse audio frame of FLAC stream; %v", path, err)
+				}
+				if err := enc.WriteFrame(frame); err != nil {
+					t.Fatalf("%q: unable to encode audio frame of FLAC stream; %v", path, err)
+				}
+			}
+			// Close encoder and flush pending writes.
+			if err := enc.Close(); err != nil {
+				t.Fatalf("%q: unable to close encoder for FLAC stream; %v", path, err)
+			}
+
+			// Parse encoded FLAC file.
+			stream, err := flac.ParseFile(out.Name())
+			if err != nil {
+				t.Fatalf("%q: unable to parse output FLAC file; %v", path, err)
+			}
+			defer stream.Close()
+
+			if stream.Info.BlockSizeMax != wantBlockSizeMax {
+				t.Errorf("%q: BlockSizeMax mismatch; expected %d, got %d", path, wantBlockSizeMax, stream.Info.BlockSizeMax)
+			}
+			if stream.Info.NSamples != wantNSamples {
+				t.Errorf("%q: NSamples mismatch; expected %d, got %d", path, wantNSamples, stream.Info.NSamples)
+			}
+			if stream.Info.MD5sum != wantMD5sum {
+				t.Errorf("%q: MD5sum mismatch; expected %x, got %x", path, wantMD5sum, stream.Info.MD5sum)
+			}
+
+			// Check custom vorbis comment.
+			for _, block := range stream.Blocks {
+				if comment, ok := block.Body.(*meta.VorbisComment); ok {
+					got := comment.Vendor
+					if got != want {
+						t.Errorf("%q: Vorbis comment mismatch; expected %q, got %q", path, want, got)
+						continue
+					}
+				}
+			}
+		})
 	}
 }
 
 func TestEncodeAnalysisFixed(t *testing.T) {
-	for _, path := range paths {
+	for _, path := range allPaths {
 		t.Run(path, func(t *testing.T) {
 			if !exists(path) {
 				t.Skipf("path %q does not exist", path)
@@ -323,6 +362,19 @@ func TestEncodeAnalysisFixed(t *testing.T) {
 				t.Fatalf("%q: unable to close encoded FLAC stream; %v", path, err)
 			}
 
+			if *gotStream.Info != *wantStream.Info {
+				t.Errorf("%q: StreamInfo mismatch; expected %+v, got %+v", path, wantStream.Info, gotStream.Info)
+			}
+			if len(gotStream.Blocks) != len(wantStream.Blocks) {
+				t.Fatalf("%q: metadata block count mismatch; expected %d, got %d", path, len(wantStream.Blocks), len(gotStream.Blocks))
+			}
+			for i := range wantStream.Blocks {
+				if gotStream.Blocks[i].Header != wantStream.Blocks[i].Header || !reflect.DeepEqual(gotStream.Blocks[i].Body, wantStream.Blocks[i].Body) {
+					t.Errorf("%q: metadata block %d mismatch; expected (%+v, %+v), got (%+v, %+v)",
+						path, i, wantStream.Blocks[i].Header, wantStream.Blocks[i].Body,
+						gotStream.Blocks[i].Header, gotStream.Blocks[i].Body)
+				}
+			}
 			if !slices.Equal(wantSamples, gotSamples) {
 				t.Fatalf("%q: content mismatch; expected %#v, got %#v", path, wantSamples, gotSamples)
 			}
@@ -356,4 +408,65 @@ func getSamples(stream *flac.Stream) ([]int32, error) {
 func exists(path string) bool {
 	_, err := os.Stat(path)
 	return err == nil
+}
+
+// TestEncodeRoundTripWriteSeeker verifies that round-trip decoding and encoding
+// a FLAC stream to an io.WriteSeeker updates StreamInfo accurately on Close.
+func TestEncodeRoundTripWriteSeeker(t *testing.T) {
+	// files with non-standard headers are not tested
+	for _, path := range paths {
+		t.Run(path, func(t *testing.T) {
+			if !exists(path) {
+				t.Skipf("path %q does not exist", path)
+			}
+			// Decode source file.
+			stream, err := flac.ParseFile(path)
+			if err != nil {
+				t.Fatalf("%q: unable to parse FLAC file; %v", path, err)
+			}
+			defer stream.Close()
+
+			// Open encoder for FLAC stream backed by an io.WriteSeeker.
+			out, err := os.CreateTemp(t.TempDir(), "*.flac")
+			if err != nil {
+				t.Fatalf("unable to create temp file; %v", err)
+			}
+			defer out.Close()
+
+			enc, err := flac.NewEncoder(out, stream.Info, stream.Blocks...)
+			if err != nil {
+				t.Fatalf("%q: unable to create encoder for FLAC stream; %v", path, err)
+			}
+			enc.EnablePredictionAnalysis(false)
+			for {
+				frame, err := stream.ParseNext()
+				if err != nil {
+					if err == io.EOF {
+						break
+					}
+					t.Fatalf("%q: unable to parse audio frame of FLAC stream; %v", path, err)
+				}
+				if err := enc.WriteFrame(frame); err != nil {
+					t.Fatalf("%q: unable to encode audio frame of FLAC stream; %v", path, err)
+				}
+			}
+			// Close encoder and flush pending writes.
+			if err := enc.Close(); err != nil {
+				t.Fatalf("%q: unable to close encoder for FLAC stream; %v", path, err)
+			}
+
+			// Compare source and destination FLAC streams.
+			want, err := os.ReadFile(path)
+			if err != nil {
+				t.Fatalf("%q: unable to read file; %v", path, err)
+			}
+			got, err := os.ReadFile(out.Name())
+			if err != nil {
+				t.Fatalf("%q: unable to read encoded file; %v", path, err)
+			}
+			if !bytes.Equal(got, want) {
+				t.Fatalf("%q: content mismatch; expected % X, got % X", path, want, got)
+			}
+		})
+	}
 }

@@ -18,6 +18,8 @@ type Encoder struct {
 	w io.Writer
 	// Minimum and maximum block size (in samples) of frames written by encoder.
 	blockSizeMin, blockSizeMax uint16
+	// Block size (in samples) of the most recently written frame.
+	blockSizePrev uint16
 	// Minimum and maximum frame size (in bytes) of frames written by encoder.
 	frameSizeMin, frameSizeMax uint32
 	// MD5 running hash of unencoded audio samples.
@@ -83,6 +85,9 @@ func (enc *Encoder) Close() error {
 			return errutil.Err(err)
 		}
 		// Update minimum and maximum block size (in samples) of FLAC stream.
+		if enc.blockSizeMin == 0 {
+			enc.blockSizeMin = enc.blockSizeMax
+		}
 		enc.Info.BlockSizeMin = enc.blockSizeMin
 		enc.Info.BlockSizeMax = enc.blockSizeMax
 		// Update minimum and maximum frame size (in bytes) of FLAC stream.
